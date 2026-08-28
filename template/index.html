@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skill Atlas</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: oklch(0.17 0.012 265);
+    --panel: oklch(0.213 0.014 265);
+    --panel-2: oklch(0.253 0.016 265);
+    --line: oklch(0.32 0.018 265);
+    --text: oklch(0.94 0.006 265);
+    --dim: oklch(0.7 0.014 265);
+    --dimmer: oklch(0.56 0.014 265);
+    --accent: oklch(0.75 0.14 220);
+    --ok: oklch(0.76 0.15 155);
+    --warn: oklch(0.8 0.14 80);
+    --off: oklch(0.68 0.13 25);
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  header {
+    padding: 22px 24px 14px; border-bottom: 1px solid var(--line);
+  }
+  h1 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; font-weight: 600; }
+  .sub { color: var(--dimmer); font-size: 12px; font-family: var(--mono); }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+    padding: 5px 10px; font-size: 12px; color: var(--dim);
+  }
+  .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 5; background: color-mix(in oklch, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--line);
+    padding: 12px 24px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .row1 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=search] {
+    flex: 1 1 280px; min-width: 200px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px;
+    font: 14px var(--sans); outline: none;
+  }
+  input[type=search]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
+  select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px; font: 13px var(--sans); outline: none;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .chip {
+    border: 1px solid var(--line); background: transparent; color: var(--dimmer);
+    border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer;
+    font-family: var(--mono); transition: background .12s, color .12s, border-color .12s;
+  }
+  .chip[aria-pressed="true"] { background: var(--panel-2); color: var(--text); border-color: var(--dim); }
+  .chip:hover { border-color: var(--accent); }
+  .chip-group-label { font-size: 11px; color: var(--dimmer); text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }
+  .linkbtn { background: none; border: 0; color: var(--accent); font-size: 12px; cursor: pointer; padding: 4px; }
+
+  main { display: grid; grid-template-columns: minmax(0,1fr) 420px; gap: 0; align-items: start; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } #detail { display: none; } }
+
+  .count { padding: 10px 24px 4px; color: var(--dimmer); font-size: 12px; font-family: var(--mono); }
+  ul.list { list-style: none; margin: 0; padding: 0 12px 60px 12px; }
+  li.item {
+    padding: 11px 12px; border-radius: 9px; cursor: pointer; border: 1px solid transparent;
+    display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 14px; align-items: baseline;
+  }
+  li.item:hover { background: var(--panel); }
+  li.item[aria-selected="true"] { background: var(--panel); border-color: var(--line); }
+  .nm { font-family: var(--mono); font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+  .desc {
+    grid-column: 1 / -1; color: var(--dim); font-size: 12.5px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .tags { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .02em; padding: 2px 7px;
+    border-radius: 5px; border: 1px solid var(--line); color: var(--dimmer); white-space: nowrap;
+  }
+  .tag.enabled { color: var(--ok); border-color: color-mix(in oklch, var(--ok) 40%, var(--line)); }
+  .tag.disabled { color: var(--off); border-color: color-mix(in oklch, var(--off) 40%, var(--line)); }
+  .tag.stale { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, var(--line)); }
+  .tag.manual { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 40%, var(--line)); }
+  mark { background: color-mix(in oklch, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; }
+
+  #detail {
+    position: sticky; top: 96px; align-self: start; border-left: 1px solid var(--line);
+    padding: 18px 22px 60px; max-height: calc(100vh - 96px); overflow: auto;
+  }
+  #detail h2 { margin: 0 0 2px; font-size: 17px; font-family: var(--mono); letter-spacing: -0.01em; }
+  #detail .invoke { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 12px; }
+  #detail p.d { color: var(--dim); font-size: 13px; margin: 0 0 16px; }
+  dl { display: grid; grid-template-columns: 108px minmax(0,1fr); gap: 6px 12px; margin: 0 0 18px; font-size: 12.5px; }
+  dt { color: var(--dimmer); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; padding-top: 1px; }
+  dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-word; }
+  pre.body {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--dim); white-space: pre-wrap;
+    max-height: 260px; overflow: auto; margin: 0;
+  }
+  .empty { color: var(--dimmer); font-size: 13px; padding: 40px 24px; }
+  kbd { font-family: var(--mono); font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Skill Atlas</h1>
+  <div class="sub" id="meta"></div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="toolbar">
+  <div class="row1">
+    <input type="search" id="q" placeholder="Search name, description, plugin, path…  (press / )" autocomplete="off" spellcheck="false">
+    <select id="sort">
+      <option value="name">Name A→Z</option>
+      <option value="-name">Name Z→A</option>
+      <option value="-modified">Recently modified</option>
+      <option value="modified">Oldest modified</option>
+      <option value="-words">Longest</option>
+      <option value="words">Shortest</option>
+      <option value="scope">Scope, then name</option>
+      <option value="status">Status, then name</option>
+      <option value="plugin">Plugin, then name</option>
+    </select>
+    <button class="linkbtn" id="reset">Reset filters</button>
+  </div>
+  <div class="chips" id="filters"></div>
+</div>
+
+<div class="count" id="count"></div>
+<main>
+  <ul class="list" id="list"></ul>
+  <aside id="detail"><div class="empty">Select a skill to see its full record.</div></aside>
+</main>
+
+<script id="data" type="application/json">__SKILL_ATLAS_DATA__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const SKILLS = DATA.skills;
+
+// Chips that start off: worktree/project copies and superseded plugin versions bury the live set.
+const DEFAULT_OFF = new Set(['scope:project', 'status:stale']);
+const GROUPS = [
+  ['scope', 'Scope', s => s.scope],
+  ['status', 'Status', s => s.status],
+  ['invocation', 'Invocation', s => s.invocation],
+];
+
+const active = new Map();
+for (const [key, , get] of GROUPS) {
+  const values = [...new Set(SKILLS.map(get))].sort();
+  active.set(key, new Set(values.filter(v => !DEFAULT_OFF.has(key + ':' + v))));
+}
+
+const el = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function haystack(s) {
+  return [s.name, s.invoke, s.description, s.plugin, s.marketplace, s.project,
+          s.path, s.scope, s.status, (s.allowed_tools||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+}
+SKILLS.forEach(s => s._hay = haystack(s));
+
+function highlight(text, terms) {
+  let out = esc(text);
+  for (const t of terms) {
+    if (t.length < 2) continue;
+    out = out.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
+  }
+  return out;
+}
+
+function renderFilters() {
+  el('filters').innerHTML = GROUPS.map(([key, label, get]) => {
+    const values = [...new Set(SKILLS.map(get))].sort();
+    const chips = values.map(v => {
+      const n = SKILLS.filter(s => get(s) === v).length;
+      const on = active.get(key).has(v);
+      return `<button class="chip" data-group="${key}" data-value="${esc(v)}" aria-pressed="${on}">${esc(v)} ${n}</button>`;
+    }).join('');
+    return `<span class="chip-group-label">${label}</span>${chips}`;
+  }).join('<span style="width:10px"></span>');
+}
+
+function currentSet() {
+  const terms = el('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  let rows = SKILLS.filter(s => GROUPS.every(([key, , get]) => active.get(key).has(get(s))));
+  if (terms.length) rows = rows.filter(s => terms.every(t => s._hay.includes(t)));
+
+  const sort = el('sort').value;
+  const dir = sort.startsWith('-') ? -1 : 1;
+  const key = sort.replace(/^-/, '');
+  const byName = (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  rows.sort((a, b) => {
+    if (key === 'name') return dir * byName(a, b);
+    if (key === 'words') return dir * (a.words - b.words) || byName(a, b);
+    if (key === 'modified') return dir * a.modified.localeCompare(b.modified) || byName(a, b);
+    return String(a[key] || '~').localeCompare(String(b[key] || '~')) || byName(a, b);
+  });
+  return { rows, terms };
+}
+
+let selected = null;
+
+function render() {
+  const { rows, terms } = currentSet();
+  el('count').textContent = `${rows.length} shown of ${SKILLS.length} scanned`;
+  el('list').innerHTML = rows.map((s, i) => {
+    const tags = [
+      `<span class="tag ${esc(s.status)}">${esc(s.status)}</span>`,
+      s.manual_only ? '<span class="tag manual">manual only</span>' : '',
+      s.plugin ? `<span class="tag">${esc(s.plugin)}</span>` : '',
+      s.project ? `<span class="tag">${esc(s.project)}</span>` : '',
+      `<span class="tag">${esc(s.scope)}</span>`,
+    ].join('');
+    return `<li class="item" data-i="${SKILLS.indexOf(s)}" aria-selected="${s === selected}" tabindex="0">
+      <span class="nm">${highlight(s.invoke, terms)}</span>
+      <span class="tags">${tags}</span>
+      <span class="desc">${highlight(s.description || '(no description)', terms)}</span>
+    </li>`;
+  }).join('') || '<li class="empty">Nothing matches.</li>';
+}
+
+function field(label, value) {
+  if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return '';
+  return `<dt>${esc(label)}</dt><dd>${esc(Array.isArray(value) ? value.join(', ') : value)}</dd>`;
+}
+
+function renderDetail(s) {
+  const o = s.origin || {};
+  const ms = s.marketplace_source || {};
+  el('detail').innerHTML = `
+    <h2>${esc(s.name)}</h2>
+    <div class="invoke">/${esc(s.invoke)}</div>
+    <p class="d">${esc(s.description || '(no description)')}</p>
+    <dl>
+      ${field('Status', s.status)}
+      ${field('Scope', s.scope)}
+      ${field('Invocation', s.invocation)}
+      ${field('Config roots', s.config_roots)}
+      ${field('Plugin', s.plugin_ref)}
+      ${field('Plugin ver', s.plugin_version)}
+      ${field('Marketplace', ms.url || ms.path || s.marketplace)}
+      ${field('Commit', s.commit)}
+      ${field('Installed', (s.installed_at || o.installedAt || '').slice(0, 10))}
+      ${field('Updated', (s.last_updated || o.updatedAt || '').slice(0, 10))}
+      ${field('Upstream', o.sourceUrl || o.source)}
+      ${field('Project', s.project_path || s.plugin_project)}
+      ${field('Version', s.version)}
+      ${field('License', s.license)}
+      ${field('Model', s.model)}
+      ${field('Tools', s.allowed_tools)}
+      ${field('Args', s.argument_hint)}
+      ${field('Modified', s.modified.slice(0, 16).replace('T', ' '))}
+      ${field('Size', `${s.words} words · ${s.headings} sections`)}
+      ${field('Bundle', `${s.file_count} files · ${(s.bytes / 1024).toFixed(1)} KB${s.subdirs.length ? ' · ' + s.subdirs.join('/') : ''}`)}
+      ${field('Path', s.path)}
+    </dl>
+    ${Object.keys(s.extra_frontmatter || {}).length ? `<dl>${Object.entries(s.extra_frontmatter).map(([k, v]) => field(k, typeof v === 'object' ? JSON.stringify(v) : v)).join('')}</dl>` : ''}
+    <pre class="body">${esc(s.body_preview)}</pre>`;
+}
+
+el('list').addEventListener('click', e => {
+  const li = e.target.closest('li.item');
+  if (!li) return;
+  selected = SKILLS[+li.dataset.i];
+  render();
+  renderDetail(selected);
+});
+el('q').addEventListener('input', render);
+el('sort').addEventListener('change', render);
+el('filters').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const set = active.get(chip.dataset.group);
+  set.has(chip.dataset.value) ? set.delete(chip.dataset.value) : set.add(chip.dataset.value);
+  renderFilters(); render();
+});
+el('reset').addEventListener('click', () => {
+  el('q').value = '';
+  for (const [key, , get] of GROUPS) {
+    active.set(key, new Set([...new Set(SKILLS.map(get))].filter(v => !DEFAULT_OFF.has(key + ':' + v))));
+  }
+  renderFilters(); render();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== el('q')) { e.preventDefault(); el('q').focus(); el('q').select(); }
+  if (e.key === 'Escape') { el('q').value = ''; render(); el('q').blur(); }
+});
+
+const counts = {};
+for (const s of SKILLS) counts[s.status] = (counts[s.status] || 0) + 1;
+el('meta').textContent = `${DATA.host} · scanned ${DATA.generated_at.slice(0, 16).replace('T', ' ')} · roots: ${Object.values(DATA.config_roots).join('  ')}`;
+el('stats').innerHTML = [
+  `<span class="stat"><b>${SKILLS.length}</b> skills</span>`,
+  ...Object.entries(counts).sort().map(([k, v]) => `<span class="stat">${k} <b>${v}</b></span>`),
+  `<span class="stat">manual only <b>${SKILLS.filter(s => s.manual_only).length}</b></span>`,
+  DATA.bundled_skills_disabled ? '<span class="stat">bundled skills <b>off</b></span>' : '',
+].join('');
+
+renderFilters();
+render();
+</script>
+</body>
+</html>

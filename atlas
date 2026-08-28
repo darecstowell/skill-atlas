@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Rebuild the atlas from the live config and open it.
+set -euo pipefail
+cd "$(dirname "$0")"
+exec python3 build.py --open "$@"
