@@ -38,7 +38,7 @@ def trash(names: list[str], roots: list[Path]) -> dict:
     """Move each skill folder to the Trash and drop its lock entries and on/off setting."""
     npx_lock = skill_lock_path(roots[0])
     skills_dir = npx_lock.parent / "skills"
-    record = {"folders": {}, "locks": {}, "settings": {}}
+    record: dict[str, dict] = {"folders": {}, "locks": {}, "settings": {}}
 
     for name in names:
         src = skills_dir / name

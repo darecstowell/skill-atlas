@@ -1,101 +1,150 @@
-# Skill Atlas
+<p align="center">
+  <img src="assets/banner.png" alt="Skill Atlas" width="100%">
+</p>
 
-A browsable inventory of every Claude Code skill installed on this machine. Run it whenever you
-want to see what you have, what is switched on, and where it came from.
+<p align="center">
+  <a href="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml"><img src="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.9%2B-3776AB" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/dependencies-none-6CB2E8" alt="No dependencies">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B97A3" alt="MIT license"></a>
+</p>
+
+Skill Atlas shows every Claude Code skill on your machine on one local page. You can turn skills
+on and off, update them from GitHub, install new skills from the repos you follow, and move old
+skills to the Trash.
+
+<p align="center">
+  <img src="assets/screenshot.png" alt="Skill Atlas, grouped by source, with updates and available skills" width="900">
+</p>
+
+## Quick start
 
 ```bash
-./atlas            # serve on 127.0.0.1:7381 with working switches, open in the browser
-python3 build.py   # rebuild only
-python3 build.py --json > skills.json   # raw records to stdout
+git clone https://github.com/darecstowell/skill-atlas.git
+cd skill-atlas
+./atlas
 ```
 
-No dependencies. Python 3.9 or later, standard library only.
+`./atlas` starts a server on `127.0.0.1:7381` and opens the page. It needs Python 3.9 or later and
+nothing else. For a short command, add an alias:
 
-## What it scans
+```bash
+alias atlas='~/path/to/skill-atlas/atlas'
+```
 
-`config.json` names the roots. Defaults:
+## What it does
 
-| Source | Where | Notes |
+| | |
+| --- | --- |
+| **See everything** | Personal, plugin, and project skills in one list, grouped by the repo they came from. Search covers names, descriptions, sources, and paths. |
+| **Switch skills on and off** | One switch per skill, per source, or per plugin. Changes go to `settings.json`, with a backup made first. |
+| **Update from GitHub** | Marks skills whose upstream folder changed. Update one skill, one source, or all. About 40 skills update in 3 seconds. |
+| **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
+| **Tidy up** | Delete moves a skill to the macOS Trash, with Undo. A **same as** tag marks skills with the same description. |
+
+## How it works
+
+**Sources.** A skill is tracked when it has a GitHub source in `~/.agents/.skill-lock.json`
+(written by `npx skills`) or in `~/.agents/.atlas-lock.json` (written by **Link to GitHub…**).
+Untracked skills that share a name prefix, such as `emil-*`, get their own group.
+
+**Update checks.** On load, the atlas reads each source repo's file tree from GitHub (through `gh`,
+then anonymous HTTPS). A skill is out of date when its folder SHA is different from the SHA in the
+lock. Results stay in a cache for 10 minutes; **Check again** refreshes them.
+
+**Updates and installs.** The atlas downloads one tarball per repo, swaps each skill folder through
+a staged copy, and writes the new SHA back to the lock. `npx skills` stays in step.
+
+**Local edits are safe.** A skill whose folder no longer matches its lock is tagged **edited**.
+Batch updates skip it. Its own Update button asks first, because an update replaces the whole
+folder.
+
+**New skills.** The first check of a repo records a baseline. After that, skills added upstream
+get a **new** tag. **Dismiss** clears the tag. **Watch a source…** follows a repo that has none of
+its skills installed yet.
+
+## Switches
+
+| Switch | Writes | Scope |
 | --- | --- | --- |
-| Personal skills | `<config root>/skills` | Symlinks are resolved, so one skill shared by two roots is listed once. |
-| Plugin skills | `<config root>/plugins/cache/<marketplace>/<plugin>/<version>/skills` | Every cached version, live or superseded. |
-| Project skills | `<project root>/**/.claude/skills` and `.agents/skills` | Depth is capped by `project_scan_depth`. |
+| Skill | `skillOverrides` in `settings.json` | One personal skill |
+| Source | `skillOverrides` for each skill in the group | All skills from one repo |
+| Plugin | `enabledPlugins` in `settings.json` | A whole plugin. Plugin skills cannot be turned off one by one. |
 
-Bundled skills that ship inside the Claude Code binary are not on disk, so they cannot be scanned.
-The header says whether `disableBundledSkills` is set.
+When you have more than one config root, the root picker sets which settings file to change
+(`personal` is `~/.claude`, `work` is `~/.claude-work`). Restart Claude Code sessions to load a
+change.
 
-## What "status" means
+## Keyboard
 
-- **enabled** — a personal skill, or a plugin skill whose plugin is `true` in `enabledPlugins`.
-- **disabled** — the plugin is installed but set to `false` in `enabledPlugins`.
-- **installed** — the plugin is installed and has no entry in `enabledPlugins`.
-- **stale** — a cached plugin version that is not the one recorded in `installed_plugins.json`.
-- **project-only** — a skill that loads only while you work inside that project.
+| Key | Action |
+| --- | --- |
+| `/` or `⌘K` | Search |
+| `j` / `k` | Move between skills |
+| `Enter` | Open the detail panel |
+| `x` or `Space` | Turn the skill on or off |
+| `u` | Update the skill |
+| `i` | Install an available skill |
+| `c` | Compact rows |
+| `⌘Z` | Undo the last change |
+| `?` | All shortcuts |
 
-Personal skills have no per-skill off switch, so they always read as enabled. The separate
-**invocation** field is the real gate on their behaviour: `disable-model-invocation: true` in the
-frontmatter means only you can call the skill by name, and the model will never reach for it.
+## Configuration
 
-## Reading the page
+`config.json` sets where the atlas looks:
 
-Skills are grouped as your skills, plugins, and project skills. Use the switch at the top to pick
-which settings file (`personal` or `work`) the page reads. By source splits your skills by the repo they were
-installed from; each source has a switch that turns all of its skills on or off together. Search matches name, description, plugin,
-project, and path. Terms are ANDed. All / On / Off filters by the current state.
+```json
+{
+  "config_roots": { "personal": "~/.claude", "work": "~/.claude-work" },
+  "project_roots": ["~/Documents/dev-personal", "~/Documents/dev"],
+  "project_scan_depth": 3
+}
+```
 
-Project skills and old plugin versions are hidden at first. Check the boxes to show them.
+| Source | Where |
+| --- | --- |
+| Personal skills | `<config root>/skills`. Symlinks are resolved, so a skill shared by two roots shows once. |
+| Plugin skills | `<config root>/plugins/cache/<marketplace>/<plugin>/<version>/skills` |
+| Project skills | `<project root>/**/.claude/skills` and `.agents/skills`, down to `project_scan_depth` |
 
-`./atlas` serves the page with working switches. Each change writes the chosen root's
-`settings.json` and keeps a one-time backup at `settings.json.atlas-bak`. Restart Claude Code
-sessions to pick up a change. The page built by `build.py` is read-only. The switches show the state of `skillOverrides` (one
-personal skill) and `enabledPlugins` (a whole plugin). Plugin skills cannot be turned off one by one.
+Bundled skills are inside the Claude Code binary, not on disk, so the atlas cannot list them.
 
-## Updates
+## Safety
 
-A skill is tracked when it has a GitHub source in `~/.agents/.skill-lock.json` (written by
-`npx skills`) or in `~/.agents/.atlas-lock.json` (written here, by **Link to GitHub…**). Linking
-finds the folder in the repo with the same name as the skill.
+- The server binds to `127.0.0.1` only. Each API call must send a token that changes every time
+  the server starts, so other web pages cannot call it.
+- In `settings.json`, the atlas changes only `skillOverrides` and `enabledPlugins`. It makes a
+  one-time backup at `settings.json.atlas-bak` before the first write.
+- Deletes go to the macOS Trash, never `rm`.
+- Plugin skills are not checked for updates.
 
-On load, `./atlas` reads each source repo's tree from GitHub (through `gh`, then anonymous HTTPS)
-and marks a skill out of date when its folder SHA differs from the lock. Results are cached for 10
-minutes; "Check again" refreshes them.
+## Without the server
 
-Updates download one tarball per repo from codeload.github.com, swap each skill folder in place,
-and write the new SHA back to the lock the skill came from, so `npx skills` stays in step. A skill
-whose folder no longer matches its lock is tagged **edited**: batch updates skip it, and its own
-Update button asks you to confirm, because an update replaces the whole folder.
+```bash
+python3 build.py                        # write a read-only page to out/index.html
+python3 build.py --json > skills.json   # print the raw records
+```
 
-Plugin skills are not checked.
+## Development
 
-## New skills
+The tool uses only the Python standard library. Dev tools run through
+[uv](https://docs.astral.sh/uv/):
 
-Each update check also lists the skills a source repo offers that you have not installed. They show
-under **Available from <repo>** at the end of that repo's group. A skill is **new** when its path
-appeared upstream after the atlas last looked at the repo; the first look only records a baseline.
-**Dismiss** marks the new ones as seen; they stay available. The header chip and the **New** filter
-show every new skill across your sources. Install downloads one tarball per repo and records the
-skill in the same lock as its siblings, so it gets update checks like the rest.
+```bash
+uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
+```
 
-**Watch a source…** follows a repo that has none of its skills installed yet. Watched repos, and the
-paths already seen for each repo, live in `~/.agents/.atlas-lock.json` under `sources` and `seen`.
+| File | Job |
+| --- | --- |
+| `scan.py` | Reads the config roots and makes one record per skill |
+| `serve.py` | Local server and the only writer of `settings.json` |
+| `updates.py` | Update checks, updates, installs, and watched sources |
+| `remove.py` | Moves skills to the Trash, and puts them back |
+| `build.py` | Puts the records into `template/index.html` |
+| `template/index.html` | The page: one file of HTML, CSS, and JavaScript |
 
-## Groups and deleting
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
-By source groups skills by repo. Untracked skills that share a name prefix (three or more, such as
-`emil-*`) get their own group. A **same as** tag marks skills whose description matches another one.
+## License
 
-Delete moves a skill folder to the macOS Trash and removes its lock entries and `skillOverrides`
-setting. The toast offers Undo for the last delete.
-
-## Keys
-
-`/` or `⌘K` search · `j`/`k` or arrows move · `Enter` opens the detail panel · `x` or `Space` turns
-a skill on or off · `u` updates it · `c` compact rows · `?` all shortcuts · `Esc` clears or closes ·
-`⌘Z` undoes the last change while its toast shows.
-
-## Layout
-
-- `scan.py` — reads the config roots and returns one record per skill.
-- `build.py` — writes `out/skills.json` and inlines it into `out/index.html`.
-- `template/index.html` — the viewer, with a `__SKILL_ATLAS_DATA__` placeholder.
-- `out/` — generated, not tracked.
+[MIT](LICENSE)

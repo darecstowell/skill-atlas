@@ -85,13 +85,13 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
             while i < end and (not lines[i].strip() or lines[i][:1] in (" ", "\t")):
                 child_lines.append(lines[i])
                 i += 1
-            items = [l.strip()[2:].strip() for l in child_lines if l.strip().startswith("- ")]
+            items = [c.strip()[2:].strip() for c in child_lines if c.strip().startswith("- ")]
             if items:
                 data[key] = [_unquote(v) for v in items]
             else:
                 child: dict = {}
-                for l in child_lines:
-                    cm = SCALAR_KEY.match(l.strip())
+                for c in child_lines:
+                    cm = SCALAR_KEY.match(c.strip())
                     if cm:
                         child[cm.group(1)] = _unquote(cm.group(2))
                 data[key] = child
@@ -136,12 +136,14 @@ class HostConfig:
     marketplaces: dict = field(default_factory=dict)
 
     @classmethod
-    def load(cls, label: str, root: Path) -> "HostConfig":
+    def load(cls, label: str, root: Path) -> HostConfig:
         return cls(
             label=label,
             root=root,
             settings=read_json(root / "settings.json"),
-            installed_plugins=read_json(root / "plugins" / "installed_plugins.json").get("plugins", {}),
+            installed_plugins=read_json(root / "plugins" / "installed_plugins.json").get(
+                "plugins", {}
+            ),
             marketplaces=read_json(root / "plugins" / "known_marketplaces.json"),
         )
 
@@ -215,11 +217,23 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
     text = skill_md.read_text(errors="replace")
     fm, body = parse_frontmatter(text)
     skill_dir = skill_md.parent
-    meta = fm.get("metadata") if isinstance(fm.get("metadata"), dict) else {}
+    meta = fm.get("metadata")
+    if not isinstance(meta, dict):
+        meta = {}
 
     known = {
-        "name", "description", "metadata", "license", "allowed-tools", "argument-hint",
-        "references", "inputs", "version", "model", "compatibility", "disable-model-invocation",
+        "name",
+        "description",
+        "metadata",
+        "license",
+        "allowed-tools",
+        "argument-hint",
+        "references",
+        "inputs",
+        "version",
+        "model",
+        "compatibility",
+        "disable-model-invocation",
     }
     stat = skill_md.stat()
     headings = len(re.findall(r"^##+ ", body, re.M))
@@ -243,7 +257,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "words": len(body.split()),
         "headings": headings,
         "extra_frontmatter": {k: v for k, v in fm.items() if k not in known},
-        "body_preview": "\n".join(l for l in body.split("\n") if l.strip())[:600],
+        "body_preview": "\n".join(ln for ln in body.split("\n") if ln.strip())[:600],
     }
     rec.update(bundle_stats(skill_dir))
     rec.update(extra)
@@ -295,7 +309,10 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
             enabled = host.plugin_enabled(ref)
             for version_dir in sorted(p for p in plugin_dir.iterdir() if p.is_dir()):
                 is_live = str(version_dir) in live_paths
-                install = next((i for i in installs if i.get("installPath") == str(version_dir)), {})
+                install = next(
+                    (i for i in installs if i.get("installPath") == str(version_dir)),
+                    {},
+                )
                 if not is_live:
                     status = "stale"
                 elif enabled is False:
@@ -317,7 +334,9 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                         plugin=plugin_dir.name,
                         plugin_ref=ref,
                         marketplace=marketplace_dir.name,
-                        marketplace_source=(host.marketplaces.get(marketplace_dir.name) or {}).get("source", {}),
+                        marketplace_source=(host.marketplaces.get(marketplace_dir.name) or {}).get(
+                            "source", {}
+                        ),
                         plugin_version=version_dir.name,
                         plugin_scope=install.get("scope", ""),
                         plugin_project=install.get("projectPath", ""),
@@ -337,31 +356,31 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
     for root in project_roots:
         if not root.exists():
             continue
-        candidates = []
+        candidates: list[Path] = []
         for holder in (".claude", ".agents"):
             for level in range(1, max(depth, 1) + 1):
                 candidates += root.glob("/".join(["*"] * level) + f"/{holder}/skills")
         for skills_dir in sorted(set(candidates)):
-                holder = skills_dir.parent.name
-                if not skills_dir.is_dir():
+            holder = skills_dir.parent.name
+            if not skills_dir.is_dir():
+                continue
+            project_dir = skills_dir.parent.parent
+            for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+                key = str(skill_md.resolve())
+                if key in seen:
                     continue
-                project_dir = skills_dir.parent.parent
-                for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
-                    key = str(skill_md.resolve())
-                    if key in seen:
-                        continue
-                    rec = build_record(
-                        skill_md,
-                        scope="project",
-                        config_roots=[],
-                        status="project-only",
-                        project=project_dir.name,
-                        project_path=str(project_dir),
-                        holder=holder,
-                        source_root=str(skills_dir),
-                    )
-                    seen[key] = rec
-                    out.append(rec)
+                rec = build_record(
+                    skill_md,
+                    scope="project",
+                    config_roots=[],
+                    status="project-only",
+                    project=project_dir.name,
+                    project_path=str(project_dir),
+                    holder=holder,
+                    source_root=str(skills_dir),
+                )
+                seen[key] = rec
+                out.append(rec)
     return out
 
 
@@ -389,7 +408,9 @@ def scan(repo: Path) -> dict:
         skills_dir = host.root / "skills"
         if skills_dir.exists():
             # Skills linked in the atlas first, so the npx lock wins on a clash.
-            lock_index.update(read_json(skill_lock_path(host.root).with_name(ATLAS_LOCK)).get("skills", {}))
+            lock_index.update(
+                read_json(skill_lock_path(host.root).with_name(ATLAS_LOCK)).get("skills", {})
+            )
             lock_index.update(read_json(skill_lock_path(host.root)).get("skills", {}))
 
     seen: dict = {}

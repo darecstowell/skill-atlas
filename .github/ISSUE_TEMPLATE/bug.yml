@@ -1,0 +1,22 @@
+name: Bug report
+description: Something in the atlas does not work as described.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Setup
+      description: macOS version, Python version, and Claude Code version.
+      placeholder: macOS 15.5 · Python 3.12 · Claude Code 2.1
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console or terminal output
+      render: text

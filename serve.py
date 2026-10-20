@@ -80,7 +80,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/data":
             return self._json(200, scan(REPO))
         if path == "/api/updates":
-            return self._json(200, updates.check(list(ROOTS.values()), refresh="refresh=1" in query))
+            return self._json(
+                200, updates.check(list(ROOTS.values()), refresh="refresh=1" in query)
+            )
         if path.startswith("/api/jobs/") and path[10:] in updates.JOBS:
             return self._json(200, updates.job_view(updates.JOBS[path[10:]]))
         self._send(404, b"not found", "text/plain")
@@ -103,11 +105,21 @@ class Handler(BaseHTTPRequestHandler):
                 subprocess.run(["open", "-R", path], check=False)
                 return self._json(200, {"ok": True})
             if self.path == "/api/watch":
-                return self._json(200, updates.watch(str(req["repo"]), bool(req.get("on", True)), list(ROOTS.values())))
+                return self._json(
+                    200,
+                    updates.watch(
+                        str(req["repo"]),
+                        bool(req.get("on", True)),
+                        list(ROOTS.values()),
+                    ),
+                )
             if self.path in ("/api/available", "/api/install", "/api/dismiss"):
                 repo = updates.parse_repo(str(req["repo"]))
                 paths = [str(x) for x in req["paths"]]
-                if not paths or any(x.startswith("/") or ".." in x.split("/") or not x.endswith("SKILL.md") for x in paths):
+                if not paths or any(
+                    x.startswith("/") or ".." in x.split("/") or not x.endswith("SKILL.md")
+                    for x in paths
+                ):
                     raise ValueError("bad skill paths")
                 roots = list(ROOTS.values())
                 if self.path == "/api/available":

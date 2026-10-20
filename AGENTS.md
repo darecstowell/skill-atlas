@@ -4,7 +4,8 @@ A local tool that inventories installed Claude Code skills. Read `README.md` fir
 
 ## Rules
 
-- Standard library only. No dependencies, no build step, no package manager.
+- Standard library only at run time. No dependencies, no build step. Dev tools (ruff, mypy,
+  pytest) run through `uv run`; see `CONTRIBUTING.md`. Run all four checks before you commit.
 - `scan.py` reads the host config; it never writes to `~/.claude` or `~/.claude-work`.
 - `serve.py` is the only writer. It changes `skillOverrides` and `enabledPlugins` in a root's
   `settings.json` and nothing else, keeps a one-time `settings.json.atlas-bak`, and binds to 127.0.0.1.
