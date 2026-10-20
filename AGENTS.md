@@ -10,7 +10,10 @@ A local tool that inventories installed Claude Code skills. Read `README.md` fir
   `settings.json` and nothing else, keeps a one-time `settings.json.atlas-bak`, and binds to 127.0.0.1.
 - `updates.py` and `remove.py` are the only code that changes skill folders. Updates swap a folder
   through a staged copy; deletes move it to `~/.Trash`, never `rm`. Both keep the npx lock and
-  `.atlas-lock.json` in step, and touch no other key in them.
+  `.atlas-lock.json` in step, and touch no other key in them. Installs from a source go through
+  the same staged copy and never replace an existing folder.
+- `.atlas-lock.json` also holds `sources` (watched repos) and `seen` (paths per repo). Only
+  `updates.py` writes them.
 - `out/` is generated. Never hand-edit it, and never track it.
 - The frontmatter parser in `scan.py` covers the YAML subset that real skills use. Widen it when a
   skill fails to parse, rather than adding a YAML dependency.

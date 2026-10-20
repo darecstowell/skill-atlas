@@ -154,7 +154,7 @@
   }
   .sec-head .fold { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .sec-head .fold .n { font-weight: 500; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
-  .sec-head .tools { margin-left: auto; }
+  .sec-head .tools { margin-left: auto; display: flex; gap: var(--s4); }
 
   .fold {
     position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0;
@@ -244,6 +244,29 @@
   .tick { width: 12px; height: 12px; }
   .is-queued .uicon { display: none; }
   @keyframes spin { to { rotate: 360deg; } }
+
+  /* ---------- available from a source ---------- */
+  .chip {
+    position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0;
+    border-radius: var(--r-pill); background: var(--tint-accent); color: var(--accent); font: 500 12px var(--sans); white-space: nowrap; cursor: pointer;
+    transition: background-color 120ms ease, scale 150ms var(--ease-out);
+  }
+  .chip::before { content: ""; position: absolute; inset: -8px -2px; }
+  .chip:hover { background: color-mix(in oklch, var(--accent) 24%, var(--surface-1)); }
+  .chip:active { scale: .96; }
+  .gnew { flex: none; }
+  .avail-head {
+    display: flex; align-items: center; gap: var(--s2); min-height: 36px; padding: 0 var(--s2) 0 15px; margin-top: 2px;
+    border-top: 1px dashed var(--border);
+  }
+  .avail-head .fold { font-size: 12px; color: var(--text-3); }
+  .avail-head .fold .n { font-variant-numeric: tabular-nums; }
+  .avail-head .gctl { margin-left: auto; }
+  .avail-note { margin: 0; padding: 10px 15px 12px; font-size: 12px; color: var(--text-3); }
+  .row.avail .nmt { color: var(--text-2); }
+  .row.avail[data-st="outdated"] .nmt { color: var(--text); }
+  .skel { display: inline-block; width: min(55%, 360px); height: 8px; border-radius: 3px; background: var(--surface-2); vertical-align: middle; }
+  .aerr { color: var(--text-3); }
 
   /* ---------- switch ---------- */
   .switch {
@@ -440,6 +463,7 @@
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
       <button data-v="off" aria-pressed="false">Off <span class="n" data-n="off"></span></button>
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
+      <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
     </div>
     <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
       <button data-g="source" aria-pressed="true">By source</button>
@@ -489,7 +513,7 @@ const ui = {
   root: ROOT_LABELS[0], view: 'all', q: '', showProject: false, showStale: false, selected: null,
   groupBy: localStorage.getItem('atlas.groupBy') || 'source',
   compact: localStorage.getItem('atlas.compact') === '1',
-  menu: null, confirm: null, linkOpen: null, linkErr: null, previewOpen: false, descOpen: false, restored: new Set(),
+  menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, previewOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
 const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
@@ -544,7 +568,7 @@ function index() {
 index();
 
 // Update state for GitHub-tracked skills, keyed by their lock name (the folder name).
-const upd = { status: {}, errors: {}, checking: false, checkedAt: null, job: null, confirm: null };
+const upd = { status: {}, errors: {}, checking: false, checkedAt: null, job: null, confirm: null, available: {}, watched: [], descs: {} };
 const RUNNING = new Set(['queued', 'downloading', 'installing']);
 const jobState = name => upd.job?.items[name]?.state;
 const isBusy = name => RUNNING.has(jobState(name));
@@ -552,6 +576,27 @@ const lockName = s => (s.scope === 'personal' && s.origin?.skillFolderHash ? s.d
 const updStatus = s => upd.status[lockName(s)];
 const isOutdated = s => updStatus(s) === 'outdated';
 const jobRunning = () => Boolean(upd.job && !upd.job.done);
+
+// Skills a source repo offers that are not installed. Keys: `a:<repo>:<path>`.
+const availKey = (repo, a) => `a:${repo}:${a.path}`;
+const newIn = repo => (upd.available[repo] || []).filter(a => a.new);
+const newTotal = () => Object.keys(upd.available).reduce((n, r) => n + newIn(r).length, 0);
+const selKey = s => (s ? (s.kind === 'avail' ? s.key : 'r:' + s.path) : null);
+function availShown(repo) {
+  if (!WRITABLE || !['all', 'new'].includes(ui.view) || (ui.view === 'all' && ui.groupBy !== 'source')) return [];
+  const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
+  return (upd.available[repo] || []).filter(a => {
+    if (ui.view === 'new' && !a.new) return false;
+    const hay = `${a.name} ${repo} ${upd.descs[repo]?.skills?.[a.path]?.description || ''}`.toLowerCase();
+    return terms.every(t => hay.includes(t));
+  });
+}
+// Open by default when the list has news or the repo has nothing installed; a toggle flips the default.
+function availOpen(repo, installed) {
+  if (ui.q || ui.view === 'new') return true;
+  const byDefault = newIn(repo).length > 0 || installed === 0;
+  return byDefault ? !collapsed.has('av:' + repo) : collapsed.has('+av:' + repo);
+}
 
 // What the switch shows for one skill under the chosen settings file.
 function state(s) {
@@ -577,6 +622,7 @@ function inView(s) {
 
 function visible(s) {
   if (!inView(s)) return false;
+  if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -678,13 +724,16 @@ function rowState(s, st) {
   return 'on';
 }
 
+const jobVerbs = () => (upd.job?.kind === 'install' ? ['Installing', 'Installed'] : ['Updating', 'Updated']);
+
 function updateSlot(s, primary = false) {
   const name = lockName(s);
   if (!name || !WRITABLE) return '';
   const js = jobState(name);
   if (js && js !== 'failed') {
     const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
-    const label = js === 'queued' ? 'Queued' : js === 'done' ? 'Updated' : REDUCED.matches ? 'Updating…' : 'Updating';
+    const [ing, ed] = jobVerbs();
+    const label = js === 'queued' ? 'Queued' : js === 'done' ? ed : REDUCED.matches ? ing + '…' : ing;
     return `<span class="ustate ${cls}${upd.job.leaving ? ' is-leaving' : ''}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${label}</span></span>`;
   }
   if (js === 'failed') return `<button class="btn danger" data-k="retry" data-update="${esc(name)}" title="${esc(upd.job.items[name].error)}">Retry</button>`;
@@ -709,22 +758,23 @@ function row(s) {
 const collapsed = new Set(JSON.parse(localStorage.getItem('atlas.collapsed') || '[]'));
 const isOpen = id => Boolean(ui.q) || !collapsed.has(id);
 
-function fold(id, inner, label) {
-  return `<button class="fold" data-k="fold" data-fold="${esc(id)}" aria-expanded="${isOpen(id)}" aria-label="${esc(label)}">${ICON.chev}${inner}</button>`;
+function fold(id, inner, label, open = isOpen(id)) {
+  return `<button class="fold" data-k="fold" data-fold="${esc(id)}" aria-expanded="${open}" aria-label="${esc(label)}">${ICON.chev}${inner}</button>`;
 }
 
-function section(id, title, count, body, groupIds = []) {
-  const tools = groupIds.length > 1 && !ui.q
-    ? `<span class="tools" data-k="t"><button class="linkbtn" data-fold-all="${esc(groupIds.join('\n'))}">${groupIds.every(g => collapsed.has(g)) ? 'Expand all' : 'Collapse all'}</button></span>`
+function section(id, title, count, body, groupIds = [], extraTools = '') {
+  const foldAll = groupIds.length > 1 && !ui.q
+    ? `<button class="linkbtn" data-fold-all="${esc(groupIds.join('\n'))}">${groupIds.every(g => collapsed.has(g)) ? 'Expand all' : 'Collapse all'}</button>`
     : '';
+  const tools = foldAll || extraTools
+    ? `<span class="tools" data-k="t">${extraTools}${foldAll}</span>` : '';
   return `<section class="sec" data-k="${esc(id)}">
     <div class="sec-head" data-k="h">${fold(id, `<span data-leaf>${title}</span> <span class="n">${count}</span>`, title)}${tools}</div>
     ${isOpen(id) ? `<div class="sec-body" data-k="b">${body}</div>` : ''}
   </section>`;
 }
 
-function group(id, headInner, body) {
-  const open = isOpen(id);
+function group(id, headInner, body, open = isOpen(id)) {
   return `<div class="group${open ? '' : ' collapsed'}" data-k="${esc(id)}">
     <div class="group-head" data-k="h">${headInner}</div>${open ? body : ''}
   </div>`;
@@ -741,13 +791,18 @@ function groupMenu(source, all) {
   if (!WRITABLE) return '';
   const open = ui.menu === source;
   const confirm = ui.confirm === 'group:' + source;
+  const watching = upd.watched.includes(source);
   const items = [
-    isLocalGroup(source) ? `<button role="menuitem" data-show-link="${esc(source)}">Link to GitHub…</button><hr>` : '',
-    `<button role="menuitem" class="danger${confirm ? ' confirm' : ''}" data-delete-source="${esc(source)}">${confirm ? `Move ${all.length} to Trash` : `Delete ${plural(all.length, 'skill')}…`}</button>`,
-  ].join('');
+    watching ? `<button role="menuitem" data-unwatch="${esc(source)}">Stop watching</button>` : '',
+    isLocalGroup(source) ? `<button role="menuitem" data-show-link="${esc(source)}">Link to GitHub…</button>` : '',
+    all.length ? `<button role="menuitem" class="danger${confirm ? ' confirm' : ''}" data-delete-source="${esc(source)}">${confirm ? `Move ${all.length} to Trash` : `Delete ${plural(all.length, 'skill')}…`}</button>` : '',
+  ].filter(Boolean);
+  if (!items.length) return '';
+  // The destructive item sits last, after a divider.
+  if (all.length && items.length > 1) items.splice(items.length - 1, 0, '<hr>');
   return `<span class="menu-wrap" data-k="mw">
     <button class="btn ghost icon" data-k="mb" data-menu="${esc(source)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${esc(source)}">${ICON.dots}</button>
-    ${open ? `<div class="menu" data-k="m" role="menu" aria-label="${esc(source)} actions">${items}</div>` : ''}
+    ${open ? `<div class="menu" data-k="m" role="menu" aria-label="${esc(source)} actions">${items.join('')}</div>` : ''}
   </span>`;
 }
 
@@ -762,8 +817,81 @@ function linkForm(key, names, { cancel = false } = {}) {
   </form>`;
 }
 
+function watchForm() {
+  const msg = ui.linkErr?.key === 'watch' ? ui.linkErr.msg : '';
+  const err = msg ? `<div class="err" role="alert">${ICON.alert}${esc(msg[0].toUpperCase() + msg.slice(1))}.</div>` : '';
+  return `<form class="linkform" data-k="wf" data-watch>
+    <label for="watch-repo">Watch a GitHub repo for new skills</label>
+    <input id="watch-repo" name="repo" placeholder="owner/repo or URL" autocomplete="off" spellcheck="false" required>
+    <button class="btn">Watch</button><button type="button" class="btn ghost" data-watch-cancel>Cancel</button>
+    ${err}
+  </form>`;
+}
+
+function availRow(repo, a) {
+  const key = availKey(repo, a);
+  const d = upd.descs[repo];
+  const info = d?.skills?.[a.path];
+  const desc = info ? highlight(cleanDesc(info.description) || 'No description')
+    : d?.error ? `<span class="aerr">Description unavailable: ${esc(d.error)}</span>` : '<span class="skel" aria-label="Loading description"></span>';
+  const js = upd.job?.kind === 'install' ? jobState(a.name) : null;
+  let slot = '';
+  if (js && js !== 'failed') {
+    const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
+    const label = js === 'queued' ? 'Queued' : js === 'done' ? 'Installed' : REDUCED.matches ? 'Installing…' : 'Installing';
+    slot = `<span class="ustate ${cls}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${label}</span></span>`;
+  } else if (a.taken) {
+    slot = a.taken === 'moved'
+      ? '<span class="ustate" data-k="tk" title="This repo moved the folder of a skill you have. Update or relink it.">installed under an old path</span>'
+      : `<span class="ustate" data-k="tk" title="A skill named ${esc(a.name)} is already installed">name in use</span>`;
+  } else if (WRITABLE) {
+    slot = `<button class="btn ${js === 'failed' ? 'danger' : 'accent'}" data-k="ins" data-install-one="${esc(repo)}" data-path="${esc(a.path)}"${js === 'failed' ? ` title="${esc(upd.job.items[a.name].error)}"` : ''}>${js === 'failed' ? 'Retry' : 'Install'}</button>`;
+  }
+  const hints = !a.taken && WRITABLE ? '<span class="kh" aria-hidden="true"><kbd>i</kbd></span>' : '<span></span>';
+  const tag = a.new ? '<span class="tags"><span class="tag update">new</span></span>' : '';
+  return `<div class="row avail" data-k="${esc(key)}" data-st="${js === 'done' ? 'done' : RUNNING.has(js) ? 'busy' : a.new ? 'outdated' : 'avail'}" aria-current="${selKey(ui.selected) === key}">
+    <button class="open" data-avail="${esc(repo)}" data-path="${esc(a.path)}" data-leaf><span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(a.name)}</span>${tag}</span><span class="desc">${desc}</span></button>
+    ${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
+  </div>`;
+}
+
+const needDescs = new Set();
+
+function availBlock(repo, shown, installed) {
+  const all = upd.available[repo] || [];
+  if (!all.length) return installed ? '' : '<p class="avail-note" data-k="an">You have every skill from this repo. New ones will show here.</p>';
+  if (!shown.length) return '';
+  const id = 'av:' + repo;
+  const open = availOpen(repo, installed);
+  if (open && !upd.descs[repo]) needDescs.add(repo);
+  const installable = all.filter(a => !a.taken);
+  const fresh = installable.filter(a => a.new);
+  const busy = upd.job?.kind === 'install' && !upd.job.done && all.some(a => upd.job.items[a.name]);
+  let acts = '';
+  if (WRITABLE && busy) acts = '<button class="btn accent" data-k="ia" disabled>Installing…</button>';
+  else if (WRITABLE && fresh.length) {
+    acts = `<button class="btn accent" data-k="ia" data-install="${esc(repo)}" data-which="new">Install <span class="tnum">${fresh.length}</span> new</button>
+      <button class="btn ghost" data-k="dm" data-dismiss="${esc(repo)}">Dismiss</button>`;
+  } else if (WRITABLE && installable.length > 1) {
+    acts = `<button class="btn ghost" data-k="ia" data-install="${esc(repo)}" data-which="all">Install all <span class="tnum">${installable.length}</span></button>`;
+  }
+  const count = shown.length === all.length ? all.length : `${shown.length} of ${all.length}`;
+  return `<div class="avail-block" data-k="${esc(id)}">
+    <div class="avail-head" data-k="ah">${fold(id, `<span data-leaf>Available from ${esc(repo)}</span> <span class="n">${count}</span>`, `Available from ${repo}`, open)}
+      <span class="gctl" data-k="ac">${acts}</span></div>
+    ${open ? shown.map(a => availRow(repo, a)).join('') : ''}
+  </div>`;
+}
+
 function sourceGroups(personal) {
   const groups = groupMap(personal, sourceOf);
+  // Repos with skills to offer, or watched with nothing installed, still get a group.
+  const have = new Set(groups.map(([s]) => s));
+  for (const repo of Object.keys(upd.available)) {
+    if (have.has(repo)) continue;
+    const watchedEmpty = upd.watched.includes(repo) && ui.view === 'all' && !ui.q && !SKILLS.some(s => live(s) && sourceOf(s) === repo);
+    if (availShown(repo).length || watchedEmpty) groups.push([repo, []]);
+  }
   // Repos first, then name-prefix groups, then the rest; bigger groups first within each.
   const rank = src => (src === NO_SOURCE ? 2 : isLocalGroup(src) ? 1 : 0);
   groups.sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
@@ -774,13 +902,21 @@ function sourceGroups(personal) {
     const url = all.find(s => s.origin?.sourceUrl)?.origin.sourceUrl;
     const local = isLocalGroup(source);
     const id = 'src:' + source;
-    const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length ? ` · ${list.length} shown` : ''}${url ? ` · <a href="${esc(url.replace(/\.git$/, ''))}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
-    const head = `${fold(id, `<span class="gname" data-leaf>${highlight(source)}</span>`, source)}
+    const avail = upd.available[source] || [];
+    const fresh = newIn(source).length;
+    const repoUrl = url ? url.replace(/\.git$/, '') : !local ? `https://github.com/${source}` : '';
+    const counts = all.length
+      ? `<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length && ui.view !== 'new' ? ` · ${list.length} shown` : ''}`
+      : 'watching';
+    const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
+    const head = `${fold(id, `<span class="gname" data-leaf>${highlight(source)}</span>`, source, ui.view === 'new' || isOpen(id))}
+      ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
       <span class="gsub" data-leaf>${meta}</span>
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
-      ${switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`)}</span>`;
+      ${all.length ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
-    return group(id, head, form + list.map(row).join(''));
+    const block = local ? '' : availBlock(source, availShown(source), all.length);
+    return group(id, head, form + list.map(row).join('') + block, ui.view === 'new' || isOpen(id));
   }).join('');
 }
 
@@ -791,11 +927,12 @@ function emptyHtml() {
       <p>${ui.view === 'all' ? 'Try fewer or shorter words.' : `The ${ui.view} filter is on.`}${hidden ? ` ${plural(hidden, 'hidden skill')} match.` : ''}</p>
       <span class="acts"><button class="btn" data-clear>Clear search</button>${hidden && !ui.showProject ? '<button class="btn ghost" data-show-project>Show project skills</button>' : ''}</span></div>`;
   }
-  if (ui.view === 'updates') {
+  if (ui.view === 'updates' || ui.view === 'new') {
     const at = upd.checkedAt ? Date.parse(upd.checkedAt.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : NaN;
     const ago = Number.isNaN(at) ? null : Math.max(0, Math.round((Date.now() - at) / 60000));
-    return `<div class="empty" data-k="empty"><h2>Everything is up to date</h2>
-      <p>${ago === null ? 'No check has run yet.' : ago ? `Checked ${ago}m ago.` : 'Checked just now.'}</p>
+    const when = ago === null ? 'No check has run yet.' : ago ? `Checked ${ago}m ago.` : 'Checked just now.';
+    return `<div class="empty" data-k="empty"><h2>${ui.view === 'new' ? 'No new skills' : 'Everything is up to date'}</h2>
+      <p>${when}${ui.view === 'new' ? ' Your sources have not added skills since you last looked.' : ''}</p>
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
@@ -810,12 +947,21 @@ function render() {
   const out = [];
 
   const personal = shown.filter(s => s.scope === 'personal');
-  if (personal.length) {
+  const bySource = ui.groupBy === 'source' || ui.view === 'new';
+  const offered = bySource ? Object.keys(upd.available).filter(r => availShown(r).length || (ui.view === 'all' && !ui.q && upd.watched.includes(r))) : [];
+  needDescs.clear();
+  if (personal.length || offered.length || ui.watchOpen) {
     const total = SKILLS.filter(s => s.scope === 'personal' && inRoot(s)).length;
-    const bySource = ui.groupBy === 'source';
-    const body = bySource ? sourceGroups(personal) : personal.map(row).join('');
-    const ids = bySource ? [...new Set(personal.map(s => 'src:' + sourceOf(s)))] : [];
-    out.push(section('sec:personal', 'Your skills', personal.length === total ? total : `${personal.length} of ${total}`, body, ids));
+    const groups = bySource ? sourceGroups(personal) : personal.map(row).join('');
+    const body = (ui.watchOpen ? watchForm() : '') + groups;
+    const ids = bySource ? [...new Set([...personal.map(s => 'src:' + sourceOf(s)), ...offered.map(r => 'src:' + r)])] : [];
+    const watchBtn = WRITABLE && ui.view !== 'new' && !ui.watchOpen ? '<button class="linkbtn" data-watch-open>Watch a source…</button>' : '';
+    if (ui.view === 'new') {
+      const n = offered.reduce((k, r) => k + availShown(r).length, 0);
+      out.push(section('sec:new', 'New from your sources', n, body, ids));
+    } else {
+      out.push(section('sec:personal', 'Your skills', personal.length === total ? total : `${personal.length} of ${total}`, body, ids, watchBtn));
+    }
   }
 
   const plugins = shown.filter(s => s.scope === 'plugin');
@@ -845,16 +991,20 @@ function render() {
 
   patch(el('list'), out.join('') || emptyHtml());
   renderChrome();
+  for (const repo of needDescs) loadDescs(repo);
 }
 
 function renderChrome() {
   const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
   const on = lv.filter(s => state(s).on).length;
   const outdated = lv.filter(isOutdated);
-  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length };
+  const fresh = newTotal();
+  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh };
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
   el('viewUpdates').hidden = !WRITABLE;
-  document.title = WRITABLE && outdated.length ? `(${outdated.length}) Skill Atlas` : 'Skill Atlas';
+  el('viewNew').hidden = !WRITABLE || (!fresh && ui.view !== 'new');
+  const badge = [outdated.length ? `${outdated.length}↑` : '', fresh ? `${fresh} new` : ''].filter(Boolean).join(' · ');
+  document.title = WRITABLE && badge ? `(${badge}) Skill Atlas` : 'Skill Atlas';
 
   patch(el('meta'), [
     `<span><b>${on}</b> on · <b>${lv.length - on}</b> off</span>`,
@@ -870,15 +1020,17 @@ function renderChrome() {
     if (upd.job && !upd.job.fade) {
       const items = Object.values(upd.job.items);
       const finished = items.filter(i => !RUNNING.has(i.state)).length;
+      const [ing, ed] = jobVerbs();
       cluster = upd.job.done
-        ? `<span data-k="t">Updated <b>${items.filter(i => i.state === 'done').length}</b> of <b>${items.length}</b></span>`
-        : `<span data-k="t">Updating <b>${finished}</b> of <b>${items.length}</b>…</span>`;
+        ? `<span data-k="t">${ed} <b>${items.filter(i => i.state === 'done').length}</b> of <b>${items.length}</b></span>`
+        : `<span data-k="t">${ing} <b>${finished}</b> of <b>${items.length}</b>…</span>`;
     } else if (upd.checking) {
       cluster = '<span data-k="t">Checking for updates…</span>';
     } else if (upd.checkedAt) {
-      cluster = outdated.length
+      const chip = fresh && ui.view !== 'new' ? `<button class="chip" data-k="nw" data-view-new>${plural(fresh, 'new skill')}</button>` : '';
+      cluster = chip + (outdated.length
         ? `<span data-k="t"><b>${outdated.length}</b> ${outdated.length === 1 ? 'update' : 'updates'}</span>${warn}${groupUpdateButton(lv, 'data-update-all', { label: 'Update all', cls: 'btn primary', count: false })}${again}`
-        : `<span data-k="t">Up to date</span>${warn}${again}`;
+        : `<span data-k="t">Up to date</span>${warn}${again}`);
     }
   }
   patch(el('cluster'), cluster);
@@ -904,7 +1056,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['c'], 'Compact rows'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['c'], 'Compact rows'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -923,7 +1075,40 @@ function inventoryHtml() {
   </div>`;
 }
 
+function availDetailHtml(s) {
+  const a = (upd.available[s.repo] || []).find(x => x.path === s.path) || s.a;
+  const info = upd.descs[s.repo]?.skills?.[s.path];
+  if (!info && !upd.descs[s.repo]) needDescs.add(s.repo);
+  const js = upd.job?.kind === 'install' ? jobState(a.name) : null;
+  let action;
+  if (js && js !== 'failed') {
+    const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
+    action = `<span class="ustate ${cls}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${js === 'queued' ? 'Queued' : js === 'done' ? 'Installed' : 'Installing'}</span></span>`;
+  } else if (!a.taken && WRITABLE) {
+    action = `<button class="btn primary" data-k="ins" data-install-one="${esc(s.repo)}" data-path="${esc(s.path)}">${js === 'failed' ? 'Retry' : 'Install'}</button>`;
+  } else action = '';
+  const why = a.taken === 'moved' ? 'You have this skill under its old folder. Update or relink it instead.'
+    : a.taken ? `A skill named ${esc(a.name)} is already installed, so this one cannot go in next to it.`
+    : `Installs into ~/.agents/skills/${esc(a.name)} and tracks ${esc(s.repo)} for updates.`;
+  const gh = `https://github.com/${s.repo}/tree/HEAD/${s.path.replace(/\/?SKILL\.md$/, '')}`;
+  return `
+    <div class="d-top" data-k="top">
+      <h2 class="d-title" data-leaf><span class="slash">/</span>${esc(a.name)}</h2>
+      <button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">${ICON.close}</button>
+    </div>
+    <p class="d-sub" data-k="sub" data-leaf>${esc(s.repo)} · ${a.new ? 'new, ' : ''}not installed</p>
+    <p class="d-desc" data-k="desc" data-leaf>${info ? esc(info.description || 'No description') : upd.descs[s.repo]?.error ? 'Description unavailable.' : '<span class="skel"></span>'}</p>
+    <div class="d-sec" data-k="cards"><div class="card ${a.taken ? '' : 'accent'}" data-k="c-ins"><div data-leaf><strong>${a.taken ? 'Cannot install' : 'Available'}</strong>${why}</div>
+      <span class="uslot" data-k="u">${action}</span></div></div>
+    <div class="d-sec" data-k="facts"><dl data-leaf>
+      ${field('Source', s.repo, true)}
+      ${field('Path', s.path, true)}
+    </dl></div>
+    <div class="d-sec danger-zone" data-k="dz"><a class="btn ghost" data-k="repo" href="${esc(gh)}" target="_blank" rel="noreferrer">Open on GitHub ↗</a></div>`;
+}
+
 function detailHtml(s) {
+  if (s.kind === 'avail') return availDetailHtml(s);
   const st = state(s);
   const o = s.origin || {};
   const ms = s.marketplace_source || {};
@@ -989,7 +1174,7 @@ let detailFor;
 function renderDetail() {
   const d = el('detail');
   const s = ui.selected;
-  const key = s ? s.path : null;
+  const key = selKey(s);
   const html = s ? detailHtml(s) : inventoryHtml();
   if (key !== detailFor) {
     d.innerHTML = html; d.scrollTop = 0; detailFor = key;
@@ -997,6 +1182,7 @@ function renderDetail() {
     patch(d, html);
   }
   if (s) d.setAttribute('data-open', ''); else d.removeAttribute('data-open');
+  for (const repo of needDescs) loadDescs(repo);
 }
 
 function rerender() { render(); renderDetail(); }
@@ -1084,7 +1270,11 @@ async function checkUpdates(refresh = false) {
   upd.checking = true; renderChrome();
   try {
     const data = await api('/api/updates' + (refresh ? '?refresh=1' : ''));
-    Object.assign(upd, { status: data.skills, errors: data.errors, checkedAt: data.checked_at });
+    Object.assign(upd, { status: data.skills, errors: data.errors, checkedAt: data.checked_at, available: data.available || {}, watched: data.watched || [] });
+    // Drop cached descriptions that miss a path the repo now offers.
+    for (const [repo, d] of Object.entries(upd.descs)) {
+      if (d.skills && (upd.available[repo] || []).some(a => !d.skills[a.path])) delete upd.descs[repo];
+    }
   } catch (err) {
     toast(`Could not check for updates: ${esc(err.message)}`);
   } finally {
@@ -1094,43 +1284,71 @@ async function checkUpdates(refresh = false) {
 
 async function reloadData() {
   const token = DATA.api_token;
-  const path = ui.selected?.path;
+  const prev = ui.selected;
   DATA = { ...(await api('/api/data')), api_token: token };
   SKILLS = DATA.skills; index();
-  ui.selected = SKILLS.find(s => s.path === path) || null;
+  // An available skill that just got installed stays selected as the installed skill.
+  ui.selected = prev?.kind === 'avail'
+    ? SKILLS.find(s => live(s) && s.dir_name === prev.a.name && s.origin?.source === prev.repo) || prev
+    : SKILLS.find(s => s.path === prev?.path) || null;
+}
+
+async function loadDescs(repo) {
+  const all = upd.available[repo] || [];
+  if (!all.length || upd.descs[repo]) return;
+  upd.descs[repo] = { loading: true };
+  try {
+    const r = await api('/api/available', { repo, paths: all.map(a => a.path) });
+    upd.descs[repo] = { skills: r.skills };
+  } catch (err) {
+    upd.descs[repo] = { error: err.message };
+  }
+  rerender();
 }
 
 const announce = msg => { el('announce').textContent = msg; };
 
 // Skills you edited are left out of batch updates; they need their own confirmed click.
-async function runUpdate(skills, note = '') {
+function runUpdate(skills, note = '') {
   const names = skills.map(lockName);
+  return runJob('update', () => api('/api/update', { names }), names, note);
+}
+
+// One job at a time: update or install. Rows show queued → working → ✓, the header bar fills.
+async function runJob(kind, start, names, note = '', repo = '') {
   if (!names.length) return;
   upd.confirm = null;
   if (upd.job?.done) upd.job = null;
+  const [ing, ed] = kind === 'install' ? ['Installing', 'Installed'] : ['Updating', 'Updated'];
   try {
-    upd.job = await api('/api/update', { names });
+    upd.job = { ...(await start()), kind };
   } catch (err) {
-    return toast(`Could not start the update: ${esc(err.message)}`);
+    return toast(`Could not start: ${esc(err.message)}`);
   }
-  announce(`Updating ${plural(names.length, 'skill')}.`);
+  announce(`${ing} ${plural(names.length, 'skill')}.`);
   resetBar(); rerender();
 
   while (!upd.job.done) {
     await sleep(300);
     const prev = JSON.stringify(upd.job.items);
-    upd.job = await api('/api/jobs/' + upd.job.id).catch(() => upd.job);
+    upd.job = { ...(await api('/api/jobs/' + upd.job.id).catch(() => upd.job)), kind };
     if (prev !== JSON.stringify(upd.job.items) || upd.job.done) rerender();
   }
 
   const items = Object.entries(upd.job.items);
   const failed = items.filter(([, i]) => i.state === 'failed');
   const ok = items.length - failed.length;
+  if (kind === 'install' && upd.available[repo]) {
+    // Installed skills leave the Available list now rather than after the next check.
+    const done = new Set(items.filter(([, i]) => i.state === 'done').map(([n]) => n));
+    upd.available[repo] = upd.available[repo].filter(a => !done.has(a.name));
+  }
   await reloadData();
   await checkUpdates();
+  const where = kind === 'install' && repo ? ` from ${esc(repo)}` : '';
   const msg = failed.length
-    ? `Updated ${ok}, <b>${failed.length} failed</b>: ${esc(failed[0][1].error)}. Use Retry on the row.`
-    : `Updated <b>${ok === 1 ? esc(names[0]) : plural(ok, 'skill')}</b> in ${upd.job.seconds}s.${note} Restart Claude Code sessions to pick it up.`;
+    ? `${ed} ${ok}, <b>${failed.length} failed</b>: ${esc(failed[0][1].error)}. Use Retry on the row.`
+    : `${ed} <b>${ok === 1 ? esc(names[0]) : plural(ok, 'skill')}</b>${where} in ${upd.job.seconds}s.${note} Restart Claude Code sessions to pick it up.`;
   toast(msg);
   announce(msg.replace(/<[^>]+>/g, ''));
 
@@ -1148,6 +1366,60 @@ async function runUpdate(skills, note = '') {
     upd.job = null;
   }
   rerender();
+}
+
+function installFrom(repo, list) {
+  if (jobRunning()) return toast('Another job is still running.');
+  const ok = list.filter(a => !a.taken);
+  if (!ok.length) return;
+  runJob('install', () => api('/api/install', { repo, paths: ok.map(a => a.path) }), ok.map(a => a.name), '', repo);
+}
+
+async function dismissNew(repo) {
+  const fresh = newIn(repo);
+  if (!fresh.length) return;
+  try {
+    await api('/api/dismiss', { repo, paths: fresh.map(a => a.path) });
+  } catch (err) { return toast(`Could not dismiss: ${esc(err.message)}`); }
+  fresh.forEach(a => { a.new = false; });
+  // Keep the list where the user is looking, even though it no longer has news.
+  collapsed.add('+av:' + repo); collapsed.delete('av:' + repo);
+  localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+  rerender();
+  toast(`Dismissed ${plural(fresh.length, 'new skill')} from <b>${esc(repo)}</b>. They stay under Available.`);
+}
+
+async function watchSource(form) {
+  const btn = form.querySelector('button:not([type])');
+  btn.disabled = true; btn.textContent = 'Watching…';
+  try {
+    const r = await api('/api/watch', { repo: form.repo.value, on: true });
+    upd.watched = r.watched; ui.watchOpen = false; ui.linkErr = null;
+    collapsed.delete('src:' + r.repo);
+    await checkUpdates(true);
+    const n = (upd.available[r.repo] || []).length;
+    toast(`Watching <b>${esc(r.repo)}</b>. ${n ? `${plural(n, 'skill')} available.` : 'You have all its skills.'}`);
+    el('list').querySelector(`[data-k="src:${CSS.escape(r.repo)}"]`)?.scrollIntoView({ block: 'nearest' });
+  } catch (err) {
+    ui.linkErr = { key: 'watch', msg: err.message };
+  } finally {
+    btn.disabled = false; btn.textContent = 'Watch'; rerender();
+  }
+}
+
+async function unwatch(repo) {
+  ui.menu = null;
+  try {
+    upd.watched = (await api('/api/watch', { repo, on: false })).watched;
+  } catch (err) { return toast(`Could not stop watching: ${esc(err.message)}`); }
+  const kept = upd.available[repo];
+  if (!SKILLS.some(s => live(s) && sourceOf(s) === repo)) delete upd.available[repo];
+  rerender();
+  toast(`Stopped watching <b>${esc(repo)}</b>.`, async () => {
+    upd.watched = (await api('/api/watch', { repo, on: true })).watched;
+    if (kept) upd.available[repo] = kept;
+    rerender();
+  });
 }
 
 function updateBatch(list) {
@@ -1262,6 +1534,11 @@ function select(s) {
   rerender();
 }
 
+function selectAvail(repo, path) {
+  const a = (upd.available[repo] || []).find(x => x.path === path);
+  if (a) select({ kind: 'avail', repo, path, a, key: availKey(repo, a) });
+}
+
 document.addEventListener('click', async e => {
   const t = e.target;
   if (ui.menu && !t.closest('.menu-wrap')) closeMenu(false);
@@ -1285,6 +1562,29 @@ document.addEventListener('click', async e => {
   const us = t.closest('[data-update-source]');
   if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
   if (t.closest('[data-recheck]')) return checkUpdates(true);
+  if (t.closest('[data-view-new]')) { ui.view = 'new'; setSeg('view', 'v', 'new'); render(); scrollTo({ top: 0 }); return; }
+  const io = t.closest('[data-install-one]');
+  if (io) {
+    const a = (upd.available[io.dataset.installOne] || []).find(x => x.path === io.dataset.path);
+    return a && installFrom(io.dataset.installOne, [a]);
+  }
+  const ia = t.closest('[data-install]');
+  if (ia) {
+    const all = upd.available[ia.dataset.install] || [];
+    return installFrom(ia.dataset.install, ia.dataset.which === 'new' ? all.filter(a => a.new) : all);
+  }
+  const dm = t.closest('[data-dismiss]');
+  if (dm) return dismissNew(dm.dataset.dismiss);
+  if (t.closest('[data-watch-open]')) {
+    ui.watchOpen = true; ui.linkErr = null; collapsed.delete('sec:personal'); render();
+    el('list').querySelector('#watch-repo')?.focus(); return;
+  }
+  if (t.closest('[data-watch-cancel]')) {
+    ui.watchOpen = false; ui.linkErr = null; render();
+    el('list').querySelector('[data-watch-open]')?.focus(); return;
+  }
+  const uw = t.closest('[data-unwatch]');
+  if (uw) return unwatch(uw.dataset.unwatch);
 
   const mb = t.closest('[data-menu]');
   if (mb) {
@@ -1296,7 +1596,13 @@ document.addEventListener('click', async e => {
   const f = t.closest('[data-fold]');
   if (f) {
     const id = f.dataset.fold;
-    if (!ui.q) collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
+    if (id.startsWith('av:') && !ui.q && ui.view !== 'new') {
+      // Available lists open by default only when they have news, so the stored flag means "not the default".
+      const repo = id.slice(3);
+      const installed = SKILLS.filter(s => live(s) && sourceOf(s) === repo).length;
+      const flag = newIn(repo).length || !installed ? 'av:' + repo : '+av:' + repo;
+      collapsed.has(flag) ? collapsed.delete(flag) : collapsed.add(flag);
+    } else if (!ui.q && !(ui.view === 'new' && id.startsWith('src:'))) collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
     localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
     render(); return;
   }
@@ -1332,8 +1638,9 @@ document.addEventListener('click', async e => {
   const rv = t.closest('[data-reveal]');
   if (rv) return api('/api/reveal', { path: rv.dataset.reveal }).catch(err => toast(`Could not reveal: ${esc(err.message)}`));
   const open = t.closest('.open');
+  if (open && open.dataset.avail) return selectAvail(open.dataset.avail, open.dataset.path);
   if (open) return select(SKILLS[+open.dataset.id]);
-  if (t.closest('[data-close]')) { const p = ui.selected?.path; select(null); focusRow(p); return; }
+  if (t.closest('[data-close]')) { const k = selKey(ui.selected); select(null); focusRow(k); return; }
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');
@@ -1356,6 +1663,7 @@ document.addEventListener('submit', e => {
   const form = e.target.closest('.linkform');
   if (!form) return;
   e.preventDefault();
+  if (form.hasAttribute('data-watch')) return watchSource(form);
   linkSkills(form);
 });
 
@@ -1406,8 +1714,8 @@ function closeHelp() {
   return true;
 }
 
-function focusRow(path) {
-  const r = path && el('list').querySelector(`.row[data-k="r:${CSS.escape(path)}"] .open`);
+function focusRow(key) {
+  const r = key && el('list').querySelector(`.row[data-k="${CSS.escape(key)}"] .open`);
   if (!r) return false;
   r.focus({ preventScroll: true }); r.closest('.row').scrollIntoView({ block: 'nearest' });
   return true;
@@ -1454,13 +1762,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (t === el('q')) {
       if (el('q').value) { el('q').value = ''; ui.q = ''; render(); }
-      else { el('q').blur(); if (!focusRow(ui.selected?.path)) moveCursor(1); }
+      else { el('q').blur(); if (!focusRow(selKey(ui.selected))) moveCursor(1); }
       return;
     }
-    if (typing && t.closest('.linkform')) { ui.linkOpen = null; ui.linkErr = null; render(); return; }
+    if (typing && t.closest('.linkform')) { ui.linkOpen = null; ui.watchOpen = false; ui.linkErr = null; render(); return; }
     if (ui.menu) return closeMenu();
     if (ui.confirm || upd.confirm) { ui.confirm = null; upd.confirm = null; rerender(); return; }
-    if (ui.selected) { const p = ui.selected.path; select(null); focusRow(p); }
+    if (ui.selected) { const k = selKey(ui.selected); select(null); focusRow(k); }
     return;
   }
   if (typing) return;
@@ -1484,6 +1792,7 @@ document.addEventListener('keydown', e => {
     const b = rowEl.querySelector('[data-update]');
     if (b) updateOne(b.dataset.update, Boolean(b.dataset.confirmed));
   }
+  if (e.key === 'i') rowEl.querySelector('[data-install-one]')?.click();
 });
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));

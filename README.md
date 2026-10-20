@@ -67,6 +67,18 @@ Update button asks you to confirm, because an update replaces the whole folder.
 
 Plugin skills are not checked.
 
+## New skills
+
+Each update check also lists the skills a source repo offers that you have not installed. They show
+under **Available from <repo>** at the end of that repo's group. A skill is **new** when its path
+appeared upstream after the atlas last looked at the repo; the first look only records a baseline.
+**Dismiss** marks the new ones as seen; they stay available. The header chip and the **New** filter
+show every new skill across your sources. Install downloads one tarball per repo and records the
+skill in the same lock as its siblings, so it gets update checks like the rest.
+
+**Watch a source…** follows a repo that has none of its skills installed yet. Watched repos, and the
+paths already seen for each repo, live in `~/.agents/.atlas-lock.json` under `sources` and `seen`.
+
 ## Groups and deleting
 
 By source groups skills by repo. Untracked skills that share a name prefix (three or more, such as

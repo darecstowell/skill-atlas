@@ -17,10 +17,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scan import ATLAS_LOCK, git_tree_hash, read_json, skill_lock_path
+from scan import ATLAS_LOCK, git_tree_hash, parse_frontmatter, read_json, skill_lock_path
 
 CACHE_SECONDS = 600
 _cache: dict = {}
+_tarballs: dict[tuple[str, str], tuple[float, bytes]] = {}
 JOBS: dict[str, dict] = {}
 _job_lock = threading.Lock()
 
@@ -68,11 +69,17 @@ def fetch_tree(repo: str, ref: str) -> dict | None:
     return tree if tree and "tree" in tree else None
 
 
-def fetch_tarball(repo: str, ref: str) -> bytes | None:
+def fetch_tarball(repo: str, ref: str, max_age: float = 0) -> bytes | None:
+    cached = _tarballs.get((repo, ref))
+    if cached and time.time() - cached[0] < max_age:
+        return cached[1]
     # codeload is not rate limited; gh covers private repos.
-    return _https(f"https://codeload.github.com/{repo}/tar.gz/{ref}", timeout=120) or _gh(
+    blob = _https(f"https://codeload.github.com/{repo}/tar.gz/{ref}", timeout=120) or _gh(
         [f"repos/{repo}/tarball/{ref}"], binary=True
     )
+    if blob:
+        _tarballs[(repo, ref)] = (time.time(), blob)
+    return blob
 
 
 def folder_of(skill_path: str) -> str:
@@ -110,6 +117,77 @@ def write_lock_entries(lock: Path, entries: dict[str, dict]) -> None:
     os.replace(tmp, lock)
 
 
+def _atlas_lock(roots: list[Path]) -> Path:
+    return skill_lock_path(roots[0]).with_name(ATLAS_LOCK)
+
+
+def _edit_atlas_lock(roots: list[Path], change) -> None:
+    lock = _atlas_lock(roots)
+    data = read_json(lock) or {"version": 1, "skills": {}}
+    change(data)
+    tmp = lock.with_name(lock.name + ".atlas-tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(tmp, lock)
+
+
+def mark_seen(roots: list[Path], repo: str, paths: list[str]) -> None:
+    def change(data):
+        seen = data.setdefault("seen", {})
+        seen[repo] = sorted(set(seen.get(repo, [])) | set(paths))
+    _edit_atlas_lock(roots, change)
+
+
+def watched(roots: list[Path]) -> list[str]:
+    """Repos you follow for new skills even when none of their skills is installed."""
+    return read_json(_atlas_lock(roots)).get("sources", [])
+
+
+def watch(repo_text: str, on: bool, roots: list[Path]) -> dict:
+    repo = parse_repo(repo_text)
+    if on and not fetch_tree(repo, "HEAD"):
+        raise ValueError(f"could not read {repo} from GitHub")
+
+    def change(data):
+        sources = set(data.get("sources", []))
+        sources.add(repo) if on else sources.discard(repo)
+        data["sources"] = sorted(sources)
+    _edit_atlas_lock(roots, change)
+    _cache.clear()
+    return {"repo": repo, "watched": watched(roots)}
+
+
+def skill_paths(tree: dict) -> list[str]:
+    return [e["path"] for e in tree["tree"] if e["type"] == "blob" and e["path"].rsplit("/", 1)[-1] == "SKILL.md"]
+
+
+def skill_name(repo: str, path: str) -> str:
+    folder = folder_of(path)
+    return folder.rsplit("/", 1)[-1] if folder else repo.split("/", 1)[1]
+
+
+def _available(repo: str, tree: dict, entries: dict[str, dict], local: set[str], seen: dict, roots: list[Path]) -> list[dict]:
+    """Skills in the repo that are not installed. The first look at a repo only records a baseline."""
+    paths = skill_paths(tree)
+    if repo not in seen:
+        mark_seen(roots, repo, paths)
+        seen[repo] = paths
+    installed_paths = {e["skillPath"] for e in entries.values()}
+    installed_names = set(entries)
+    out = []
+    for path in paths:
+        if path in installed_paths:
+            continue
+        name = skill_name(repo, path)
+        out.append({
+            "name": name,
+            "path": path,
+            "new": path not in seen[repo],
+            # Same name from this repo means the installed skill moved upstream; any other match is a clash.
+            "taken": "moved" if name in installed_names else "taken" if name in local else "",
+        })
+    return sorted(out, key=lambda a: (not a["new"], a["name"]))
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -127,8 +205,14 @@ def check(roots: list[Path], refresh: bool = False) -> dict:
     by_source: dict[tuple[str, str], dict[str, dict]] = {}
     for name, (_, e) in tracked(roots).items():
         by_source.setdefault((e["source"], e.get("ref") or "HEAD"), {})[name] = e
+    tracked_repos = {repo for repo, _ in by_source}
+    for repo in watched(roots):
+        if repo not in tracked_repos:
+            by_source[(repo, "HEAD")] = {}
 
-    statuses, errors = {}, {}
+    statuses, errors, available = {}, {}, {}
+    local = {p.name for r in roots for p in (skill_lock_path(r).parent / "skills").glob("*") if p.is_dir()}
+    seen = read_json(_atlas_lock(roots)).get("seen", {})
     with ThreadPoolExecutor(max_workers=8) as pool:
         trees = dict(zip(by_source, pool.map(lambda key: fetch_tree(*key), by_source)))
     for (repo, ref), tree in trees.items():
@@ -139,8 +223,14 @@ def check(roots: list[Path], refresh: bool = False) -> dict:
         for name, e in by_source[(repo, ref)].items():
             latest = folder_sha(tree, e["skillPath"])
             statuses[name] = "unknown" if latest is None else "current" if latest == e["skillFolderHash"] else "outdated"
+        found = _available(repo, tree, by_source[(repo, ref)], local, seen, roots)
+        if found or not by_source[(repo, ref)]:
+            available[repo] = found
 
-    data = {"checked_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "skills": statuses, "errors": errors}
+    data = {
+        "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "skills": statuses, "errors": errors, "available": available, "watched": watched(roots),
+    }
     _cache.update(at=time.time(), data=data)
     return data
 
@@ -235,7 +325,11 @@ def _run_job(job: dict, roots: list[Path]) -> None:
 
 
 def start_update(names: list[str], roots: list[Path]) -> dict:
-    """Start a background update job. Only one runs at a time."""
+    """Start a background update job. Only one job runs at a time."""
+    return _start_job(names, _run_job, roots)
+
+
+def _start_job(names: list[str], target, roots: list[Path]) -> dict:
     with _job_lock:
         if any(not j["done"] for j in JOBS.values()):
             raise RuntimeError("another update is still running")
@@ -243,12 +337,105 @@ def start_update(names: list[str], roots: list[Path]) -> dict:
                "lock": threading.Lock(), "items": {n: {"state": "queued"} for n in names}}
         JOBS.clear()
         JOBS[job["id"]] = job
-    threading.Thread(target=_run_job, args=(job, roots), daemon=True).start()
+    threading.Thread(target=target, args=(job, roots), daemon=True).start()
     return job
 
 
 def job_view(job: dict) -> dict:
     return {k: v for k, v in job.items() if k != "lock"}
+
+
+# --------------------------------------------------------------------------
+# skills a source offers that are not installed
+# --------------------------------------------------------------------------
+
+
+def _repo_ref(repo: str, roots: list[Path]) -> str:
+    return next((e.get("ref") or "HEAD" for _, e in tracked(roots).values() if e["source"] == repo), "HEAD")
+
+
+def describe(repo: str, paths: list[str], roots: list[Path]) -> dict:
+    """Name and description for each path, read from one tarball (cached for 10 minutes)."""
+    blob = fetch_tarball(repo, _repo_ref(repo, roots), max_age=CACHE_SECONDS)
+    if not blob:
+        raise ValueError(f"could not download {repo}")
+    wanted = set(paths)
+    out = {}
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+        for m in tar.getmembers():
+            rel = m.name.split("/", 1)[1] if "/" in m.name else ""
+            if rel in wanted and m.isfile():
+                fm, _ = parse_frontmatter(tar.extractfile(m).read().decode("utf-8", "replace"))
+                out[rel] = {"name": str(fm.get("name") or skill_name(repo, rel)),
+                            "description": re.sub(r"\s+", " ", str(fm.get("description", ""))).strip()}
+    return {"repo": repo, "skills": out}
+
+
+def dismiss(repo: str, paths: list[str], roots: list[Path]) -> dict:
+    mark_seen(roots, repo, paths)
+    _cache.clear()
+    return {"repo": repo, "dismissed": len(paths)}
+
+
+def _install_source(repo: str, paths: list[str], job: dict, roots: list[Path]) -> None:
+    items = job["items"]
+    names = {p: skill_name(repo, p) for p in paths}
+    for n in names.values():
+        items[n] = {"state": "downloading"}
+    ref = _repo_ref(repo, roots)
+    tree = fetch_tree(repo, ref)
+    blob = fetch_tarball(repo, ref) if tree else None
+    if not blob:
+        for n in names.values():
+            items[n] = {"state": "failed", "error": f"could not download {repo}"}
+        return
+    npx_lock = skill_lock_path(roots[0])
+    skills_dir = npx_lock.parent / "skills"
+    # Record new skills in the same lock as their siblings, so `npx skills` sees them too.
+    siblings = [(lock, e) for lock, e in tracked(roots).values() if e["source"] == repo]
+    lock = siblings[0][0] if siblings else npx_lock.with_name(ATLAS_LOCK)
+    extra = {k: siblings[0][1][k] for k in ("ref",) if siblings and k in siblings[0][1]}
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+        for path, n in names.items():
+            sha = folder_sha(tree, path)
+            if sha is None:
+                items[n] = {"state": "failed", "error": "folder not found upstream"}
+                continue
+            if (skills_dir / n).exists():
+                items[n] = {"state": "failed", "error": f"a skill named {n} is already installed"}
+                continue
+            items[n] = {"state": "installing"}
+            staged = skills_dir / f".atlas-new-{n}"
+            shutil.rmtree(staged, ignore_errors=True)
+            try:
+                _extract(tar, folder_of(path), staged)
+                if not (staged / "SKILL.md").exists():
+                    raise ValueError("no SKILL.md in the download")
+                os.rename(staged, skills_dir / n)
+                stamp = now_iso()
+                entry = {"source": repo, "sourceType": "github", "sourceUrl": f"https://github.com/{repo}.git",
+                         "skillPath": path, "skillFolderHash": sha, "installedAt": stamp, "updatedAt": stamp, **extra}
+                with job["lock"]:
+                    write_lock_entries(lock, {n: entry})
+                items[n] = {"state": "done"}
+            except (OSError, ValueError, tarfile.TarError) as err:
+                shutil.rmtree(staged, ignore_errors=True)
+                items[n] = {"state": "failed", "error": str(err)}
+    with job["lock"]:
+        mark_seen(roots, repo, paths)
+
+
+def start_install(repo: str, paths: list[str], roots: list[Path]) -> dict:
+    """Install skills from a source repo as a background job, like an update."""
+    def run(job: dict, roots: list[Path]) -> None:
+        try:
+            _install_source(repo, paths, job, roots)
+        finally:
+            _cache.clear()
+            job["seconds"] = round(time.time() - job["started"], 1)
+            job["done"] = True
+
+    return _start_job([skill_name(repo, p) for p in paths], run, roots)
 
 
 # --------------------------------------------------------------------------

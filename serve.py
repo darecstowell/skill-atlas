@@ -102,6 +102,19 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("unknown skill path")
                 subprocess.run(["open", "-R", path], check=False)
                 return self._json(200, {"ok": True})
+            if self.path == "/api/watch":
+                return self._json(200, updates.watch(str(req["repo"]), bool(req.get("on", True)), list(ROOTS.values())))
+            if self.path in ("/api/available", "/api/install", "/api/dismiss"):
+                repo = updates.parse_repo(str(req["repo"]))
+                paths = [str(x) for x in req["paths"]]
+                if not paths or any(x.startswith("/") or ".." in x.split("/") or not x.endswith("SKILL.md") for x in paths):
+                    raise ValueError("bad skill paths")
+                roots = list(ROOTS.values())
+                if self.path == "/api/available":
+                    return self._json(200, updates.describe(repo, paths, roots))
+                if self.path == "/api/dismiss":
+                    return self._json(200, updates.dismiss(repo, paths, roots))
+                return self._json(200, updates.job_view(updates.start_install(repo, paths, roots)))
             if self.path == "/api/undo-delete":
                 return self._json(200, remove.undo())
             if self.path in ("/api/update", "/api/link", "/api/delete"):
