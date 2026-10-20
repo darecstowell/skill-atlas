@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import shutil
+import subprocess
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -94,6 +95,13 @@ class Handler(BaseHTTPRequestHandler):
                 names = [str(n) for n in req.get("names") or [req["name"]]]
                 write_setting(root, req["kind"], names, bool(req["on"]))
                 return self._json(200, settings_state(root))
+            if self.path == "/api/reveal":
+                # Only paths the scan itself reported, so the page cannot open arbitrary files.
+                path = str(req["path"])
+                if path not in {s["path"] for s in scan(REPO)["skills"]}:
+                    raise ValueError("unknown skill path")
+                subprocess.run(["open", "-R", path], check=False)
+                return self._json(200, {"ok": True})
             if self.path == "/api/undo-delete":
                 return self._json(200, remove.undo())
             if self.path in ("/api/update", "/api/link", "/api/delete"):

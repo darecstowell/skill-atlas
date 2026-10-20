@@ -75,7 +75,11 @@ By source groups skills by repo. Untracked skills that share a name prefix (thre
 Delete moves a skill folder to the macOS Trash and removes its lock entries and `skillOverrides`
 setting. The toast offers Undo for the last delete.
 
-Keys: `/` focuses search, `Esc` clears it or closes the detail panel, arrow keys move through the list.
+## Keys
+
+`/` or `⌘K` search · `j`/`k` or arrows move · `Enter` opens the detail panel · `x` or `Space` turns
+a skill on or off · `u` updates it · `c` compact rows · `?` all shortcuts · `Esc` clears or closes ·
+`⌘Z` undoes the last change while its toast shows.
 
 ## Layout
 
