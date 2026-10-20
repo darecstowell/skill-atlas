@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild the atlas from the live config and open it.
+# Serve the atlas with working switches. It rescans on every page load.
 set -euo pipefail
 cd "$(dirname "$0")"
-exec python3 build.py --open "$@"
+exec python3 serve.py "$@"

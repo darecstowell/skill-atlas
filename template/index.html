@@ -3,314 +3,914 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Skill Atlas</title>
+<title>Skills</title>
 <style>
   :root {
     color-scheme: dark;
-    --bg: oklch(0.17 0.012 265);
-    --panel: oklch(0.213 0.014 265);
-    --panel-2: oklch(0.253 0.016 265);
-    --line: oklch(0.32 0.018 265);
-    --text: oklch(0.94 0.006 265);
-    --dim: oklch(0.7 0.014 265);
-    --dimmer: oklch(0.56 0.014 265);
-    --accent: oklch(0.75 0.14 220);
-    --ok: oklch(0.76 0.15 155);
-    --warn: oklch(0.8 0.14 80);
-    --off: oklch(0.68 0.13 25);
+    --bg: oklch(0.17 0.01 265);
+    --panel: oklch(0.205 0.012 265);
+    --raised: oklch(0.25 0.014 265);
+    --line: oklch(0.29 0.014 265);
+    --text: oklch(0.94 0.005 265);
+    --dim: oklch(0.72 0.012 265);
+    --faint: oklch(0.56 0.012 265);
+    --accent: oklch(0.74 0.13 235);
+    --on: oklch(0.72 0.14 155);
+    --warn: oklch(0.8 0.13 80);
     --mono: ui-monospace, "SF Mono", Menlo, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased;
   }
-  a { color: var(--accent); }
-  header {
-    padding: 22px 24px 14px; border-bottom: 1px solid var(--line);
-  }
-  h1 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; font-weight: 600; }
-  .sub { color: var(--dimmer); font-size: 12px; font-family: var(--mono); }
-  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .stat {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
-    padding: 5px 10px; font-size: 12px; color: var(--dim);
-  }
-  .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
-
-  .toolbar {
-    position: sticky; top: 0; z-index: 5; background: color-mix(in oklch, var(--bg) 88%, transparent);
-    backdrop-filter: blur(12px); border-bottom: 1px solid var(--line);
-    padding: 12px 24px; display: flex; flex-direction: column; gap: 10px;
-  }
-  .row1 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  input[type=search] {
-    flex: 1 1 280px; min-width: 200px; background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px;
-    font: 14px var(--sans); outline: none;
-  }
-  input[type=search]:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent); }
-  select {
-    background: var(--panel); color: var(--text); border: 1px solid var(--line);
-    border-radius: 8px; padding: 9px 10px; font: 13px var(--sans); outline: none;
-  }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .chip {
-    border: 1px solid var(--line); background: transparent; color: var(--dimmer);
-    border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer;
-    font-family: var(--mono); transition: background .12s, color .12s, border-color .12s;
-  }
-  .chip[aria-pressed="true"] { background: var(--panel-2); color: var(--text); border-color: var(--dim); }
-  .chip:hover { border-color: var(--accent); }
-  .chip-group-label { font-size: 11px; color: var(--dimmer); text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }
-  .linkbtn { background: none; border: 0; color: var(--accent); font-size: 12px; cursor: pointer; padding: 4px; }
-
-  main { display: grid; grid-template-columns: minmax(0,1fr) 420px; gap: 0; align-items: start; }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } #detail { display: none; } }
-
-  .count { padding: 10px 24px 4px; color: var(--dimmer); font-size: 12px; font-family: var(--mono); }
-  ul.list { list-style: none; margin: 0; padding: 0 12px 60px 12px; }
-  li.item {
-    padding: 11px 12px; border-radius: 9px; cursor: pointer; border: 1px solid transparent;
-    display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 14px; align-items: baseline;
-  }
-  li.item:hover { background: var(--panel); }
-  li.item[aria-selected="true"] { background: var(--panel); border-color: var(--line); }
-  .nm { font-family: var(--mono); font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
-  .desc {
-    grid-column: 1 / -1; color: var(--dim); font-size: 12.5px;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .tags { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-  .tag {
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: .02em; padding: 2px 7px;
-    border-radius: 5px; border: 1px solid var(--line); color: var(--dimmer); white-space: nowrap;
-  }
-  .tag.enabled { color: var(--ok); border-color: color-mix(in oklch, var(--ok) 40%, var(--line)); }
-  .tag.disabled { color: var(--off); border-color: color-mix(in oklch, var(--off) 40%, var(--line)); }
-  .tag.stale { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, var(--line)); }
-  .tag.manual { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 40%, var(--line)); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   mark { background: color-mix(in oklch, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; }
 
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: color-mix(in oklch, var(--bg) 90%, transparent); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line); padding: 14px max(24px, (100vw - 1400px) / 2 + 24px);
+    display: grid; grid-template-columns: auto auto 1fr; gap: 10px 20px; align-items: center;
+  }
+  h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .summary { grid-column: 1 / -1; color: var(--faint); font-size: 12.5px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .summary b { color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .summary { align-items: center; }
+  .readonly { color: var(--warn); }
+
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+  .seg button {
+    background: none; border: 0; border-radius: 6px; padding: 4px 11px; font-size: 12.5px;
+    color: var(--faint); cursor: pointer; transition: color 150ms, background-color 150ms;
+  }
+  .seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+  .seg button:hover { color: var(--text); }
+
+  .search { justify-self: end; width: min(100%, 360px); position: relative; }
+  .search input {
+    width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 34px 7px 11px; font: 14px var(--sans);
+  }
+  .search input:focus-visible { outline-offset: 0; border-color: transparent; }
+  .search kbd { position: absolute; right: 9px; top: 50%; translate: 0 -50%; }
+  kbd { font-family: var(--mono); font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+
+  .filters { grid-column: 1 / -1; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--dim); }
+  .filters label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .filters input { accent-color: var(--accent); margin: 0; }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; align-items: start; max-width: 1400px; margin: 0 auto; }
+
+  .list { padding: 8px 12px 80px; }
+  section { margin-top: 18px; }
+  section > h2 {
+    margin: 0 12px 6px; font-size: 11.5px; font-weight: 600; color: var(--faint);
+    text-transform: uppercase; letter-spacing: 0.07em; display: flex; gap: 8px;
+  }
+  section > h2 span { font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+  .group { margin: 4px 0 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .group-head { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .group.collapsed .group-head { border-bottom: 0; }
+  .fold {
+    all: unset; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; border-radius: 4px;
+  }
+  .fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .fold .chev { width: 12px; color: var(--faint); transition: transform 160ms var(--ease-out); }
+  .fold[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+  section > h2 .fold { gap: 6px; }
+  section > h2 .tools { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .group-head .gname { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .group-head .gsub { color: var(--faint); font-size: 12px; flex: 1; }
+  .group-head .gsub a { color: var(--dim); }
+  .group .row { border-radius: 0; }
+  .group .row:last-child { border-radius: 0 0 9px 9px; }
+
+  .row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    padding: 8px 12px; border-radius: 8px;
+  }
+  .row:hover { background: var(--panel); }
+  .row[aria-current="true"] { background: var(--raised); }
+  .row .open {
+    all: unset; cursor: pointer; min-width: 0; display: grid; gap: 1px;
+  }
+  .row .open:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .nm { font-family: var(--mono); font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+  .desc { color: var(--dim); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row.off .nm, .row.off .desc { color: var(--faint); }
+  .pill { font-family: var(--sans); font-weight: 500; font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+  .where { color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .ctl { display: flex; gap: 10px; align-items: center; }
+  .pill.new { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 45%, var(--line)); }
+  .pill.edited { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 45%, var(--line)); }
+  .btn.primary { background: color-mix(in oklch, var(--accent) 22%, var(--panel)); border-color: color-mix(in oklch, var(--accent) 50%, var(--line)); color: var(--text); }
+  .btn.warn { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 50%, var(--line)); }
+  .btn[disabled] { opacity: 0.6; cursor: progress; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--dim); font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .note { font-size: 12.5px; color: var(--dim); margin-top: 6px; }
+
+  .ustate { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--faint); white-space: nowrap; }
+  .ustate.busy { color: var(--dim); }
+  .ustate.ok { color: var(--on); }
+  .ustate.fail { color: var(--warn); }
+  .ustate.enter { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+  @starting-style { .ustate.enter { opacity: 0; transform: scale(0.96); } }
+  .spin {
+    width: 10px; height: 10px; border-radius: 50%; flex: none;
+    border: 1.5px solid currentColor; border-top-color: transparent;
+    animation: spin 800ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.35; } }
+
+  #progress {
+    grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; font-size: 12.5px; color: var(--dim);
+    transition: opacity 200ms var(--ease-out);
+  }
+  #progress[hidden] { display: none; }
+  #progress.finishing { opacity: 0; }
+  #progress .track { flex: 1; max-width: 420px; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  #progress .fill {
+    height: 100%; background: var(--accent); border-radius: inherit;
+    transform: scaleX(0); transform-origin: left; transition: transform 300ms var(--ease-out);
+  }
+  #progress b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  .linkform { display: flex; gap: 8px; margin-top: 8px; }
+  .linkform input {
+    flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 8px; font: 12.5px var(--mono);
+  }
+  .note.warn { color: var(--warn); }
+
+  .switch {
+    position: relative; flex: none; width: 34px; height: 20px; border-radius: 999px; border: 0; padding: 0;
+    background: var(--line); cursor: pointer; transition: background-color 160ms var(--ease-out);
+  }
+  .switch::before { content: ""; position: absolute; inset: -12px -5px; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    transition: transform 160ms var(--ease-out);
+  }
+  .switch[aria-checked="true"] { background: var(--on); }
+  .switch[aria-checked="true"]::after { transform: translateX(14px); }
+  .switch:active::after { transform: scale(0.9); }
+  .switch[aria-checked="true"]:active::after { transform: translateX(14px) scale(0.9); }
+  .switch[aria-checked="mixed"] { background: color-mix(in oklch, var(--on) 45%, var(--line)); }
+  .switch[aria-checked="mixed"]::after { transform: translateX(7px); }
+  .switch[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+
+  .empty { color: var(--faint); padding: 48px 24px; text-align: center; }
+  .empty button { margin-top: 10px; }
+
   #detail {
-    position: sticky; top: 96px; align-self: start; border-left: 1px solid var(--line);
-    padding: 18px 22px 60px; max-height: calc(100vh - 96px); overflow: auto;
+    position: sticky; top: var(--head-h, 120px); max-height: calc(100vh - var(--head-h, 120px));
+    overflow: auto; border-left: 1px solid var(--line); padding: 22px 24px 60px;
   }
-  #detail h2 { margin: 0 0 2px; font-size: 17px; font-family: var(--mono); letter-spacing: -0.01em; }
-  #detail .invoke { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-bottom: 12px; }
-  #detail p.d { color: var(--dim); font-size: 13px; margin: 0 0 16px; }
-  dl { display: grid; grid-template-columns: 108px minmax(0,1fr); gap: 6px 12px; margin: 0 0 18px; font-size: 12.5px; }
-  dt { color: var(--dimmer); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; padding-top: 1px; }
-  dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-word; }
+  #detail h3 { margin: 0; font: 600 16px var(--mono); letter-spacing: -0.01em; word-break: break-word; }
+  .invoke { display: flex; gap: 8px; align-items: center; margin: 4px 0 14px; }
+  .invoke code { font: 12.5px var(--mono); color: var(--accent); }
+  .btn {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px;
+    font-size: 12px; color: var(--dim); cursor: pointer; transition: transform 160ms var(--ease-out), color 150ms;
+  }
+  .btn:hover { color: var(--text); }
+  .btn:active { transform: scale(0.97); }
+  #detail p { color: var(--dim); font-size: 13px; margin: 0 0 18px; max-width: 65ch; }
+  .control { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 18px; }
+  .control div { font-size: 12.5px; color: var(--dim); }
+  .control strong { display: block; color: var(--text); font-weight: 600; font-size: 13px; }
+  .control code { font: 11.5px var(--mono); color: var(--faint); }
+  dl { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 6px 12px; margin: 0 0 18px; font-size: 12.5px; }
+  dt { color: var(--faint); }
+  dd { margin: 0; word-break: break-word; }
+  dd.mono { font: 12px var(--mono); }
+  details summary { cursor: pointer; color: var(--dim); font-size: 12.5px; }
   pre.body {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
-    font-family: var(--mono); font-size: 11.5px; color: var(--dim); white-space: pre-wrap;
-    max-height: 260px; overflow: auto; margin: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 8px 0 0;
+    font: 11.5px/1.55 var(--mono); color: var(--dim); white-space: pre-wrap; max-height: 320px; overflow: auto;
   }
-  .empty { color: var(--dimmer); font-size: 13px; padding: 40px 24px; }
-  kbd { font-family: var(--mono); font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .hint { color: var(--faint); font-size: 13px; padding-top: 40px; text-align: center; }
+  .close { display: none; }
+
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; }
+    header { grid-template-columns: 1fr auto; }
+    .search { grid-column: 1 / -1; justify-self: stretch; width: 100%; }
+    #detail { position: fixed; inset: auto 0 0 0; top: auto; max-height: 75vh; z-index: 10; background: var(--panel); border: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: 0 -12px 40px rgb(0 0 0 / 0.5); }
+    #detail:empty, #detail:has(.hint) { display: none; }
+    .close { display: inline-block; float: right; }
+  }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; z-index: 20; translate: -50% 0;
+    display: flex; gap: 14px; align-items: center; padding: 9px 10px 9px 14px;
+    background: var(--raised); border: 1px solid var(--line); border-radius: 10px; font-size: 13px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+  #toast[hidden] { display: none; }
+  #toast.leaving { opacity: 0; transform: translateY(6px); transition-duration: 150ms; transition-timing-function: ease-in; }
+  @starting-style { #toast { opacity: 0; transform: translateY(8px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switch::after, .btn, #toast { transition-property: opacity, background-color, color; }
+    .spin { animation: pulse 1.2s ease-in-out infinite alternate; border-top-color: currentColor; }
+    #progress .fill { transition: none; }
+    @starting-style { .ustate.enter { transform: none; } }
+    @starting-style { #toast { transform: none; } }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>Skill Atlas</h1>
-  <div class="sub" id="meta"></div>
-  <div class="stats" id="stats"></div>
+<header id="head">
+  <h1>Skills</h1>
+  <div class="seg" id="roots" aria-label="Settings file"></div>
+  <div class="search">
+    <input type="search" id="q" placeholder="Search skills" aria-label="Search skills" autocomplete="off" spellcheck="false">
+    <kbd>/</kbd>
+  </div>
+  <div class="filters">
+    <div class="seg" id="view" aria-label="Show">
+      <button data-v="all" aria-pressed="true">All</button>
+      <button data-v="on" aria-pressed="false">On</button>
+      <button data-v="off" aria-pressed="false">Off</button>
+      <button data-v="updates" aria-pressed="false">Updates</button>
+    </div>
+    <div class="seg" id="groupBy" aria-label="Group your skills by">
+      <button data-g="type" aria-pressed="true">By type</button>
+      <button data-g="source" aria-pressed="false">By source</button>
+    </div>
+    <label><input type="checkbox" id="showProject"> Project skills</label>
+    <label><input type="checkbox" id="showStale"> Old plugin versions</label>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div id="progress" role="status" hidden><div class="track"><div class="fill"></div></div><span></span></div>
 </header>
 
-<div class="toolbar">
-  <div class="row1">
-    <input type="search" id="q" placeholder="Search name, description, plugin, path…  (press / )" autocomplete="off" spellcheck="false">
-    <select id="sort">
-      <option value="name">Name A→Z</option>
-      <option value="-name">Name Z→A</option>
-      <option value="-modified">Recently modified</option>
-      <option value="modified">Oldest modified</option>
-      <option value="-words">Longest</option>
-      <option value="words">Shortest</option>
-      <option value="scope">Scope, then name</option>
-      <option value="status">Status, then name</option>
-      <option value="plugin">Plugin, then name</option>
-    </select>
-    <button class="linkbtn" id="reset">Reset filters</button>
-  </div>
-  <div class="chips" id="filters"></div>
-</div>
-
-<div class="count" id="count"></div>
 <main>
-  <ul class="list" id="list"></ul>
-  <aside id="detail"><div class="empty">Select a skill to see its full record.</div></aside>
+  <div class="list" id="list"></div>
+  <aside id="detail"></aside>
 </main>
+<div id="toast" role="status" hidden></div>
 
 <script id="data" type="application/json">__SKILL_ATLAS_DATA__</script>
 <script>
-const DATA = JSON.parse(document.getElementById('data').textContent);
-const SKILLS = DATA.skills;
-
-// Chips that start off: worktree/project copies and superseded plugin versions bury the live set.
-const DEFAULT_OFF = new Set(['scope:project', 'status:stale']);
-const GROUPS = [
-  ['scope', 'Scope', s => s.scope],
-  ['status', 'Status', s => s.status],
-  ['invocation', 'Invocation', s => s.invocation],
-];
-
-const active = new Map();
-for (const [key, , get] of GROUPS) {
-  const values = [...new Set(SKILLS.map(get))].sort();
-  active.set(key, new Set(values.filter(v => !DEFAULT_OFF.has(key + ':' + v))));
-}
+let DATA = JSON.parse(document.getElementById('data').textContent);
+let SKILLS = DATA.skills;
+const WRITABLE = Boolean(DATA.api_token);
+const ROOT_LABELS = Object.keys(DATA.config_roots);
 
 const el = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tilde = p => String(p || '').replace(/^\/Users\/[^/]+/, '~');
 
-function haystack(s) {
-  return [s.name, s.invoke, s.description, s.plugin, s.marketplace, s.project,
-          s.path, s.scope, s.status, (s.allowed_tools||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+const ui = {
+  root: ROOT_LABELS[0], view: 'all', q: '', showProject: false, showStale: false, selected: null,
+  groupBy: localStorage.getItem('atlas.groupBy') || 'type',
+};
+const NO_SOURCE = 'Local, no upstream';
+const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
+const isLocalGroup = source => source === NO_SOURCE || source.endsWith('-*');
+
+function index() {
+  const personal = SKILLS.filter(s => s.scope === 'personal');
+  // Untracked skills that share a name prefix (emil-animations, emil-color…) get their own group.
+  const prefixOf = s => (s.name.includes('-') ? s.name.split('-')[0] : null);
+  const counts = {};
+  for (const s of personal) if (!s.origin?.source && prefixOf(s)) counts[prefixOf(s)] = (counts[prefixOf(s)] || 0) + 1;
+  const byDesc = {};
+  for (const s of personal) if (s.description) (byDesc[s.description] ||= []).push(s);
+
+  // Label each group with the longest dash-separated prefix its members share: source-command-*.
+  const labels = {};
+  for (const p of Object.keys(counts).filter(p => counts[p] >= 3)) {
+    const parts = personal.filter(s => !s.origin?.source && prefixOf(s) === p).map(s => s.name.split('-'));
+    let n = 1;
+    while (parts.every(x => x.length > n + 1 && x[n] === parts[0][n])) n++;
+    labels[p] = parts[0].slice(0, n).join('-') + '-*';
+  }
+
+  SKILLS.forEach((s, i) => {
+    s.id = i;
+    s._prefix = s.scope === 'personal' && !s.origin?.source ? labels[prefixOf(s)] || null : null;
+    s._dupes = (byDesc[s.description] || []).filter(x => x !== s).map(x => x.name);
+    s._hay = [s.name, s.invoke, s.description, s.plugin, s.marketplace, s.project, s.path, sourceOf(s)]
+      .filter(Boolean).join(' ').toLowerCase();
+  });
 }
-SKILLS.forEach(s => s._hay = haystack(s));
+index();
 
-function highlight(text, terms) {
+// Update state for skills installed by `npx skills`, keyed by their lock name (the folder name).
+const upd = { status: {}, errors: {}, checking: false, checkedAt: null, job: null, doneAt: {}, confirm: null };
+const RUNNING = new Set(['queued', 'downloading', 'installing']);
+const jobState = name => upd.job?.items[name]?.state;
+const isBusy = name => RUNNING.has(jobState(name));
+const lockName = s => (s.scope === 'personal' && s.origin?.skillFolderHash ? s.dir_name : null);
+const updStatus = s => upd.status[lockName(s)];
+const isOutdated = s => updStatus(s) === 'outdated';
+
+// What the switch shows for one skill under the chosen settings file.
+function state(s) {
+  const cfg = DATA.settings[ui.root] || { skillOverrides: {}, enabledPlugins: {} };
+  if (s.scope === 'personal') {
+    const mode = cfg.skillOverrides[s.name] || 'on';
+    return { on: mode !== 'off', mode, toggle: 'skill', key: s.name };
+  }
+  if (s.scope === 'plugin') {
+    if (s.status === 'stale') return { on: false, mode: 'old version' };
+    const v = cfg.enabledPlugins[s.plugin_ref];
+    return { on: v === true, mode: v === undefined ? 'not set' : '', toggle: 'plugin', key: s.plugin_ref };
+  }
+  return { on: true, mode: 'project only' };
+}
+
+function visible(s) {
+  if (s.scope !== 'project' && !s.config_roots.includes(ui.root)) return false;
+  if (s.scope === 'project' && !ui.showProject) return false;
+  if (s.status === 'stale' && !ui.showStale) return false;
+  if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
+  else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
+  const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
+  return terms.every(t => s._hay.includes(t));
+}
+
+function highlight(text) {
   let out = esc(text);
-  for (const t of terms) {
-    if (t.length < 2) continue;
-    out = out.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
+  for (const t of ui.q.split(/\s+/).filter(t => t.length > 1)) {
+    out = out.replace(new RegExp('(' + esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
   }
   return out;
 }
 
-function renderFilters() {
-  el('filters').innerHTML = GROUPS.map(([key, label, get]) => {
-    const values = [...new Set(SKILLS.map(get))].sort();
-    const chips = values.map(v => {
-      const n = SKILLS.filter(s => get(s) === v).length;
-      const on = active.get(key).has(v);
-      return `<button class="chip" data-group="${key}" data-value="${esc(v)}" aria-pressed="${on}">${esc(v)} ${n}</button>`;
-    }).join('');
-    return `<span class="chip-group-label">${label}</span>${chips}`;
-  }).join('<span style="width:10px"></span>');
+function switchHtml(on, label, attrs) {
+  const disabled = !attrs || !WRITABLE;
+  return `<button class="switch" role="switch" aria-checked="${on}" aria-label="${esc(label)}"
+    ${disabled ? 'aria-disabled="true"' : ''} ${attrs || ''}></button>`;
 }
 
-function currentSet() {
-  const terms = el('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  let rows = SKILLS.filter(s => GROUPS.every(([key, , get]) => active.get(key).has(get(s))));
-  if (terms.length) rows = rows.filter(s => terms.every(t => s._hay.includes(t)));
-
-  const sort = el('sort').value;
-  const dir = sort.startsWith('-') ? -1 : 1;
-  const key = sort.replace(/^-/, '');
-  const byName = (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-  rows.sort((a, b) => {
-    if (key === 'name') return dir * byName(a, b);
-    if (key === 'words') return dir * (a.words - b.words) || byName(a, b);
-    if (key === 'modified') return dir * a.modified.localeCompare(b.modified) || byName(a, b);
-    return String(a[key] || '~').localeCompare(String(b[key] || '~')) || byName(a, b);
-  });
-  return { rows, terms };
+function row(s, { inGroup = false } = {}) {
+  const st = state(s);
+  const tags = [
+    s.manual_only ? '<span class="pill" title="disable-model-invocation: Claude never calls it on its own">you only</span>' : '',
+    st.mode && !['on', 'off', 'not set'].includes(st.mode) ? `<span class="pill">${esc(st.mode)}</span>` : '',
+    s.status === 'stale' ? `<span class="pill">v${esc(s.plugin_version)}</span>` : '',
+    isOutdated(s) && !WRITABLE ? '<span class="pill new">update</span>' : '',
+    s._dupes?.length ? `<span class="pill" title="Same description as ${esc(s._dupes.join(', '))}">same as ${esc(s._dupes[0])}${s._dupes.length > 1 ? ` +${s._dupes.length - 1}` : ''}</span>` : '',
+    s.local_edits ? '<span class="pill edited" title="Changed after install. Updating replaces your changes.">edited</span>' : '',
+    updStatus(s) === 'unknown' ? '<span class="pill" title="Not found in the source repo. It may have moved or been removed.">not upstream</span>' : '',
+  ].join('');
+  const control = s.scope === 'personal'
+    ? `<span class="ctl">${updateButton(s)}${switchHtml(st.on, `Turn ${s.name} ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)}</span>`
+    : !inGroup && s.scope === 'project' ? `<span class="where">${esc(s.project)}</span>` : '';
+  return `<div class="row ${st.on ? '' : 'off'}" aria-current="${ui.selected === s}">
+    <button class="open" data-id="${s.id}">
+      <span class="nm">${highlight(s.invoke)}${tags}</span>
+      <span class="desc">${highlight(s.description || 'No description')}</span>
+    </button>
+    ${control}
+  </div>`;
 }
 
-let selected = null;
+// Keeps the spinner's rotation continuous across list re-renders.
+const spinner = () => `<i class="spin" style="animation-delay:-${Date.now() % 800}ms"></i>`;
+
+function updateButton(s) {
+  const name = lockName(s);
+  if (!name || !WRITABLE) return '';
+  const st = jobState(name);
+  if (st === 'queued') return '<span class="ustate">Queued</span>';
+  if (RUNNING.has(st)) return `<span class="ustate busy">${spinner()}Updating</span>`;
+  const since = Date.now() - (upd.doneAt[name] || 0);
+  if (st === 'done' && since < 2000) return `<span class="ustate ok${since < 250 ? ' enter' : ''}">✓ Updated</span>`;
+  if (st === 'failed') return `<button class="btn warn" data-update="${esc(name)}" title="${esc(upd.job.items[name].error)}">Retry</button>`;
+  if (!isOutdated(s)) return '';
+  if (upd.confirm === name) return `<button class="btn warn" data-update="${esc(name)}" data-confirmed="1">Replace my edits</button>`;
+  return `<button class="btn" data-update="${esc(name)}">Update</button>`;
+}
+
+function groupUpdateButton(list, attrs, { label = 'Update', cls = 'btn' } = {}) {
+  const out = list.filter(isOutdated);
+  if (!out.length || !WRITABLE) return '';
+  if (out.some(s => isBusy(lockName(s)))) return `<button class="${cls}" disabled>Updating…</button>`;
+  return `<button class="${cls}" ${attrs}>${label} ${out.length}</button>`;
+}
+
+function groupBy(list, key) {
+  const m = new Map();
+  for (const s of list) m.set(s[key], [...(m.get(s[key]) || []), s]);
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+// Collapsed groups are kept per id across reloads. Searching opens everything so matches stay visible.
+const collapsed = new Set(JSON.parse(localStorage.getItem('atlas.collapsed') || '[]'));
+const isOpen = id => Boolean(ui.q) || !collapsed.has(id);
+const CHEVRON = '<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function fold(id, inner) {
+  return `<button class="fold" data-fold="${esc(id)}" aria-expanded="${isOpen(id)}">${CHEVRON}${inner}</button>`;
+}
+
+function sectionHead(id, title, count, groupIds = []) {
+  const tools = groupIds.length > 1 && !ui.q
+    ? `<span class="tools"><button class="linkbtn" data-fold-all="${esc(groupIds.join('\n'))}">${groupIds.every(g => collapsed.has(g)) ? 'Expand all' : 'Collapse all'}</button></span>`
+    : '';
+  return `<h2>${fold(id, `${title} <span>${count}</span>`)}${tools}</h2>`;
+}
+
+function section(id, title, count, body, groupIds) {
+  return `<section>${sectionHead(id, title, count, groupIds)}${isOpen(id) ? body : ''}</section>`;
+}
+
+function group(id, head, body, extraClass = '') {
+  const open = isOpen(id);
+  return `<div class="group${open ? '' : ' collapsed'} ${extraClass}">${head(open)}${open ? body : ''}</div>`;
+}
+
+function sourceGroups(personal) {
+  for (const s of personal) s._source = sourceOf(s);
+  const groups = groupBy(personal, '_source');
+  // Repos first, then name-prefix groups, then the rest; bigger groups first within each.
+  const rank = src => (src === NO_SOURCE ? 2 : isLocalGroup(src) ? 1 : 0);
+  groups.sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
+  return groups.map(([source, list]) => {
+    const all = SKILLS.filter(s => s.scope === 'personal' && s.config_roots.includes(ui.root) && sourceOf(s) === source);
+    const onCount = all.filter(s => state(s).on).length;
+    const checked = onCount === all.length ? 'true' : onCount === 0 ? 'false' : 'mixed';
+    const url = all.find(s => s.origin?.sourceUrl)?.origin.sourceUrl;
+    const local = isLocalGroup(source);
+    const counts = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${onCount} of ${all.length} on${list.length < all.length ? ` · ${list.length} shown` : ''}`;
+    const delKey = 'group:' + source;
+    return group('src:' + source, () => `
+      <div class="group-head">${fold('src:' + source, `<span class="gname">${highlight(source)}</span>`)}
+        <span class="gsub">${counts}${url ? ` · <a href="${esc(url.replace(/\.git$/, ''))}" target="_blank" rel="noreferrer">repo</a>` : ''}</span>
+        ${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}
+        ${local && WRITABLE ? `<button class="btn" data-show-link="${esc(source)}">Link to GitHub…</button>` : ''}
+        ${WRITABLE ? deleteButton(delKey, all.length, `data-delete-source="${esc(source)}"`) : ''}
+        ${switchHtml(checked, `Turn all ${all.length} skills from ${source} ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`)}</div>`,
+      `${local && ui.linkOpen === source ? linkForm('Link every skill here whose folder name matches', all.map(s => s.dir_name)) : ''}
+      ${list.map(s => row(s, { inGroup: true })).join('')}`);
+  }).join('');
+}
+
+function linkForm(label, names) {
+  return `<form class="linkform" data-names="${esc(names.join(' '))}" style="padding:8px 12px" aria-label="${esc(label)}">
+    <input name="repo" placeholder="owner/repo or GitHub URL" aria-label="GitHub repo" autocomplete="off" spellcheck="false" required>
+    <button class="btn">Link</button></form>`;
+}
 
 function render() {
-  const { rows, terms } = currentSet();
-  el('count').textContent = `${rows.length} shown of ${SKILLS.length} scanned`;
-  el('list').innerHTML = rows.map((s, i) => {
-    const tags = [
-      `<span class="tag ${esc(s.status)}">${esc(s.status)}</span>`,
-      s.manual_only ? '<span class="tag manual">manual only</span>' : '',
-      s.plugin ? `<span class="tag">${esc(s.plugin)}</span>` : '',
-      s.project ? `<span class="tag">${esc(s.project)}</span>` : '',
-      `<span class="tag">${esc(s.scope)}</span>`,
-    ].join('');
-    return `<li class="item" data-i="${SKILLS.indexOf(s)}" aria-selected="${s === selected}" tabindex="0">
-      <span class="nm">${highlight(s.invoke, terms)}</span>
-      <span class="tags">${tags}</span>
-      <span class="desc">${highlight(s.description || '(no description)', terms)}</span>
-    </li>`;
-  }).join('') || '<li class="empty">Nothing matches.</li>';
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const inRoot = s => s.scope === 'project' || s.config_roots.includes(ui.root);
+  const shown = SKILLS.filter(visible).sort(byName);
+  const out = [];
+
+  const personal = shown.filter(s => s.scope === 'personal');
+  if (personal.length) {
+    const total = SKILLS.filter(s => s.scope === 'personal' && inRoot(s)).length;
+    const body = ui.groupBy === 'source' ? sourceGroups(personal) : personal.map(s => row(s)).join('');
+    const ids = ui.groupBy === 'source' ? [...new Set(personal.map(s => 'src:' + sourceOf(s)))] : [];
+    out.push(section('sec:personal', 'Your skills', personal.length === total ? total : `${personal.length} of ${total}`, body, ids));
+  }
+
+  const plugins = shown.filter(s => s.scope === 'plugin');
+  if (plugins.length) {
+    const groups = groupBy(plugins, 'plugin_ref').map(([ref, list]) => {
+      const live = list.find(s => s.status !== 'stale') || list[0];
+      const st = state(live);
+      const ctl = live.status === 'stale' ? '' :
+        switchHtml(st.on, `Turn plugin ${live.plugin} ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
+      const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
+      return group('plg:' + ref, () => `
+        <div class="group-head">${fold('plg:' + ref, `<span class="gname">${highlight(live.plugin)}</span>`)}
+          <span class="gsub">${esc(live.marketplace)} · ${list.length} skill${list.length === 1 ? '' : 's'}${note}</span>${ctl}</div>`,
+        list.map(s => row(s, { inGroup: true })).join(''));
+    });
+    const refs = [...new Set(plugins.map(s => s.plugin_ref))];
+    out.push(section('sec:plugins', 'Plugins', refs.length, groups.join(''), refs.map(r => 'plg:' + r)));
+  }
+
+  const project = shown.filter(s => s.scope === 'project');
+  if (project.length) {
+    const byProject = groupBy(project, 'project');
+    const groups = byProject.map(([name, list]) => group('prj:' + name, () => `
+      <div class="group-head">${fold('prj:' + name, `<span class="gname">${esc(name)}</span>`)}<span class="gsub">loads only inside this project · ${list.length}</span></div>`,
+      list.map(s => row(s, { inGroup: true })).join('')));
+    out.push(section('sec:project', 'Project skills', project.length, groups.join(''), byProject.map(([n]) => 'prj:' + n)));
+  }
+
+  el('list').innerHTML = out.join('') || `<div class="empty">No skills match “${esc(ui.q)}”.<br>
+    <button class="btn" id="clear">Clear search and filters</button></div>`;
+  renderSummary();
 }
 
-function field(label, value) {
+function renderSummary() {
+  const live = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
+  const on = live.filter(s => state(s).on).length;
+  el('summary').innerHTML = [
+    `<span><b>${on}</b> on</span>`,
+    `<span><b>${live.length - on}</b> off</span>`,
+    `<span>Writes to <b>${esc(tilde(DATA.settings[ui.root]?.path))}</b></span>`,
+    DATA.bundled_skills_disabled ? '<span>Built-in skills <b>off</b></span>' : '',
+    WRITABLE ? updateSummary(live) : '<span class="readonly">Read-only. Run <b>./atlas</b> to change skills.</span>',
+  ].join('');
+}
+
+function updateSummary(live) {
+  if (upd.checking) return '<span>Checking for updates…</span>';
+  if (!upd.checkedAt) return '';
+  const out = live.filter(isOutdated);
+  const failed = Object.keys(upd.errors).length;
+  const again = '<button class="linkbtn" id="recheck">Check again</button>';
+  const warn = failed ? `<span class="readonly" title="${esc(Object.values(upd.errors).join('\n'))}">${failed} source${failed === 1 ? '' : 's'} could not be checked</span>` : '';
+  if (!out.length) return `<span>All skills up to date</span>${warn}${again}`;
+  return `<span><b>${out.length}</b> update${out.length === 1 ? '' : 's'}</span>
+    ${groupUpdateButton(live, 'data-update-all', { label: 'Update all', cls: 'btn primary' })}${warn}${again}`;
+}
+
+function field(label, value, mono) {
   if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return '';
-  return `<dt>${esc(label)}</dt><dd>${esc(Array.isArray(value) ? value.join(', ') : value)}</dd>`;
+  return `<dt>${esc(label)}</dt><dd${mono ? ' class="mono"' : ''}>${esc(Array.isArray(value) ? value.join(', ') : value)}</dd>`;
 }
 
-function renderDetail(s) {
+function renderDetail() {
+  const s = ui.selected;
+  if (!s) { el('detail').innerHTML = '<div class="hint">Select a skill to see where it lives and what it does.</div>'; return; }
+  const st = state(s);
   const o = s.origin || {};
   const ms = s.marketplace_source || {};
+  let control = '';
+  if (s.scope === 'personal') {
+    control = `<div class="control">${switchHtml(st.on, `Turn ${s.name} ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)}
+      <div><strong>${st.on ? 'On' : 'Off'}</strong><code>skillOverrides.${esc(s.name)}${st.mode === 'on' ? '' : ` = "${esc(st.mode)}"`}</code></div></div>`;
+    if (!lockName(s) && WRITABLE) {
+      control += `<div class="control"><div style="flex:1"><strong>Not linked to a repo</strong>Link it to get update checks.
+        ${linkForm('Link this skill to a GitHub repo', [s.dir_name]).replace('style="padding:8px 12px"', '')}</div></div>`;
+    } else if (isOutdated(s) || isBusy(lockName(s)) || jobState(lockName(s))) {
+      control += `<div class="control">${updateButton(s)}<div><strong>Update available</strong>A newer version is on ${esc(s.origin.source)}.
+        ${s.local_edits ? '<div class="note warn">You changed this skill after install. Updating replaces your changes.</div>' : ''}</div></div>`;
+    } else if (s.local_edits) {
+      control += '<div class="note warn" style="margin:-8px 0 18px">You changed this skill after install.</div>';
+    }
+  } else if (s.scope === 'plugin' && s.status !== 'stale') {
+    control = `<div class="control">${switchHtml(st.on, `Turn plugin ${s.plugin} ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(st.key)}"`)}
+      <div><strong>Plugin ${st.on ? 'on' : 'off'}</strong>Turns all ${SKILLS.filter(x => x.plugin_ref === s.plugin_ref && x.status !== 'stale').length} skills in ${esc(s.plugin)} on or off together.</div></div>`;
+  } else if (s.status === 'stale') {
+    control = `<div class="control"><div><strong>Old version</strong>Claude Code no longer loads this copy.</div></div>`;
+  } else {
+    control = `<div class="control"><div><strong>Project skill</strong>Loads only when you work inside ${esc(s.project)}.</div></div>`;
+  }
   el('detail').innerHTML = `
-    <h2>${esc(s.name)}</h2>
-    <div class="invoke">/${esc(s.invoke)}</div>
-    <p class="d">${esc(s.description || '(no description)')}</p>
+    <button class="btn close" data-close>Close</button>
+    <h3>${esc(s.name)}</h3>
+    <div class="invoke"><code>/${esc(s.invoke)}</code><button class="btn" data-copy="/${esc(s.invoke)}">Copy</button></div>
+    <p>${esc(s.description || 'No description')}</p>
+    ${control}
     <dl>
-      ${field('Status', s.status)}
-      ${field('Scope', s.scope)}
-      ${field('Invocation', s.invocation)}
-      ${field('Config roots', s.config_roots)}
-      ${field('Plugin', s.plugin_ref)}
-      ${field('Plugin ver', s.plugin_version)}
-      ${field('Marketplace', ms.url || ms.path || s.marketplace)}
-      ${field('Commit', s.commit)}
-      ${field('Installed', (s.installed_at || o.installedAt || '').slice(0, 10))}
-      ${field('Updated', (s.last_updated || o.updatedAt || '').slice(0, 10))}
-      ${field('Upstream', o.sourceUrl || o.source)}
-      ${field('Project', s.project_path || s.plugin_project)}
-      ${field('Version', s.version)}
-      ${field('License', s.license)}
-      ${field('Model', s.model)}
-      ${field('Tools', s.allowed_tools)}
-      ${field('Args', s.argument_hint)}
-      ${field('Modified', s.modified.slice(0, 16).replace('T', ' '))}
-      ${field('Size', `${s.words} words · ${s.headings} sections`)}
-      ${field('Bundle', `${s.file_count} files · ${(s.bytes / 1024).toFixed(1)} KB${s.subdirs.length ? ' · ' + s.subdirs.join('/') : ''}`)}
-      ${field('Path', s.path)}
+      ${field('Who calls it', s.manual_only ? 'Only you, by name' : 'You or Claude')}
+      ${field('Plugin', s.plugin_ref, true)}
+      ${field('Version', s.plugin_version || s.version, true)}
+      ${field('Source', ms.url || ms.repo || o.sourceUrl || o.source, true)}
+      ${field('Updated', (s.last_updated || o.updatedAt || s.modified || '').slice(0, 10))}
+      ${field('Tools', s.allowed_tools, true)}
+      ${field('Arguments', s.argument_hint, true)}
+      ${field('Size', `${s.words.toLocaleString()} words · ${s.file_count} files`)}
+      ${field('Path', tilde(s.path), true)}
     </dl>
-    ${Object.keys(s.extra_frontmatter || {}).length ? `<dl>${Object.entries(s.extra_frontmatter).map(([k, v]) => field(k, typeof v === 'object' ? JSON.stringify(v) : v)).join('')}</dl>` : ''}
-    <pre class="body">${esc(s.body_preview)}</pre>`;
+    <details><summary>Preview</summary><pre class="body">${esc(s.body_preview)}</pre></details>
+    ${s.scope === 'personal' && WRITABLE ? `<div style="margin-top:28px;padding-top:16px;border-top:1px solid var(--line)">
+      ${deleteButton('skill:' + s.dir_name, 1, `data-delete="${esc(s.dir_name)}"`)}
+      <div class="note">Moves the folder to the Trash and removes its lock entry. You can undo it.</div></div>` : ''}`;
 }
 
-el('list').addEventListener('click', e => {
-  const li = e.target.closest('li.item');
-  if (!li) return;
-  selected = SKILLS[+li.dataset.i];
-  render();
-  renderDetail(selected);
-});
-el('q').addEventListener('input', render);
-el('sort').addEventListener('change', render);
-el('filters').addEventListener('click', e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  const set = active.get(chip.dataset.group);
-  set.has(chip.dataset.value) ? set.delete(chip.dataset.value) : set.add(chip.dataset.value);
-  renderFilters(); render();
-});
-el('reset').addEventListener('click', () => {
-  el('q').value = '';
-  for (const [key, , get] of GROUPS) {
-    active.set(key, new Set([...new Set(SKILLS.map(get))].filter(v => !DEFAULT_OFF.has(key + ':' + v))));
+let toastTimer;
+function toast(html, undo) {
+  const t = el('toast');
+  clearTimeout(toastTimer);
+  t.classList.remove('leaving');
+  t.hidden = true; void t.offsetWidth; t.hidden = false;
+  t.innerHTML = `<span>${html}</span>${undo ? '<button class="btn" id="undo">Undo</button>' : ''}`;
+  if (undo) el('undo').onclick = () => { hideToast(); undo(); };
+  const ms = undo ? 8000 : 3000;
+  toastTimer = setTimeout(hideToast, ms);
+  t.onmouseenter = () => clearTimeout(toastTimer);
+  t.onmouseleave = () => { toastTimer = setTimeout(hideToast, 2000); };
+}
+function hideToast() {
+  const t = el('toast');
+  t.classList.add('leaving');
+  setTimeout(() => { t.hidden = true; }, 150);
+}
+
+async function post(kind, names, on) {
+  const res = await fetch('/api/toggle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Atlas-Token': DATA.api_token },
+    body: JSON.stringify({ root: ui.root, kind, names, on }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+  DATA.settings[ui.root] = await res.json();
+  rerender();
+}
+
+async function setSource(source, on) {
+  const all = SKILLS.filter(s => s.scope === 'personal' && s.config_roots.includes(ui.root) && sourceOf(s) === source);
+  // Only the skills that change, so Undo restores each one to where it was.
+  const changed = all.filter(s => state(s).on !== on).map(s => s.name);
+  await post('skill', changed, on);
+  toast(`Turned <b>${changed.length}</b> skill${changed.length === 1 ? '' : 's'} from <b>${esc(source)}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`,
+    () => post('skill', changed, !on));
+}
+
+async function setSetting(kind, key, on, { quiet = false } = {}) {
+  await post(kind, [key], on);
+  if (!quiet) {
+    const what = kind === 'plugin' ? `plugin ${key.split('@')[0]}` : key;
+    toast(`Turned <b>${esc(what)}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`,
+      () => setSetting(kind, key, !on, { quiet: true }));
   }
-  renderFilters(); render();
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined
+    ? { headers: { 'X-Atlas-Token': DATA.api_token } }
+    : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Atlas-Token': DATA.api_token }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
+  return data;
+}
+
+async function checkUpdates(refresh = false) {
+  upd.checking = true; renderSummary();
+  try {
+    const data = await api('/api/updates' + (refresh ? '?refresh=1' : ''));
+    Object.assign(upd, { status: data.skills, errors: data.errors, checkedAt: data.checked_at });
+  } catch (err) {
+    toast(`Could not check for updates: ${esc(err.message)}`);
+  } finally {
+    upd.checking = false; rerender();
+  }
+}
+
+async function reloadData() {
+  const token = DATA.api_token;
+  const path = ui.selected?.path;
+  DATA = { ...(await api('/api/data')), api_token: token };
+  SKILLS = DATA.skills; index();
+  ui.selected = SKILLS.find(s => s.path === path) || null;
+}
+
+function renderProgress() {
+  const box = el('progress');
+  const items = Object.values(upd.job?.items || {});
+  if (!items.length) { box.hidden = true; return; }
+  const finished = items.filter(i => !RUNNING.has(i.state)).length;
+  box.hidden = false;
+  box.classList.toggle('finishing', Boolean(upd.job.done && upd.job.fade));
+  box.querySelector('.fill').style.transform = `scaleX(${finished / items.length})`;
+  box.querySelector('span').innerHTML = upd.job.done
+    ? `Updated <b>${items.filter(i => i.state === 'done').length}</b> of ${items.length}`
+    : `Updating <b>${finished}</b> of ${items.length}…`;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Skills you edited are left out of batch updates; they need their own confirmed click.
+async function runUpdate(skills, note = '') {
+  const names = skills.map(lockName);
+  if (!names.length) return;
+  upd.confirm = null;
+  try {
+    upd.job = await api('/api/update', { names });
+  } catch (err) {
+    return toast(`Could not start the update: ${esc(err.message)}`);
+  }
+  rerender(); renderProgress();
+
+  while (!upd.job.done) {
+    await sleep(300);
+    const prev = upd.job.items;
+    upd.job = await api('/api/jobs/' + upd.job.id).catch(() => upd.job);
+    for (const [n, i] of Object.entries(upd.job.items)) {
+      if (i.state === 'done' && prev[n]?.state !== 'done') upd.doneAt[n] = Date.now();
+    }
+    if (JSON.stringify(prev) !== JSON.stringify(upd.job.items)) { rerender(); renderProgress(); }
+  }
+
+  const items = Object.entries(upd.job.items);
+  const failed = items.filter(([, i]) => i.state === 'failed');
+  await reloadData();
+  await checkUpdates();
+  const ok = items.length - failed.length;
+  toast(failed.length
+    ? `Updated ${ok}, <b>${failed.length} failed</b>: ${esc(failed[0][1].error)}. Use Retry on the row.`
+    : `Updated <b>${ok === 1 ? esc(names[0]) : ok + ' skills'}</b> in ${upd.job.seconds}s.${note} Restart Claude Code sessions to pick it up.`);
+
+  // Let the bar sit full for a beat, then fade it and clear the "✓ Updated" labels.
+  await sleep(900); upd.job.fade = true; renderProgress();
+  await sleep(1300);
+  if (upd.job?.done) { upd.job = null; renderProgress(); rerender(); }
+}
+
+function updateBatch(list) {
+  if (upd.job && !upd.job.done) return toast('An update is already running.');
+  const out = list.filter(isOutdated);
+  const safe = out.filter(s => !s.local_edits);
+  const skipped = out.length - safe.length;
+  const note = skipped ? ` Skipped <b>${skipped}</b> you edited; update those one at a time.` : '';
+  if (!safe.length) return toast(`All ${skipped} have your edits. Update them one at a time.`);
+  runUpdate(safe, note);
+}
+
+function deleteButton(key, count, attrs) {
+  return ui.confirmDelete === key
+    ? `<button class="btn warn" ${attrs}>Move ${count === 1 ? 'it' : count} to Trash</button>`
+    : `<button class="btn" ${attrs}>Delete${count === 1 ? '' : '…'}</button>`;
+}
+
+async function deleteSkills(list) {
+  ui.confirmDelete = null;
+  const names = list.map(s => s.dir_name);
+  try {
+    await api('/api/delete', { names });
+  } catch (err) {
+    rerender();
+    return toast(`Could not delete: ${esc(err.message)}`);
+  }
+  if (names.includes(ui.selected?.dir_name)) ui.selected = null;
+  await reloadData(); rerender();
+  toast(`Moved <b>${names.length === 1 ? esc(names[0]) : names.length + ' skills'}</b> to the Trash.`, async () => {
+    try {
+      const r = await api('/api/undo-delete', {});
+      await reloadData(); rerender();
+      toast(`Put back ${r.restored.length} skill${r.restored.length === 1 ? '' : 's'}.`);
+    } catch (err) { toast(`Could not undo: ${esc(err.message)}`); }
+  });
+}
+
+async function linkSkills(names, repo, form) {
+  const btn = form.querySelector('button');
+  btn.disabled = true; btn.textContent = 'Linking…';
+  try {
+    const r = await api('/api/link', { names, repo });
+    await reloadData(); await checkUpdates(true);
+    toast(r.linked.length
+      ? `Linked <b>${r.linked.length}</b> to ${esc(r.repo)}.${r.missing.length ? ` No folder for: ${esc(r.missing.join(', '))}.` : ''}`
+      : `No matching folders in ${esc(r.repo)}. A folder must have the same name as the skill.`);
+  } catch (err) {
+    toast(`Could not link: ${esc(err.message)}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Link'; rerender();
+  }
+}
+
+function rerender() {
+  const focused = document.activeElement;
+  const sel = focused?.dataset?.key ? `[data-key="${CSS.escape(focused.dataset.key)}"]` : focused?.dataset?.id ? `[data-id="${focused.dataset.id}"]` : null;
+  const inDetail = el('detail').contains(focused);
+  render(); renderDetail();
+  if (sel) (inDetail ? el('detail') : el('list')).querySelector(sel)?.focus();
+}
+
+document.addEventListener('click', async e => {
+  const sw = e.target.closest('.switch');
+  if (sw) {
+    if (!WRITABLE) return toast('This page is read-only. Run <b>./atlas</b> to change skills.');
+    if (sw.getAttribute('aria-disabled') === 'true') return;
+    const was = sw.getAttribute('aria-checked');
+    const on = was !== 'true';
+    sw.setAttribute('aria-checked', on);
+    try {
+      if (sw.dataset.kind === 'source') await setSource(sw.dataset.key, on);
+      else await setSetting(sw.dataset.kind, sw.dataset.key, on);
+    } catch (err) { sw.setAttribute('aria-checked', was); toast(`Could not save: ${esc(err.message)}`); }
+    return;
+  }
+  const u = e.target.closest('[data-update]');
+  if (u) {
+    if (upd.job && !upd.job.done) return toast('An update is already running.');
+    const s = SKILLS.find(x => lockName(x) === u.dataset.update);
+    if (s.local_edits && !u.dataset.confirmed) {
+      upd.confirm = lockName(s); rerender();
+      setTimeout(() => { if (upd.confirm === lockName(s)) { upd.confirm = null; rerender(); } }, 4000);
+      return;
+    }
+    return runUpdate([s]);
+  }
+  const live = s => s.scope === 'personal' && s.config_roots.includes(ui.root);
+  if (e.target.closest('[data-update-all]')) return updateBatch(SKILLS.filter(live));
+  const us = e.target.closest('[data-update-source]');
+  if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
+  if (e.target.id === 'recheck') return checkUpdates(true);
+  const f = e.target.closest('[data-fold]');
+  if (f) {
+    const id = f.dataset.fold;
+    collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
+    if (ui.q) { collapsed.delete(id); }
+    localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+    render(); el('list').querySelector(`[data-fold="${CSS.escape(id)}"]`)?.focus();
+    return;
+  }
+  const fa = e.target.closest('[data-fold-all]');
+  if (fa) {
+    const ids = fa.dataset.foldAll.split('\n');
+    const close = !ids.every(g => collapsed.has(g));
+    ids.forEach(g => (close ? collapsed.add(g) : collapsed.delete(g)));
+    localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+    render(); return;
+  }
+  const sl = e.target.closest('[data-show-link]');
+  if (sl) {
+    ui.linkOpen = ui.linkOpen === sl.dataset.showLink ? null : sl.dataset.showLink;
+    render(); el('list').querySelector('.linkform input')?.focus(); return;
+  }
+  const del = e.target.closest('[data-delete], [data-delete-source]');
+  if (del) {
+    const key = del.dataset.delete ? 'skill:' + del.dataset.delete : 'group:' + del.dataset.deleteSource;
+    if (ui.confirmDelete !== key) {
+      ui.confirmDelete = key; rerender();
+      setTimeout(() => { if (ui.confirmDelete === key) { ui.confirmDelete = null; rerender(); } }, 4000);
+      return;
+    }
+    const live = s => s.scope === 'personal' && s.config_roots.includes(ui.root);
+    const list = del.dataset.delete
+      ? SKILLS.filter(s => live(s) && s.dir_name === del.dataset.delete)
+      : SKILLS.filter(s => live(s) && sourceOf(s) === del.dataset.deleteSource);
+    return deleteSkills(list);
+  }
+  const open = e.target.closest('.open');
+  if (open) { ui.selected = SKILLS[+open.dataset.id]; rerender(); return; }
+  if (e.target.closest('[data-close]')) { ui.selected = null; rerender(); return; }
+  const copy = e.target.closest('[data-copy]');
+  if (copy) {
+    await navigator.clipboard.writeText(copy.dataset.copy);
+    copy.textContent = 'Copied';
+    setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+    return;
+  }
+  if (e.target.id === 'clear') reset();
 });
+
+function setSeg(container, attr, value) {
+  for (const b of el(container).querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset[attr] === value);
+}
+el('roots').innerHTML = ROOT_LABELS.map(r => `<button data-r="${esc(r)}" aria-pressed="${r === ui.root}">${esc(r)}</button>`).join('');
+el('roots').hidden = ROOT_LABELS.length < 2;
+el('roots').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  ui.root = b.dataset.r; setSeg('roots', 'r', ui.root); rerender();
+});
+el('view').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  ui.view = b.dataset.v; setSeg('view', 'v', ui.view); render();
+});
+el('q').addEventListener('input', () => { ui.q = el('q').value.trim(); render(); });
+el('showProject').addEventListener('change', e => { ui.showProject = e.target.checked; render(); });
+setSeg('groupBy', 'g', ui.groupBy);
+el('groupBy').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  ui.groupBy = b.dataset.g; localStorage.setItem('atlas.groupBy', ui.groupBy);
+  setSeg('groupBy', 'g', ui.groupBy); render();
+});
+el('showStale').addEventListener('change', e => { ui.showStale = e.target.checked; render(); });
+
+function reset() {
+  el('q').value = ''; ui.q = ''; ui.view = 'all'; setSeg('view', 'v', 'all');
+  render();
+}
+
+document.addEventListener('submit', e => {
+  const form = e.target.closest('.linkform');
+  if (!form) return;
+  e.preventDefault();
+  linkSkills(form.dataset.names.split(' '), form.repo.value, form);
+});
+
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && document.activeElement !== el('q')) { e.preventDefault(); el('q').focus(); el('q').select(); }
-  if (e.key === 'Escape') { el('q').value = ''; render(); el('q').blur(); }
+  const typing = e.target.matches('input, textarea');
+  if (e.key === '/' && !typing) { e.preventDefault(); el('q').focus(); el('q').select(); }
+  if (e.key === 'Escape') {
+    if (typing && el('q').value) { el('q').value = ''; ui.q = ''; render(); }
+    else if (ui.selected) { ui.selected = null; rerender(); }
+    else el('q').blur();
+  }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.target.matches('.open')) {
+    e.preventDefault();
+    const all = [...el('list').querySelectorAll('.open')];
+    all[all.indexOf(e.target) + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+  }
 });
 
-const counts = {};
-for (const s of SKILLS) counts[s.status] = (counts[s.status] || 0) + 1;
-el('meta').textContent = `${DATA.host} · scanned ${DATA.generated_at.slice(0, 16).replace('T', ' ')} · roots: ${Object.values(DATA.config_roots).join('  ')}`;
-el('stats').innerHTML = [
-  `<span class="stat"><b>${SKILLS.length}</b> skills</span>`,
-  ...Object.entries(counts).sort().map(([k, v]) => `<span class="stat">${k} <b>${v}</b></span>`),
-  `<span class="stat">manual only <b>${SKILLS.filter(s => s.manual_only).length}</b></span>`,
-  DATA.bundled_skills_disabled ? '<span class="stat">bundled skills <b>off</b></span>' : '',
-].join('');
-
-renderFilters();
+new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));
 render();
+renderDetail();
+if (WRITABLE) checkUpdates();
 </script>
 </body>
 </html>

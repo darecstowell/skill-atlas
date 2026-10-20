@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -151,6 +152,16 @@ class HostConfig:
         return self.installed_plugins.get(ref, [])
 
 
+def settings_state(root: Path) -> dict:
+    """The two keys the viewer can toggle, read fresh from one root's settings.json."""
+    s = read_json(root / "settings.json")
+    return {
+        "path": str(root / "settings.json"),
+        "skillOverrides": s.get("skillOverrides", {}),
+        "enabledPlugins": s.get("enabledPlugins", {}),
+    }
+
+
 def iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).astimezone().isoformat(timespec="seconds")
 
@@ -158,6 +169,31 @@ def iso(ts: float) -> str:
 # --------------------------------------------------------------------------
 # skill record
 # --------------------------------------------------------------------------
+
+
+def git_tree_hash(path: Path) -> str:
+    """The git tree SHA of a folder, as GitHub reports it, to spot local edits."""
+    entries = []
+    for child in path.iterdir():
+        if child.name == ".git":
+            continue
+        if child.is_dir():
+            mode, sha, key = b"40000", git_tree_hash(child), child.name + "/"
+        else:
+            data = child.read_bytes()
+            mode = b"100755" if os.access(child, os.X_OK) else b"100644"
+            sha = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+            key = child.name
+        entries.append((key, mode + b" " + child.name.encode() + b"\0" + bytes.fromhex(sha)))
+    body = b"".join(e for _, e in sorted(entries))
+    return hashlib.sha1(b"tree %d\0" % len(body) + body).hexdigest()
+
+
+ATLAS_LOCK = ".atlas-lock.json"
+
+
+def skill_lock_path(root: Path) -> Path:
+    return (root / "skills").resolve().parent / ".skill-lock.json"
 
 
 def bundle_stats(skill_dir: Path) -> dict:
@@ -239,6 +275,8 @@ def collect_personal(host: HostConfig, lock_index: dict, seen: dict) -> list[dic
             source_root=str(real),
             origin=lock_index.get(skill_md.parent.name, {}),
         )
+        locked = rec["origin"].get("skillFolderHash", "")
+        rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
         seen[key] = rec
         out.append(rec)
     return out
@@ -350,8 +388,9 @@ def scan(repo: Path) -> dict:
     for host in hosts:
         skills_dir = host.root / "skills"
         if skills_dir.exists():
-            lock = read_json(skills_dir.resolve().parent / ".skill-lock.json").get("skills", {})
-            lock_index.update(lock)
+            # Skills linked in the atlas first, so the npx lock wins on a clash.
+            lock_index.update(read_json(skill_lock_path(host.root).with_name(ATLAS_LOCK)).get("skills", {}))
+            lock_index.update(read_json(skill_lock_path(host.root)).get("skills", {}))
 
     seen: dict = {}
     records: list[dict] = []
@@ -376,6 +415,7 @@ def scan(repo: Path) -> dict:
         "host": os.uname().nodename,
         "config_roots": {h.label: str(h.root) for h in hosts},
         "bundled_skills_disabled": bundled_off,
+        "settings": {h.label: settings_state(h.root) for h in hosts},
         "count": len(records),
         "skills": records,
     }

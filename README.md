@@ -4,7 +4,7 @@ A browsable inventory of every Claude Code skill installed on this machine. Run 
 want to see what you have, what is switched on, and where it came from.
 
 ```bash
-./atlas            # rescan, rebuild, open in the browser
+./atlas            # serve on 127.0.0.1:7381 with working switches, open in the browser
 python3 build.py   # rebuild only
 python3 build.py --json > skills.json   # raw records to stdout
 ```
@@ -38,13 +38,44 @@ frontmatter means only you can call the skill by name, and the model will never 
 
 ## Reading the page
 
-Search matches name, description, plugin, marketplace, project, path, and allowed tools. Terms are
-ANDed. Sort by name, modified date, length, scope, status, or plugin.
+Skills are grouped as your skills, plugins, and project skills. Use the switch at the top to pick
+which settings file (`personal` or `work`) the page reads. By source splits your skills by the repo they were
+installed from; each source has a switch that turns all of its skills on or off together. Search matches name, description, plugin,
+project, and path. Terms are ANDed. All / On / Off filters by the current state.
 
-Two chips start switched off because they bury the live set: `scope: project` (git worktrees repeat
-the same skills many times over) and `status: stale`. Turn them on to see everything.
+Project skills and old plugin versions are hidden at first. Check the boxes to show them.
 
-Keys: `/` focuses search, `Esc` clears it.
+`./atlas` serves the page with working switches. Each change writes the chosen root's
+`settings.json` and keeps a one-time backup at `settings.json.atlas-bak`. Restart Claude Code
+sessions to pick up a change. The page built by `build.py` is read-only. The switches show the state of `skillOverrides` (one
+personal skill) and `enabledPlugins` (a whole plugin). Plugin skills cannot be turned off one by one.
+
+## Updates
+
+A skill is tracked when it has a GitHub source in `~/.agents/.skill-lock.json` (written by
+`npx skills`) or in `~/.agents/.atlas-lock.json` (written here, by **Link to GitHub…**). Linking
+finds the folder in the repo with the same name as the skill.
+
+On load, `./atlas` reads each source repo's tree from GitHub (through `gh`, then anonymous HTTPS)
+and marks a skill out of date when its folder SHA differs from the lock. Results are cached for 10
+minutes; "Check again" refreshes them.
+
+Updates download one tarball per repo from codeload.github.com, swap each skill folder in place,
+and write the new SHA back to the lock the skill came from, so `npx skills` stays in step. A skill
+whose folder no longer matches its lock is tagged **edited**: batch updates skip it, and its own
+Update button asks you to confirm, because an update replaces the whole folder.
+
+Plugin skills are not checked.
+
+## Groups and deleting
+
+By source groups skills by repo. Untracked skills that share a name prefix (three or more, such as
+`emil-*`) get their own group. A **same as** tag marks skills whose description matches another one.
+
+Delete moves a skill folder to the macOS Trash and removes its lock entries and `skillOverrides`
+setting. The toast offers Undo for the last delete.
+
+Keys: `/` focuses search, `Esc` clears it or closes the detail panel, arrow keys move through the list.
 
 ## Layout
 

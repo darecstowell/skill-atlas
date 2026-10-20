@@ -13,6 +13,13 @@ REPO = Path(__file__).resolve().parent
 OUT = REPO / "out"
 
 
+def render_page(data: dict, api_token: str = "") -> str:
+    """Inline the records into the template. No token means a read-only page."""
+    payload = json.dumps({**data, "api_token": api_token}).replace("</", "<\\/")
+    template = (REPO / "template" / "index.html").read_text()
+    return template.replace("__SKILL_ATLAS_DATA__", payload)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the Skill Atlas.")
     ap.add_argument("--open", action="store_true", help="open the page when it is built")
@@ -28,10 +35,8 @@ def main() -> int:
     OUT.mkdir(exist_ok=True)
     (OUT / "skills.json").write_text(json.dumps(data, indent=2))
 
-    payload = json.dumps(data).replace("</script>", "<\\/script>")
-    template = (REPO / "template" / "index.html").read_text()
     page = OUT / "index.html"
-    page.write_text(template.replace("__SKILL_ATLAS_DATA__", payload))
+    page.write_text(render_page(data))
 
     print(f"{data['count']} skills -> {page}")
     if args.open:
