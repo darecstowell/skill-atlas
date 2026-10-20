@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml"><img src="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/python-3.9%2B-3776AB" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/dependencies-none-6CB2E8" alt="No dependencies">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B97A3" alt="MIT license"></a>
 </p>
@@ -25,7 +25,7 @@ cd skill-atlas
 ./atlas
 ```
 
-`./atlas` starts a server on `127.0.0.1:7381` and opens the page. It needs Python 3.9 or later and
+`./atlas` starts a server on `127.0.0.1:7381` and opens the page. It needs Python 3.10 or later and
 nothing else. For a short command, add an alias:
 
 ```bash

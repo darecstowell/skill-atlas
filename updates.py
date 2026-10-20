@@ -256,7 +256,7 @@ def check(roots: list[Path], refresh: bool = False) -> dict:
     }
     seen = read_json(_atlas_lock(roots)).get("seen", {})
     with ThreadPoolExecutor(max_workers=8) as pool:
-        trees = dict(zip(by_source, pool.map(lambda key: fetch_tree(*key), by_source)))
+        trees = dict(zip(by_source, pool.map(lambda key: fetch_tree(*key), by_source), strict=True))
     for (repo, ref), tree in trees.items():
         if not tree:
             # No status at all, so a failed check never reads as "removed upstream".
