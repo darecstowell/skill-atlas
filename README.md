@@ -43,6 +43,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
 | **See where it comes from** | Each source shows its owner's GitHub avatar. A source's panel shows the repo's banner, and a skill's panel shows a picture from its own folder when it has one. |
 | **List or cards** | Switch between dense rows and a card grid. Pick light, dark, or the system theme. |
+| **Act on many at once** | Tick skills one by one, shift-click a range, or tick a whole source. Then turn them on or off, update, link, copy them as a prompt, or delete them. |
 | **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 
 ## How it works
@@ -92,6 +93,8 @@ folder is a root too. Restart Claude Code sessions to load a change.
 | `r` | Formatted or Markdown, in the reader |
 | `g` | List or cards |
 | `c` | Compact rows |
+| `m` | Select the skill for bulk actions |
+| `⌘A` | Select all skills shown |
 | `⌘Z` | Undo the last change |
 | `?` | All shortcuts |
 
