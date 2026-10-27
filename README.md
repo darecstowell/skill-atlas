@@ -2,6 +2,8 @@
   <img src="docs/images/banner.png" alt="Skill Atlas" width="100%">
 </p>
 
+<h2 align="center"><code>uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas</code></h2>
+
 <p align="center">
   <a href="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml"><img src="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python 3.10+">
