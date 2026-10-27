@@ -201,11 +201,11 @@ def iso(ts: float) -> str:
 # --------------------------------------------------------------------------
 
 
-def git_tree_hash(path: Path) -> str:
+def git_tree_hash(path: Path, skip: tuple[str, ...] = ()) -> str:
     """The git tree SHA of a folder, as GitHub reports it, to spot local edits."""
     entries = []
     for child in path.iterdir():
-        if child.name == ".git":
+        if child.name == ".git" or child.name in skip:
             continue
         if child.is_symlink():
             # Git stores a link as its target text, and following it could loop.

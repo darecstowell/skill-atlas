@@ -117,3 +117,17 @@ def test_check_with_no_roots():
     updates._cache.clear()
     assert updates.check([], refresh=True)["skills"] == {}
     updates._cache.clear()
+
+
+@pytest.mark.parametrize(
+    "path, ok",
+    [
+        ("SKILL.md", True),
+        ("skills/demo/SKILL.md", True),
+        ("/etc/SKILL.md", False),
+        ("skills/../../SKILL.md", False),
+        ("skills/demo/README.md", False),
+    ],
+)
+def test_safe_skill_path(path, ok):
+    assert updates.safe_skill_path(path) is ok

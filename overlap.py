@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import difflib
-import hashlib
 import math
-import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -96,26 +94,13 @@ def similar(records: list[dict]) -> dict[str, list[dict]]:
 
 
 def _tree(path: str, cache: dict) -> str:
-    """The folder's git tree hashes without SKILL.md, so it shows if the other files differ."""
+    """The folder's git tree hash without SKILL.md, so it shows if the other files differ."""
     if path not in cache:
         try:
-            parts = []
-            for child in sorted(Path(path).iterdir()):
-                if child.name in ("SKILL.md", ".git"):
-                    continue
-                if child.is_dir() and not child.is_symlink():
-                    parts.append(f"{child.name}/{scan.git_tree_hash(child)}")
-                else:
-                    parts.append(f"{child.name}:{_blob(child)}")
-            cache[path] = "\n".join(parts)
+            cache[path] = scan.git_tree_hash(Path(path), skip=("SKILL.md",))
         except OSError:
             cache[path] = ""
     return cache[path]
-
-
-def _blob(p: Path) -> str:
-    data = os.readlink(p).encode() if p.is_symlink() else p.read_bytes()
-    return hashlib.sha1(data).hexdigest()
 
 
 def diverged(records: list[dict]) -> dict[str, list[dict]]:

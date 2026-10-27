@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
 import harnesses
 import scan
+import updates
 
 MAX_NAME = 60
 ACTIONS = ("save", "rename", "delete", "restore", "preview", "apply")
@@ -32,11 +31,7 @@ def load() -> list[dict]:
 
 
 def _store(items: list[dict]) -> None:
-    target = path().resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(target.name + ".atlas-tmp")
-    tmp.write_text(json.dumps({"profiles": items}, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, target)
+    updates.write_json(path(), {"profiles": items})
 
 
 def _name(v) -> str:
@@ -188,7 +183,7 @@ def apply(
     settings: dict[str, dict] = {}
     for hid, row in rows.items():
         h = by_id.get(hid)
-        if h is None or not (row["on"] or row["off"] or row["plugins_on"] or row["plugins_off"]):
+        if h is None or not changes({hid: row}):
             continue
         skill_map = dict.fromkeys(row["on"], True) | dict.fromkeys(row["off"], False)
         plugin_map = dict.fromkeys(row["plugins_on"], True) | dict.fromkeys(

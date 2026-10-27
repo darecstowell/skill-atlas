@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import updates
-from scan import git_tree_hash, read_json
+from scan import as_dict, git_tree_hash, read_json
 
 KEEP = 5
 MAX_TEXT_BYTES = 512 * 1024
@@ -23,8 +23,8 @@ SNAP_ID = re.compile(r"^\d{8}T\d{9}Z(-\d+)?$")
 
 
 def history_root() -> Path:
-    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
-    return Path(base) / "skill-atlas" / "history"
+    base = os.environ.get("XDG_CACHE_HOME") or "~/.cache"
+    return Path(base).expanduser() / "skill-atlas" / "history"
 
 
 # --------------------------------------------------------------------------
@@ -34,21 +34,12 @@ def history_root() -> Path:
 
 def _tar_folder(blob: bytes, folder: str) -> dict[str, bytes]:
     """The files of one folder in a GitHub tarball, by path inside that folder."""
-    out = {}
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
-        for m in tar.getmembers():
-            parts = m.name.split("/", 1)
-            if len(parts) < 2 or not m.isfile():
-                continue
-            rel = parts[1]
-            if folder:
-                if not rel.startswith(folder + "/"):
-                    continue
-                rel = rel[len(folder) + 1 :]
-            if rel and not rel.startswith("/") and ".." not in rel.split("/"):
-                f = tar.extractfile(m)
-                out[rel] = f.read() if f else b""
-    return out
+        return {
+            rel: updates.member_bytes(tar, m)
+            for rel, m in updates.folder_members(tar, folder)
+            if m.isfile()
+        }
 
 
 def _local_folder(path: Path) -> dict[str, bytes]:
@@ -111,11 +102,7 @@ def diff(name: str, roots: list[Path]) -> dict:
         raise ValueError(f"{name} is not linked to a GitHub repo")
     lock, e = found
     repo, ref = e["source"], e.get("ref") or "HEAD"
-    blob = updates.fetch_tarball(repo, ref, max_age=updates.CACHE_SECONDS)
-    if not blob:
-        why = getattr(updates._net, "reason", "")
-        raise ValueError(f"could not download {repo}" + (f": {why}" if why else ""))
-    new = _tar_folder(blob, updates.folder_of(e["skillPath"]))
+    new = _tar_folder(updates.cached_tarball(repo, ref), updates.folder_of(e["skillPath"]))
     if "SKILL.md" not in new:
         raise ValueError(f"{e['skillPath']} is not in {repo}")
     skill_dir = lock.parent / "skills" / name
@@ -170,9 +157,7 @@ def listing(name: str) -> dict:
     out = []
     for snap in _snap_dirs(name):
         meta = read_json(snap / "meta.json")
-        entry = meta.get("entry")
-        if not isinstance(entry, dict):
-            entry = {}
+        entry = as_dict(meta.get("entry"))
         out.append(
             {
                 "id": snap.name,
@@ -196,7 +181,7 @@ def rollback(name: str, snap_id: str, roots: list[Path]) -> dict:
     found = updates.tracked(roots).get(name)
     if found is None:
         raise ValueError(f"{name} is not linked to a GitHub repo")
-    if any(not j["done"] for j in updates.JOBS.values()):
+    if updates.job_running():
         raise RuntimeError("an update is still running")
     lock, current = found
     skills_dir = lock.parent / "skills"
@@ -205,10 +190,10 @@ def rollback(name: str, snap_id: str, roots: list[Path]) -> dict:
     shutil.copytree(snap / "skill", staged, symlinks=True)
     try:
         snapshot(skills_dir / name, name, lock, current, reason="restore")
-        updates._swap(skills_dir / name, staged)
+        updates.swap_in(skills_dir / name, staged)
     except OSError:
         shutil.rmtree(staged, ignore_errors=True)
         raise
     updates.write_lock_entries(lock, {name: entry})
-    updates._cache.clear()
+    updates.clear_cache()
     return {"name": name, "restored": snap_id, "at": meta.get("at", "")}

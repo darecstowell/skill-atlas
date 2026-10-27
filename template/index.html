@@ -1266,6 +1266,8 @@ const ICON = {
   folder: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
   sun: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   moon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.5 5.5 0 0 1 6.4 2.5a5.5 5.5 0 1 0 7.1 7.1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  pen: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.2 12.8 5.5 6 12.3l-3 .7.7-3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   auto: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 14h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
 };
 
@@ -1436,7 +1438,7 @@ function visible(s) {
   if (!inView(s)) return false;
   if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
-  else if (ui.view === 'issues') { if (!s.problems?.length) return false; }
+  else if (ui.view === 'issues') { if (!s.problems.length) return false; }
   else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view === 'costly') { if (!costlyUnused().has(s)) return false; }
   else if (ui.view === 'similar' || ui.view === 'diverged') { if (!overlapView(s)) return false; }
@@ -1838,7 +1840,7 @@ function render() {
   const byName = (a, b) => a.name.localeCompare(b.name);
   const sorter = ui.sort === 'uses' ? (a, b) => uses(b) - uses(a) || byName(a, b)
     : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b)
-    : ui.sort === 'cost' ? (a, b) => listed(b) - listed(a) || byName(a, b) : byName;
+    : ui.sort === 'cost' ? (a, b) => b.tokens_listed - a.tokens_listed || byName(a, b) : byName;
   const inRoot = s => s.scope === 'project' || loads(s);
   const shown = SKILLS.filter(visible).sort(sorter);
   const out = [];
@@ -1899,7 +1901,7 @@ function renderChrome() {
   const fresh = newTotal();
   const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length, review: SKILLS.filter(s => inView(s) && isRisky(s)).length };
   counts.costly = costlyUnused().size; el('viewCostly').hidden = ui.view !== 'costly';
-  counts.issues = lv.filter(s => s.problems?.length).length;
+  counts.issues = lv.filter(s => s.problems.length).length;
   el('viewIssues').hidden = !counts.issues && ui.view !== 'issues';
   patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
@@ -2019,8 +2021,7 @@ function problemsHtml(s) {
 let healthOpen = false;
 document.addEventListener('toggle', e => { if (e.target.matches?.('details.hl')) healthOpen = e.target.open; }, true);
 function storeHealthHtml() {
-  const list = DATA.health?.problems;
-  if (!list) return '';
+  const list = DATA.health.problems;
   if (!list.length) return '<div class="d-sec hl" data-k="hl" data-leaf><p><i data-lvl="ok"></i>No problems in the skill folders or lock files.</p></div>';
   const ghosts = list.filter(p => p.code === 'ghost-lock').length;
   const broken = list.length - ghosts;
@@ -2781,20 +2782,19 @@ function inventoryUsageHtml(lv) {
 
 // ---------------------------------------------------------------- context cost
 // Estimates from scan (about 4 characters per token), so the page marks them with ≈.
-const listed = s => s.tokens_listed;
 const approx = n => `≈${short(n)}`;
-const costTotal = list => list.reduce((n, s) => n + listed(s), 0);
+const costTotal = list => list.reduce((n, s) => n + s.tokens_listed, 0);
 // Skills whose name and description a harness puts into every session.
 const listedIn = root => SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project'
   && (harness(root) ? s.harnesses.includes(root) : s.harnesses.length > 0) && state(s, root).on)
-  .sort((a, b) => listed(b) - listed(a));
+  .sort((a, b) => b.tokens_listed - a.tokens_listed);
 let costMemo = null;
 // On, in the top quarter by listed tokens, and not used in 90 days. Kept for one task.
 function costlyUnused() {
   if (costMemo?.root === ui.root) return costMemo.set;
   const on = listedIn(ui.root);
-  const cut = on.length ? listed(on[Math.ceil(on.length / 4) - 1]) : Infinity;
-  costMemo = { root: ui.root, set: new Set(USE.ready ? on.filter(s => listed(s) >= cut && isUnused(s)) : []) };
+  const cut = on.length ? on[Math.ceil(on.length / 4) - 1].tokens_listed : Infinity;
+  costMemo = { root: ui.root, set: new Set(USE.ready ? on.filter(s => s.tokens_listed >= cut && isUnused(s)) : []) };
   queueMicrotask(() => { costMemo = null; });
   return costMemo.set;
 }
@@ -2818,7 +2818,7 @@ function costHtml() {
   return `<div class="d-sec" data-k="ic">
     <h3 class="sub" data-leaf>Context cost</h3>
     ${body}
-    ${on.length ? `<div class="top cost-top" data-k="ct" data-leaf>${on.slice(0, 5).map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${approx(listed(s))}</span></button>`).join('')}</div>` : ''}
+    ${on.length ? `<div class="top cost-top" data-k="ct" data-leaf>${on.slice(0, 5).map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${approx(s.tokens_listed)}</span></button>`).join('')}</div>` : ''}
     ${flagged ? `<p class="use-note" data-k="cu" data-leaf><span class="cost-flag">${plural(flagged, 'costly skill')}</span> not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-costly>Show them</button></p>` : ''}
     <p class="use-note" data-k="cn" data-leaf>Estimate: about 4 characters per token. A skill's body loads only when it runs.</p>
   </div>`;
@@ -2871,11 +2871,10 @@ const SEC_RULES = {
   escapes: 'Escaped text', code: 'Scripts', network: 'Network hosts',
 };
 const SEC_NOTE = 'A heuristic scan of the files. It can miss real risks and flag safe code.';
-const secOf = s => s.security || { level: 'none', counts: { high: 0, medium: 0, info: 0 }, code: 0 };
-const isRisky = s => secOf(s).level === 'high';
+const isRisky = s => s.security.level === 'high';
 
 function secTag(s) {
-  const x = secOf(s);
+  const x = s.security;
   if (x.level === 'high') return `<span class="tag risk" title="${plural(x.counts.high, 'high-risk pattern')}. Read Security in the detail panel.">review</span>`;
   if (x.code) return `<span class="tag" title="Ships ${plural(x.code, 'script')} the agent can run">runs code</span>`;
   return '';
@@ -2905,7 +2904,7 @@ function secGroupHtml(s, rule, level, list) {
 
 function securityHtml(s) {
   if (s.kind) return '';
-  const sum = secOf(s);
+  const sum = s.security;
   const wrap = body => `<div class="d-sec sec" data-k="sec"><h3 data-leaf>Security</h3>${body}<p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p></div>`;
   if (!WRITABLE) {
     const c = sum.counts;
@@ -2918,13 +2917,8 @@ function securityHtml(s) {
   if (!rep || rep === 'loading') return wrap('<p class="use-note" data-k="ss" data-leaf>Scanning the files…</p>');
   if (rep.error) return wrap(`<p class="use-note" data-k="ss" data-leaf>Could not scan this skill: ${esc(rep.error)} <button class="linkbtn" data-sec-retry>Try again</button></p>`);
   if (!rep.findings.length) return wrap(`<p class="use-note" data-k="ss" data-leaf>No risky patterns in ${plural(rep.files, 'file')}.</p>`);
-  const groups = new Map();
-  for (const f of rep.findings) {
-    const k = f.rule + '\0' + f.level;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(f);
-  }
-  const html = [...groups].map(([k, list]) => { const [rule, level] = k.split('\0'); return secGroupHtml(s, rule, level, list); }).join('');
+  const html = groupMap(rep.findings, f => f.rule + '\0' + f.level)
+    .map(([k, list]) => { const [rule, level] = k.split('\0'); return secGroupHtml(s, rule, level, list); }).join('');
   const more = rep.truncated ? `<p class="sec-more" data-k="sm" data-leaf>${plural(rep.truncated, 'more finding')} not shown.</p>` : '';
   const skipped = rep.skipped ? `<p class="sec-more" data-k="sk" data-leaf>${plural(rep.skipped, 'file')} over 1 MB not scanned.</p>` : '';
   return wrap(html + more + skipped);
@@ -2938,8 +2932,8 @@ function toggleSecGroup(b) {
 
 function inventorySecHtml(list) {
   const high = list.filter(isRisky).length;
-  const medium = list.filter(s => secOf(s).level === 'medium').length;
-  const code = list.filter(s => secOf(s).code).length;
+  const medium = list.filter(s => s.security.level === 'medium').length;
+  const code = list.filter(s => s.security.code).length;
   const parts = [high && `<b>${high}</b> to review`, medium && `<b>${medium}</b> with medium findings`, `<b>${code}</b> run code`].filter(Boolean);
   return `<div class="d-sec sec" data-k="isec"><h3 data-leaf>Security</h3>
     <p class="use-note" data-k="is" data-leaf>${parts.join(' · ')}.${high ? ' <button class="linkbtn" data-view-review>Show them</button>' : ''}</p>
@@ -3342,13 +3336,8 @@ function historyHtml(s) {
 }
 
 function histDialog(html, wide = false) {
-  const dlg = el('histDlg');
-  dlg.classList.toggle('wide', wide);
-  dlg.innerHTML = html;
-  dlg.returnValue = '';
-  dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
-  if (!dlg.open) dlg.showModal();
-  return dlg;
+  el('histDlg').classList.toggle('wide', wide);
+  return showDialog(el('histDlg'), html);
 }
 const dialogResult = dlg => new Promise(r => dlg.addEventListener('close', () => r(dlg.returnValue), { once: true }));
 
@@ -3445,25 +3434,29 @@ function flip(before) {
 
 // Ask before a delete: what moves, from where, and which harnesses stop loading it. Resolves true to go on.
 function confirmDelete(list) {
-  const dlg = el('confirmDel');
   const n = list.length;
   const ids = [...new Set(list.flatMap(s => s.harnesses))].filter(id => harness(id));
   const names = ids.map(id => harness(id).label);
   const who = names.length > 3 ? `${names.slice(0, 3).join(', ')}, and ${names.length - 3} more` : names.join(names.length === 2 ? ' and ' : ', ');
   const edited = list.filter(s => s.local_edits).length;
-  dlg.innerHTML = `<form method="dialog">
+  const dlg = showDialog(el('confirmDel'), `<form method="dialog">
     <h2 id="cdTitle">Move ${n === 1 ? `<code>/${esc(list[0].invoke)}</code>` : plural(n, 'skill')} to the Trash?</h2>
     <p class="cd-lead">${who ? `${n === 1 ? 'It stops' : 'They stop'} loading in ${esc(who)}.` : ''} Lock entries and on/off settings for ${n === 1 ? 'it' : 'them'} go too.</p>
     <ul class="cd-list">${list.map(s => `<li><span class="nm">/${esc(s.invoke)}</span>${s.local_edits ? '<span class="tag edited">edited</span>' : ''}<span class="cd-path">${esc(tilde(s.dir))}</span></li>`).join('')}</ul>
     ${edited ? `<p class="note warn">${plural(edited, 'skill')} ${edited === 1 ? 'has' : 'have'} changes you made after install.</p>` : ''}
     <p class="cd-undo">You can undo this from the toast, or take the folders back out of the Trash.</p>
     <div class="cd-acts"><button class="btn" value="cancel" autofocus>Cancel</button><button class="btn danger solid" value="ok">Move ${n === 1 ? '' : `${n} `}to Trash</button></div>
-  </form>`;
+  </form>`);
+  return dialogResult(dlg).then(v => v === 'ok');
+}
+
+// A click on the backdrop lands on the dialog itself; the form covers the panel.
+function showDialog(dlg, html) {
+  dlg.innerHTML = html;
   dlg.returnValue = '';
-  // A click on the backdrop lands on the dialog itself; the form covers the panel.
   dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
-  dlg.showModal();
-  return new Promise(resolve => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true }));
+  if (!dlg.open) dlg.showModal();
+  return dlg;
 }
 
 async function deleteSkills(list) {
@@ -3620,7 +3613,6 @@ const planItem = (name, sub = '', tag = '') => `<li><span class="nm">${esc(name)
 
 // Shows the plan in the confirm dialog, then runs the groups that stay checked.
 async function showPlan(p, body) {
-  const dlg = el('confirmDel');
   const restore = Boolean(body.restore);
   const m = body.manifest || {};
   const acts = [];
@@ -3638,22 +3630,18 @@ async function showPlan(p, body) {
     ? 'Download each skill again from its GitHub source, at the version in the lock file.'
     : `${m.host ? `From ${esc(m.host)}` : 'From the file'}${when ? `, exported ${esc(when)}` : ''}. Clear a group to skip it.`;
   const verb = restore ? 'Restore' : 'Import';
-  dlg.innerHTML = `<form method="dialog">
+  const dlg = showDialog(el('confirmDel'), `<form method="dialog">
     <h2 id="cdTitle">${restore ? `Restore ${plural(p.install.length, 'missing skill')}?` : 'Import skill set?'}</h2>
     <p class="cd-lead">${acts.length ? lead : restore ? 'No skill is missing now.' : 'This computer already has everything in the file that the atlas can install.'}</p>
     <div class="ss-plan">${acts.join('')}${info}${skipped}</div>
     <div class="cd-acts">${acts.length
       ? `<button class="btn" value="cancel" autofocus>Cancel</button><button class="btn primary" value="ok">${verb}</button>`
       : '<button class="btn" value="cancel" autofocus>Close</button>'}</div>
-  </form>`;
+  </form>`);
   const form = dlg.querySelector('form');
   const go = form.querySelector('[value="ok"]');
   form.onchange = () => { if (go) go.disabled = !form.querySelector('input:checked'); };
-  dlg.returnValue = '';
-  dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
-  dlg.showModal();
-  await new Promise(resolve => dlg.addEventListener('close', resolve, { once: true }));
-  if (dlg.returnValue !== 'ok') return;
+  if (await dialogResult(dlg) !== 'ok') return;
   const picked = name => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
   const pick = {
     install: picked('install').length ? p.install.map(i => i.name) : [],
@@ -3986,10 +3974,6 @@ el('display').addEventListener('change', markDisplay);
 
 // ---------------------------------------------------------------- profiles
 const PROF = { list: null, error: null };
-const PF_ICON = {
-  pen: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.2 12.8 5.5 6 12.3l-3 .7.7-3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-  trash: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-};
 const pfWhere = () => (ui.root === 'all' ? 'each harness' : harness().label);
 const pfCan = () => ui.root === 'all' || switchable();
 
@@ -4018,8 +4002,8 @@ function renderProfiles() {
   } else {
     body = `<ul class="pf-list">${PROF.list.map(p => `<li class="pf-row"><span class="pf-name"><b title="${esc(p.name)}">${esc(p.name)}</b><span class="tnum">${esc(profileMeta(p))}</span></span>
       <button class="btn accent" data-pf-apply="${esc(p.name)}">Apply…</button>
-      <button class="btn ghost icon" data-pf-rename="${esc(p.name)}" aria-label="Rename ${esc(p.name)}" title="Rename">${PF_ICON.pen}</button>
-      <button class="btn ghost icon" data-pf-delete="${esc(p.name)}" aria-label="Delete ${esc(p.name)}" title="Delete">${PF_ICON.trash}</button></li>`).join('')}</ul>`;
+      <button class="btn ghost icon" data-pf-rename="${esc(p.name)}" aria-label="Rename ${esc(p.name)}" title="Rename">${ICON.pen}</button>
+      <button class="btn ghost icon" data-pf-delete="${esc(p.name)}" aria-label="Delete ${esc(p.name)}" title="Delete">${ICON.trash}</button></li>`).join('')}</ul>`;
   }
   const save = pfCan()
     ? '<button class="btn ghost" data-pf-save>Save current as profile…</button>'
@@ -4143,7 +4127,7 @@ async function previewProfile(name) {
 }
 
 function applyProfileSettings(r) {
-  const here = r.preview?.[ui.root];
+  const here = r.preview[ui.root];
   if (here) { cascade(rowSwitches(here.on), true); cascade(rowSwitches(here.off), false); }
   Object.assign(DATA.settings, r.settings);
   rerender();
@@ -4312,7 +4296,7 @@ function ovlIndex() {
 // Similar skills that load in the harness in view, through any copy of that name.
 function simOf(s) {
   const ix = ovlIndex();
-  return (s.similar || []).map(x => ({ ...x, s: [ix.path.get(x.path), ...(ix.byName.get(x.name) || [])].find(y => y && loads(y)) })).filter(x => x.s);
+  return s.similar.map(x => ({ ...x, s: [ix.path.get(x.path), ...(ix.byName.get(x.name) || [])].find(y => y && loads(y)) })).filter(x => x.s);
 }
 function overlapView(s) {
   return (ui.view === 'similar' ? simOf(s) : s.copies).length > 0;
@@ -4371,12 +4355,13 @@ function overlapHtml(s) {
   }
   return out.join('');
 }
+let compareRun = 0;
 async function openCompare(s, otherPath) {
   const dlg = el('diffDlg');
   const c = s.copies.find(x => x.path === otherPath);
   if (!c) return;
   const back = document.activeElement;
-  const run = (openCompare.run = (openCompare.run || 0) + 1);
+  const run = ++compareRun;
   const file = (cls, sign, path, newer) => `<div class="df-file ${cls}"><b aria-hidden="true">${sign}</b><span title="${esc(path)}">${esc(tilde(path))}</span>${newer ? '<span class="tag update">newer</span>' : ''}</div>`;
   const draw = (body, sum = '') => {
     dlg.innerHTML = `<div class="df-head"><div class="df-title"><h2 id="dfTitle"><span class="slash">/</span>${esc(s.invoke)}</h2>
@@ -4391,7 +4376,7 @@ async function openCompare(s, otherPath) {
   dlg.querySelector('.df-body').focus({ preventScroll: true });
   try {
     const d = await api(`/api/compare?a=${encodeURIComponent(s.path)}&b=${encodeURIComponent(c.path)}`);
-    if (run !== openCompare.run) return;
+    if (run !== compareRun) return;
     const cls = { '+': 'add', '-': 'del', '@': 'hunk' };
     const sum = `<p class="df-sum"><span class="a">+${d.added}</span> <span class="r">−${d.removed}</span> lines</p>`;
     if (!d.lines.length) return draw('<p class="df-msg">The two files are the same now. Reload the page to update the list.</p>');

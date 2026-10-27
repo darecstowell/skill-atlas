@@ -160,11 +160,18 @@ def profile_call(action: str, req: dict) -> dict:
     )
 
 
-def scanned_path(path: str) -> str:
-    """Only paths the scan itself reported, so the page cannot reach arbitrary files."""
-    if path not in {s["path"] for s in scan(REPO)["skills"]}:
+def scanned_record(path: str) -> dict:
+    """Only skills the scan itself reported, so the page cannot reach arbitrary files."""
+    rec = next((s for s in scan(REPO)["skills"] if s["path"] == path), None)
+    if rec is None:
         raise ValueError("unknown skill path")
-    return path
+    return rec
+
+
+def skill_name(name: str) -> str:
+    if not SAFE_NAME.match(name):
+        raise ValueError("bad skill name")
+    return name
 
 
 def str_list(req: dict, key: str) -> list[str]:
@@ -253,6 +260,7 @@ class Handler(BaseHTTPRequestHandler):
         self._answer(lambda: self._get(path, query))
 
     def _get(self, path: str, query: str) -> None:
+        q = {k: v[0] for k, v in parse_qs(query).items()}
         if path == "/api/version":
             return self._json(200, server_info())
         if path == "/api/data":
@@ -262,32 +270,25 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/usage":
             return self._json(200, usage.snapshot(list(ROOTS.values())))
         if path == "/api/updates":
-            return self._json(200, updates.check(roots(), refresh="refresh=1" in query))
+            return self._json(200, updates.check(roots(), refresh=q.get("refresh") == "1"))
         if path == "/api/skill":
-            want = scanned_path(parse_qs(query).get("path", [""])[0])
+            want = scanned_record(q.get("path", ""))["path"]
             text = Path(want).read_text(encoding="utf-8", errors="replace")
             return self._json(200, {"text": text})
-        if path in ("/api/diff", "/api/history"):
-            name = parse_qs(query).get("name", [""])[0]
-            if not SAFE_NAME.match(name):
-                raise ValueError("bad skill name")
-            if path == "/api/diff":
-                return self._json(200, history.diff(name, roots()))
-            return self._json(200, history.listing(name))
+        if path == "/api/diff":
+            return self._json(200, history.diff(skill_name(q.get("name", "")), roots()))
+        if path == "/api/history":
+            return self._json(200, history.listing(skill_name(q.get("name", ""))))
         if path == "/api/export":
             return self._json(200, manifest.export(scan(REPO), roots()))
         if path == "/api/restore":
             return self._json(200, manifest.missing(roots()))
         if path == "/api/compare":
-            q = parse_qs(query)
-            a, b = (scanned_path(q.get(k, [""])[0]) for k in ("a", "b"))
+            a, b = (scanned_record(q.get(k, ""))["path"] for k in ("a", "b"))
             return self._json(200, overlap.diff(a, b))
         if path == "/api/security":
-            want = parse_qs(query).get("path", [""])[0]
-            rec = next((s for s in scan(REPO)["skills"] if s["path"] == want), None)
-            if rec is None:
-                raise ValueError("unknown skill path")
-            return self._json(200, security.report(Path(want).parent, rec["allowed_tools"]))
+            rec = scanned_record(q.get("path", ""))
+            return self._json(200, security.report(Path(rec["path"]).parent, rec["allowed_tools"]))
         if path.startswith("/api/jobs/"):
             job = updates.JOBS.get(path[10:])
             if job is None:
@@ -303,7 +304,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/toggle":
             return self._json(200, toggle(req))
         if path == "/api/reveal":
-            reveal(scanned_path(str(req["path"])))
+            reveal(scanned_record(str(req["path"]))["path"])
             return self._json(200, {"ok": True})
         if path == "/api/repos":
             repos = sorted({updates.parse_repo(r) for r in str_list(req, "repos")})[:50]
@@ -314,20 +315,16 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/available", "/api/install", "/api/dismiss"):
             repo = updates.parse_repo(str(req["repo"]))
             paths = str_list(req, "paths")
-            if not paths or any(
-                x.startswith("/") or ".." in x.split("/") or not x.endswith("SKILL.md")
-                for x in paths
-            ):
+            if not paths or not all(map(updates.safe_skill_path, paths)):
                 raise ValueError("bad skill paths")
             if path == "/api/available":
                 return self._json(200, updates.describe(repo, paths, roots()))
             if path == "/api/dismiss":
                 return self._json(200, updates.dismiss(repo, paths, roots()))
-            return self._json(200, updates.job_view(updates.start_install(repo, paths, roots())))
+            job = updates.start_install({repo: paths}, roots())
+            return self._json(200, updates.job_view(job))
         if path == "/api/rollback":
-            name = str(req["name"])
-            if not SAFE_NAME.match(name):
-                raise ValueError("bad skill name")
+            name = skill_name(str(req["name"]))
             return self._json(200, history.rollback(name, str(req["id"]), roots()))
         if path.startswith("/api/profiles/") and path[14:] in profiles.ACTIONS:
             return self._json(200, profile_call(path[14:], req))

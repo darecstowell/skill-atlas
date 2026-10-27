@@ -4,6 +4,7 @@ import tarfile
 import time
 
 import pytest
+from conftest import get
 
 import history
 import updates
@@ -147,3 +148,18 @@ def test_rollback_rejects_bad_ids(store):
         history.rollback("demo", "../../etc", [store])
     with pytest.raises(ValueError):
         history.rollback("demo", "20260101T000000000Z", [store])
+
+
+def test_rollback_waits_for_a_running_update(store, monkeypatch):
+    history.snapshot(store / "skills" / "demo", "demo", store / ".skill-lock.json", {"x": 1})
+    snap_id = history.listing("demo")["snapshots"][0]["id"]
+    monkeypatch.setitem(updates.JOBS, "busy", {"done": False})
+    with pytest.raises(RuntimeError):
+        history.rollback("demo", snap_id, [store])
+    assert (store / "skills" / "demo" / "old.txt").exists()
+
+
+def test_endpoints_refuse_bad_names(server):
+    for route in ("diff", "history"):
+        code, err = get(f"{server}/api/{route}?name=../x")
+        assert code == 400 and err["error"] == "bad skill name"
