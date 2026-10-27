@@ -2,9 +2,9 @@
   <img src="docs/images/banner.png" alt="Skill Atlas" width="100%">
 </p>
 
-<p align="center">
-  <a href="#quick-start"><img src="docs/images/run.svg" alt="uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas" width="760"></a>
-</p>
+```bash
+uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas
+```
 
 <p align="center">
   <a href="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml"><img src="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>

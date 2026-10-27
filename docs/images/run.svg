@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="940" height="84" viewBox="0 0 940 84" role="img" aria-label="uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas">
-  <rect x="1" y="1" width="938" height="82" rx="16" fill="#0f1218" stroke="#2a313b" stroke-width="1.5"/>
-  <circle cx="34" cy="42" r="5" fill="#63adf2"/>
-  <text x="56" y="49" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="20" fill="#eef1f5" xml:space="preserve"><tspan fill="#63adf2" font-weight="600">uvx</tspan><tspan fill="#9aa3ad"> --from git+https://github.com/darecstowell/</tspan><tspan fill="#eef1f5">skill-atlas</tspan><tspan fill="#63adf2" font-weight="600"> skill-atlas</tspan></text>
-</svg>
