@@ -40,6 +40,9 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Switch skills on and off** | One switch per skill, per source, or per plugin. Changes go to `settings.json`, with a backup made first. |
 | **Update from GitHub** | Marks skills whose upstream folder changed. Update one skill, one source, or all. About 40 skills update in 3 seconds. |
 | **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
+| **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
+| **See where it comes from** | Each source shows its owner's GitHub avatar, and the detail panel shows the repo's banner, or a picture from the skill's own folder. |
+| **List or cards** | Switch between dense rows and a card grid. Pick light, dark, or the system theme. |
 | **Tidy up** | Delete moves a skill to the macOS Trash, with Undo. A **same as** tag marks skills with the same description. |
 
 ## How it works
@@ -85,6 +88,9 @@ change.
 | `x` or `Space` | Turn the skill on or off |
 | `u` | Update the skill |
 | `i` | Install an available skill |
+| `v` | Read the whole SKILL.md |
+| `r` | Formatted or Markdown, in the reader |
+| `g` | List or cards |
 | `c` | Compact rows |
 | `⌘Z` | Undo the last change |
 | `?` | All shortcuts |
@@ -117,6 +123,8 @@ Bundled skills are inside the Claude Code binary, not on disk, so the atlas cann
   one-time backup at `settings.json.atlas-bak` before the first write.
 - Deletes go to the macOS Trash, never `rm`.
 - Plugin skills are not checked for updates.
+- The page loads avatars, banners, and the SKILL.md of skills you have not installed straight
+  from GitHub, so GitHub sees those requests.
 
 ## Without the server
 
@@ -139,6 +147,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 | `scan.py` | Reads the config roots and makes one record per skill |
 | `serve.py` | Local server and the only writer of `settings.json` |
 | `updates.py` | Update checks, updates, installs, and watched sources |
+| `assets.py` | Avatars, banners, and image paths for source repos |
 | `remove.py` | Moves skills to the Trash, and puts them back |
 | `build.py` | Puts the records into `template/index.html` |
 | `template/index.html` | The page: one file of HTML, CSS, and JavaScript |
