@@ -6,9 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-import harnesses
-import scan
-import updates
+from . import harnesses, scan, updates
 
 MAX_NAME = 60
 ACTIONS = ("save", "rename", "delete", "restore", "preview", "apply")

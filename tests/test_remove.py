@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-import remove
+from skill_atlas import remove
 
 
 @pytest.fixture

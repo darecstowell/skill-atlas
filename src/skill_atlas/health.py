@@ -6,7 +6,7 @@ import os
 import re
 from pathlib import Path
 
-import scan
+from . import scan
 
 NAME_MAX = 64
 DESC_MAX = 1024

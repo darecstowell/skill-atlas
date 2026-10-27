@@ -5,9 +5,9 @@ import threading
 from pathlib import Path
 
 import pytest
-from conftest import get
 
-import usage
+from conftest import get
+from skill_atlas import usage
 
 
 def skill_line(skill, ts="2026-10-01T12:00:00.000Z", session="s1", cwd="/x/proj"):

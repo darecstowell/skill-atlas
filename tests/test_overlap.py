@@ -3,10 +3,9 @@ import urllib.parse
 from pathlib import Path
 
 import pytest
-from conftest import get
 
-import overlap
-import serve
+from conftest import get
+from skill_atlas import overlap, serve
 
 
 def rec(tmp_path, name, desc, harnesses=("codex",), folder="a", text=None, status="enabled"):

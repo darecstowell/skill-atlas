@@ -13,9 +13,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scan import read_json
+from . import REPO
+from .scan import read_json
 
-REPO = Path(__file__).resolve().parent
 CACHE = REPO / "out" / "usage-index.json"
 DEDUPE_SECONDS = 600
 RESCAN_SECONDS = 30

@@ -5,8 +5,8 @@ from email.message import Message
 
 import pytest
 
-import updates
-from updates import folder_of, folder_sha, parse_repo
+from skill_atlas import updates
+from skill_atlas.updates import folder_of, folder_sha, parse_repo
 
 
 @pytest.mark.parametrize(

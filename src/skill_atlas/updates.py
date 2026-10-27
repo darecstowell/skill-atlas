@@ -21,8 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-import history
-from scan import (
+from . import history
+from .scan import (
     ATLAS_LOCK,
     as_dict,
     git_tree_hash,

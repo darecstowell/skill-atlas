@@ -1,4 +1,5 @@
 out/
+dist/
 __pycache__/
 .DS_Store
 .venv/

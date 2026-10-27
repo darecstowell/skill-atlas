@@ -12,11 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-import harnesses
-import health
-import overlap
-import security
-import tokens
+from . import REPO, harnesses, health, overlap, security, tokens
 
 HOME = Path.home()
 
@@ -621,6 +617,5 @@ def scan(repo: Path) -> dict:
 
 
 if __name__ == "__main__":
-    repo = Path(__file__).resolve().parent
-    json.dump(scan(repo), sys.stdout, indent=2)
+    json.dump(scan(REPO), sys.stdout, indent=2)
     print()

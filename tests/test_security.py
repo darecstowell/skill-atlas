@@ -2,10 +2,9 @@ import os
 import urllib.parse
 
 import pytest
-from conftest import get
 
-import security
-import serve
+from conftest import get
+from skill_atlas import security, serve
 
 
 def make(tmp_path, files: dict[str, str | bytes], skill="---\nname: demo\n---\nBody.\n"):

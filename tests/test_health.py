@@ -2,8 +2,8 @@ import json
 import os
 from pathlib import Path
 
-from health import skill_problems, store_health
-from scan import build_record, parse_frontmatter
+from skill_atlas.health import skill_problems, store_health
+from skill_atlas.scan import build_record, parse_frontmatter
 
 
 def make(root: Path, folder: str, text: str) -> Path:
