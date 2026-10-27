@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Skill Atlas</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7.5' fill='%236CB2E8'/%3E%3Cpath d='M19.6 7.2 12.4 24.8' stroke='%230F1317' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+  // Set before first paint, so a light theme never flashes dark.
+  try {
+    const pick = localStorage.getItem('atlas.theme') || 'system';
+    document.documentElement.dataset.theme = pick === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pick;
+  } catch { document.documentElement.dataset.theme = 'dark'; }
+</script>
 <style>
   :root {
     color-scheme: dark;
@@ -15,10 +22,10 @@
     --on: oklch(.76 .15 155); --warn: oklch(.82 .12 75); --danger: oklch(.76 .14 25);
     --knob: oklch(.98 0 0);
     --focus: oklch(.95 0 0 / .85);
-    --tint-accent: color-mix(in oklch, var(--accent) 14%, var(--surface-1));
-    --tint-on: color-mix(in oklch, var(--on) 12%, var(--surface-1));
-    --tint-warn: color-mix(in oklch, var(--warn) 12%, var(--surface-1));
-    --tint-danger: color-mix(in oklch, var(--danger) 14%, var(--surface-1));
+    --tint-accent: color-mix(in oklab, var(--accent) 14%, var(--surface-1));
+    --tint-on: color-mix(in oklab, var(--on) 12%, var(--surface-1));
+    --tint-warn: color-mix(in oklab, var(--warn) 12%, var(--surface-1));
+    --tint-danger: color-mix(in oklab, var(--danger) 14%, var(--surface-1));
     --row-hover: var(--surface-1); --row-selected: var(--surface-2);
     --shadow-pop: 0 0 0 1px var(--border-strong), 0 2px 4px oklch(0 0 0 / .3), 0 12px 32px oklch(0 0 0 / .45);
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -33,19 +40,29 @@
     --ease-drawer: cubic-bezier(.32, .72, 0, 1);
     --z-sticky: 10; --z-header: 20; --z-drawer: 30; --z-menu: 40; --z-toast: 50; --z-help: 60;
     --head-h: 85px;
+    /* Each source gets a hue (--h); these fix its lightness and chroma per theme. */
+    --id-bg: .33 .07; --id-fg: .87 .1; --id-line: .68 .13; --id-tint: 7%;
+    --img-edge: oklch(1 0 0 / .1);
+    --tint-violet: color-mix(in oklab, oklch(.76 .11 300) 14%, var(--surface-1)); --violet: oklch(.8 .1 300);
+    --elevation-raised: 0 0 0 1px oklch(1 0 0 / .09);
+    --elevation-raised-hover: 0 0 0 1px oklch(1 0 0 / .15);
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      color-scheme: light;
-      --bg: oklch(.985 .003 250); --surface-1: oklch(1 0 0); --surface-2: oklch(.955 .005 250); --surface-3: oklch(.925 .006 250);
-      --border: oklch(0 0 0 / .09); --border-strong: oklch(0 0 0 / .16);
-      --text: oklch(.23 .012 250); --text-2: oklch(.43 .014 250); --text-3: oklch(.52 .014 250); --text-disabled: oklch(.68 .01 250);
-      --accent: oklch(.50 .115 245); --on-accent: oklch(1 0 0);
-      --on: oklch(.50 .115 155); --warn: oklch(.52 .11 65); --danger: oklch(.52 .17 25);
-      --focus: oklch(.25 0 0 / .8);
-      --shadow-pop: 0 0 0 1px var(--border), 0 2px 4px oklch(0 0 0 / .06), 0 12px 32px oklch(0 0 0 / .12);
-    }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: oklch(.985 .003 250); --surface-1: oklch(1 0 0); --surface-2: oklch(.955 .005 250); --surface-3: oklch(.925 .006 250);
+    --border: oklch(0 0 0 / .09); --border-strong: oklch(0 0 0 / .16);
+    --text: oklch(.23 .012 250); --text-2: oklch(.43 .014 250); --text-3: oklch(.52 .014 250); --text-disabled: oklch(.68 .01 250);
+    --accent: oklch(.50 .115 245); --on-accent: oklch(1 0 0);
+    --on: oklch(.50 .115 155); --warn: oklch(.52 .11 65); --danger: oklch(.52 .17 25);
+    --focus: oklch(.25 0 0 / .8);
+    --shadow-pop: 0 0 0 1px var(--border), 0 2px 4px oklch(0 0 0 / .06), 0 12px 32px oklch(0 0 0 / .12);
+    --id-bg: .93 .045; --id-fg: .44 .12; --id-line: .6 .14; --id-tint: 6%;
+    --img-edge: oklch(0 0 0 / .1);
+    --tint-violet: oklch(.95 .03 300); --violet: oklch(.47 .14 300);
+    --elevation-raised: 0 0 0 1px oklch(0 0 0 / .05), 0 1px 3px oklch(0 0 0 / .05), 0 4px 10px -4px oklch(0 0 0 / .05);
+    --elevation-raised-hover: 0 0 0 1px oklch(0 0 0 / .07), 0 1px 3px oklch(0 0 0 / .07), 0 4px 10px -4px oklch(0 0 0 / .08);
   }
+  .theming, .theming *, .theming *::before, .theming *::after { transition: none !important; }
 
   * { box-sizing: border-box; }
   body {
@@ -54,7 +71,7 @@
   }
   button, input { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  mark { background: color-mix(in oklch, var(--accent) 28%, transparent); color: inherit; border-radius: 2px; }
+  mark { background: color-mix(in oklab, var(--accent) 28%, transparent); color: inherit; border-radius: 2px; }
   a { color: var(--text-2); text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
   a:hover { color: var(--text); }
   kbd {
@@ -76,7 +93,7 @@
   .btn:hover { color: var(--text); }
   .btn:active { scale: .96; }
   .btn.primary { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-  .btn.primary:hover { background: color-mix(in oklch, var(--accent) 88%, var(--text)); color: var(--on-accent); }
+  .btn.primary:hover { background: color-mix(in oklab, var(--accent) 88%, var(--text)); color: var(--on-accent); }
   .btn.ghost { background: transparent; border-color: transparent; }
   .btn.ghost:hover { background: var(--surface-2); }
   .btn.accent { background: transparent; border-color: transparent; color: var(--accent); }
@@ -129,6 +146,21 @@
   .seg button[hidden] { display: none; }
   .seg button:hover { color: var(--text); }
   .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); }
+  .pop-wrap { position: relative; display: inline-flex; flex: none; }
+  .pop-wrap .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .pop-wrap .dot[hidden] { display: none; }
+  .pop {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); width: 280px; padding: var(--s3);
+    display: grid; gap: var(--s3); background: var(--surface-2); border-radius: var(--r-lg); box-shadow: var(--shadow-pop);
+    transform-origin: top right; transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  }
+  .pop[hidden] { display: none; }
+  @starting-style { .pop { opacity: 0; transform: scale(.97); } }
+  .pop-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: 12px; color: var(--text-2); }
+  .pop .seg { background: var(--surface-1); }
+  .pop hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
+  .seg.theme button { width: 26px; padding: 0; justify-content: center; }
+  .seg.theme svg { width: 14px; height: 14px; }
   .seg .n { color: var(--text-3); font-variant-numeric: tabular-nums; }
   .seg button[aria-pressed="true"] .n { color: var(--text-2); }
 
@@ -175,6 +207,17 @@
   .gsub .tnum { color: var(--text-2); }
   .gctl { display: flex; align-items: center; gap: var(--s2); flex: none; }
   .group.collapsed .group-head { border-bottom-color: transparent; }
+  /* Every sticky head is its own stacking layer; lift the one whose menu is open over its neighbors. */
+  .group-head:has(.menu) { z-index: calc(var(--z-sticky) + 1); }
+  .group > .group-head { background: color-mix(in oklab, oklch(var(--id-line) var(--h)) var(--id-tint), var(--bg)); }
+
+  .ava {
+    position: relative; flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--r-sm); overflow: hidden;
+    background: oklch(var(--id-bg) var(--h, 250)); color: oklch(var(--id-fg) var(--h, 250)); font: 700 11px/1 var(--sans); text-transform: uppercase;
+  }
+  .ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; outline: 1px solid var(--img-edge); outline-offset: -1px; border-radius: inherit; }
+  .ava svg { width: 12px; height: 12px; }
+  .ava.lg { width: 28px; height: 28px; border-radius: var(--r-md); font-size: 14px; }
 
   /* ---------- rows ---------- */
   .row {
@@ -203,7 +246,7 @@
   .row.enter { transition: opacity 240ms var(--ease-out-quart), transform 240ms var(--ease-out-quart); }
   @starting-style { .row.enter { opacity: 0; transform: translateY(4px); } }
   .row.restored { animation: restored 700ms ease-out; }
-  @keyframes restored { from { background: color-mix(in oklch, var(--accent) 14%, transparent); } }
+  @keyframes restored { from { background: color-mix(in oklab, var(--accent) 14%, transparent); } }
   .open { all: unset; cursor: pointer; min-width: 0; display: grid; gap: 1px; padding: 2px 0; }
   .nm { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
   .nmt { font: 500 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -220,6 +263,41 @@
   body.compact .nm { flex: none; max-width: 48%; }
   body.compact .desc { color: var(--text-3); flex: 1; min-width: 0; }
 
+  /* ---------- cards: the same .row nodes, laid out in a grid ---------- */
+  .thumb { display: none; }
+  body.cards .group, body.cards .avail-block, body.cards .sec-body:has(> .row) {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s3); align-items: stretch; padding-bottom: var(--s3);
+  }
+  body.cards .group > :not(.row), body.cards .avail-block > :not(.row), body.cards .sec-body > :not(.row) { grid-column: 1 / -1; }
+  body.cards .group + .group { margin-top: 0; }
+  body.cards .group-head { margin-bottom: 0; }
+  body.cards .avail-block { padding-bottom: 0; }
+  body.cards .row {
+    grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: 1fr auto; align-items: center; gap: 6px var(--s2);
+    min-height: 0; padding: 6px 10px 10px 6px; border-radius: 10px; background: var(--surface-1);
+    box-shadow: var(--elevation-raised); transition: box-shadow 150ms ease-out;
+  }
+  @media (hover: hover) and (pointer: fine) { body.cards .row:hover { background: var(--surface-1); box-shadow: var(--elevation-raised-hover); } }
+  body.cards .row[aria-current="true"] { background: var(--surface-1); }
+  body.cards .row > :nth-child(2) { display: none; }
+  body.cards .row .open { grid-column: 1 / -1; align-self: start; display: grid; gap: 4px; padding: 0; }
+  body.cards .row .uslot { grid-column: 2; grid-row: 2; min-width: 0; }
+  body.cards .row > :last-child { grid-column: 3; grid-row: 2; }
+  /* The state rail becomes a status dot in the card footer. */
+  body.cards .row::before { left: 12px; top: auto; bottom: 17px; width: 8px; height: 8px; border-radius: 50%; }
+  body.cards .thumb {
+    position: relative; display: grid; place-items: center; aspect-ratio: 2 / 1; margin-bottom: 4px; border-radius: 4px; overflow: hidden;
+    background: oklch(var(--id-bg) var(--h, 250)); color: oklch(var(--id-fg) var(--h, 250)); font: 700 28px/1 var(--sans); text-transform: uppercase;
+  }
+  body.cards .thumb.strip { aspect-ratio: auto; height: 4px; margin: 0 0 6px; border-radius: 2px; background: oklch(var(--id-line) var(--h, 250)); }
+  body.cards .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--surface-2); outline: 1px solid var(--img-edge); outline-offset: -1px; border-radius: inherit; }
+  body.cards .nm, body.cards .desc { padding: 0 4px; }
+  body.cards .nm { flex-wrap: wrap; row-gap: 4px; max-width: none; }
+  body.cards .desc { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; color: var(--text-2); }
+  body.cards.compact .row .open { display: grid; }
+  body.cards.compact .thumb { display: none; }
+  body.cards.compact .row { padding-top: 10px; }
+
   .tags { display: inline-flex; gap: 4px; flex: none; }
   .tag {
     display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--r-sm);
@@ -228,6 +306,7 @@
   .tag.edited { color: var(--warn); background: var(--tint-warn); border-color: transparent; }
   .tag.gone { border-style: dashed; }
   .tag.update { color: var(--accent); background: var(--tint-accent); border-color: transparent; }
+  .tag.manual { color: var(--violet); background: var(--tint-violet); border-color: transparent; }
 
   .uslot { display: flex; justify-content: flex-end; min-width: 84px; }
   .uslot:empty { min-width: 0; }
@@ -252,7 +331,7 @@
     transition: background-color 120ms ease, scale 150ms var(--ease-out);
   }
   .chip::before { content: ""; position: absolute; inset: -8px -2px; }
-  .chip:hover { background: color-mix(in oklch, var(--accent) 24%, var(--surface-1)); }
+  .chip:hover { background: color-mix(in oklab, var(--accent) 24%, var(--surface-1)); }
   .chip:active { scale: .96; }
   .gnew { flex: none; }
   .avail-head {
@@ -336,6 +415,19 @@
     position: sticky; top: var(--head-h); height: calc(100dvh - var(--head-h)); overflow: auto; overscroll-behavior: contain;
     background: var(--surface-1); border-left: 1px solid var(--border); padding: 20px var(--s5) 64px;
   }
+  .banner {
+    position: relative; display: grid; place-items: center; margin: 0 0 var(--s4); aspect-ratio: 2 / 1; border-radius: var(--r-lg); overflow: hidden;
+    background: oklch(var(--id-bg) var(--h, 250)); color: oklch(var(--id-fg) var(--h, 250)); font: 700 44px/1 var(--sans); letter-spacing: -.02em;
+  }
+  .banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--surface-2); outline: 1px solid var(--img-edge); outline-offset: -1px; border-radius: inherit; }
+  .banner img.ban-ava { position: static; width: 72px; height: 72px; border-radius: 16px; background: none; }
+  .banner .cap {
+    position: absolute; left: 8px; bottom: 8px; padding: 2px 7px; border-radius: var(--r-sm);
+    background: oklch(0 0 0 / .6); color: oklch(1 0 0 / .92); font: 500 11px/1.5 var(--sans); letter-spacing: 0;
+  }
+  .src-line { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s3); font-size: 12px; color: var(--text-3); }
+  .src-line b { color: var(--text-2); font: 500 12px var(--mono); }
+  .src-line .star { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .d-top { display: flex; align-items: flex-start; gap: 4px; }
   .d-title { flex: 1; min-width: 0; margin: 0; padding-top: 2px; font: 600 18px/1.3 var(--mono); letter-spacing: -.01em; overflow-wrap: anywhere; }
   .d-title .slash { font-weight: 500; }
@@ -359,14 +451,6 @@
   dt { color: var(--text-3); }
   dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
   dd.mono { font: 12px var(--mono); }
-  details summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); width: fit-content; }
-  details summary:hover { color: var(--text); }
-  pre.body {
-    margin: var(--s2) 0 0; padding: var(--s3); max-height: 360px; overflow: auto; border-radius: var(--r-md);
-    background: var(--bg); border: 1px solid var(--border); font: 11.5px/1.55 var(--mono); color: var(--text-2); white-space: pre-wrap;
-  }
-  pre.body::-webkit-scrollbar { width: 8px; }
-  pre.body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
   .danger-zone { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
   .danger-zone .note { flex-basis: 100%; }
   .danger-zone .btn.danger { margin-left: auto; }
@@ -375,6 +459,9 @@
   .inv h3 { margin: 0 0 var(--s3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
   .stat { padding: 10px var(--s3); border-radius: var(--r-lg); background: var(--surface-2); }
+  .stat[data-tone="on"] { background: var(--tint-on); } .stat[data-tone="on"] b { color: var(--on); }
+  .stat[data-tone="accent"] { background: var(--tint-accent); } .stat[data-tone="accent"] b { color: var(--accent); }
+  .stat[data-tone="warn"] { background: var(--tint-warn); } .stat[data-tone="warn"] b { color: var(--warn); }
   .stat b { display: block; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
   .stat span { font-size: 12px; color: var(--text-3); }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px var(--s3); align-items: center; font-size: 12.5px; color: var(--text-2); }
@@ -408,6 +495,83 @@
   @starting-style { #help .sheet { transform: scale(.97); } }
   #help h2 { margin: 0 0 var(--s4); font-size: 15px; display: flex; align-items: center; }
   #help h2 .btn { margin-left: auto; }
+
+  /* ---------- skill viewer ---------- */
+  #viewer {
+    width: min(1120px, calc(100vw - 32px)); height: min(900px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
+    border-radius: 14px; background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop); overflow: hidden;
+    opacity: 1; transform: none; transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+  #viewer[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  @starting-style { #viewer[open] { opacity: 0; transform: scale(.97); } }
+  #viewer::backdrop { background: oklch(0 0 0 / .5); transition: opacity 200ms var(--ease-out); }
+  @starting-style { #viewer[open]::backdrop { opacity: 0; } }
+  .v-head {
+    display: flex; align-items: center; gap: var(--s3); min-height: 56px; padding: 10px var(--s3) 10px var(--s4);
+    border-bottom: 1px solid var(--border); background: color-mix(in oklab, oklch(var(--id-line) var(--h, 250)) var(--id-tint), var(--surface-1));
+  }
+  .v-title { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .v-title h2 { margin: 0; font: 600 15px/1.3 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v-title p { margin: 0; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v-acts { display: flex; align-items: center; gap: 4px; flex: none; }
+
+  .mode { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: var(--r-md); background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); margin-right: var(--s2); }
+  .mode::before {
+    content: ""; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: var(--r-sm);
+    background: var(--surface-3); box-shadow: 0 1px 2px oklch(0 0 0 / .2); transition: transform 200ms var(--ease-out);
+  }
+  .mode[data-raw]::before { transform: translateX(100%); }
+  .mode button { position: relative; height: 24px; padding: 0 12px; border: 0; background: none; color: var(--text-3); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: color 150ms ease; }
+  .mode button[aria-pressed="true"] { color: var(--text); }
+
+  .v-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0; }
+  .v-body.no-toc { grid-template-columns: minmax(0, 1fr); }
+  .v-toc { overflow: auto; padding: var(--s4) var(--s3) var(--s5); border-right: 1px solid var(--border); font-size: 12.5px; }
+  .v-toc h3 { margin: 0 0 var(--s2); padding: 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .v-toc a { display: block; padding: 4px 8px; border-radius: var(--r-sm); color: var(--text-2); text-decoration: none; line-height: 1.35; }
+  .v-toc a.l3 { padding-left: 20px; color: var(--text-3); }
+  .v-toc a:hover { background: var(--surface-2); color: var(--text); }
+  .v-toc[hidden] { display: none; }
+  .v-scroll { overflow: auto; overscroll-behavior: contain; min-height: 0; }
+  .v-note { margin: 0; padding: 8px var(--s5); font-size: 12px; color: var(--warn); background: var(--tint-warn); }
+  .v-load { padding: var(--s6); color: var(--text-3); }
+
+  .md { max-width: 76ch; margin: 0 auto; padding: var(--s5) var(--s6) 80px; font-size: 14px; line-height: 1.65; color: var(--text-2); }
+  .md > :first-child { margin-top: 0; }
+  .md h1, .md h2, .md h3, .md h4 { color: var(--text); line-height: 1.3; text-wrap: balance; scroll-margin-top: var(--s4); }
+  .md h1 { margin: 0 0 var(--s4); font-size: 24px; letter-spacing: -.015em; }
+  .md h2 { margin: 36px 0 var(--s3); padding-bottom: 6px; font-size: 18px; border-bottom: 1px solid var(--border); }
+  .md h3 { margin: 28px 0 var(--s2); font-size: 15px; }
+  .md h4 { margin: 20px 0 6px; font-size: 14px; }
+  .md p, .md ul, .md ol, .md blockquote, .md pre, .md .md-table { margin: 0 0 var(--s4); }
+  .md ul, .md ol { padding-left: 22px; }
+  .md li { margin: 4px 0; }
+  .md li > ul, .md li > ol { margin: 4px 0 0; }
+  .md li::marker { color: var(--text-3); }
+  .md strong { color: var(--text); font-weight: 600; }
+  .md a { color: var(--accent); text-decoration-color: color-mix(in oklab, var(--accent) 40%, transparent); }
+  .md .md-rel { color: var(--text); border-bottom: 1px dotted var(--border-strong); }
+  .md code { padding: 1px 5px; border-radius: var(--r-sm); background: var(--surface-2); font: 12.5px var(--mono); color: var(--text); }
+  .md pre { padding: var(--s3) var(--s4); overflow: auto; border-radius: var(--r-md); background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
+  .md pre code { padding: 0; background: none; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+  .md blockquote { padding: 2px 0 2px var(--s4); border-left: 3px solid oklch(var(--id-line) var(--h, 250)); color: var(--text-2); }
+  .md hr { border: 0; border-top: 1px solid var(--border); margin: var(--s5) 0; }
+  .md img { max-width: 100%; border-radius: var(--r-md); outline: 1px solid var(--img-edge); outline-offset: -1px; }
+  .md .md-table { overflow-x: auto; }
+  .md table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .md th, .md td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  .md th { color: var(--text); font-weight: 600; background: var(--surface-2); }
+  .md input[type="checkbox"] { margin: 0 6px 0 0; accent-color: var(--accent); }
+  .md-front { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--s4); margin: 0 0 var(--s5); padding: var(--s3) var(--s4); border-radius: var(--r-lg); background: var(--surface-2); font-size: 12.5px; }
+  .md-front dt { color: var(--text-3); font-family: var(--mono); }
+  .md-front dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; white-space: pre-line; }
+
+  .raw { margin: 0; padding: var(--s4) 0 80px; font: 12.5px/1.65 var(--mono); color: var(--text-2); counter-reset: ln; }
+  .raw span { display: block; padding: 0 var(--s5) 0 64px; white-space: pre-wrap; overflow-wrap: anywhere; position: relative; min-height: 1.65em; }
+  .raw span::before {
+    counter-increment: ln; content: counter(ln); position: absolute; left: 0; width: 44px; text-align: right;
+    color: var(--text-disabled); font-variant-numeric: tabular-nums; user-select: none;
+  }
 
   /* ---------- narrow ---------- */
   @media (max-width: 1100px) {
@@ -456,6 +620,29 @@
       <kbd class="k-slash">/</kbd><kbd class="k-esc">esc</kbd>
     </div>
     <div class="cluster" id="cluster"></div>
+    <div class="pop-wrap" id="displayWrap">
+      <button class="btn ghost" id="displayBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="display">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Display<i class="dot" id="displayDot" hidden></i>
+      </button>
+      <div class="pop" id="display" role="dialog" aria-label="Display options" hidden>
+        <div class="pop-row"><span>Layout</span>
+          <div class="seg" id="layout" role="group" aria-label="Layout">
+            <button data-l="list" aria-pressed="true"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>List</button>
+            <button data-l="cards" aria-pressed="false"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Cards</button>
+          </div>
+        </div>
+        <div class="pop-row"><span>Group by</span>
+          <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
+            <button data-g="source" aria-pressed="true">Source</button>
+            <button data-g="type" aria-pressed="false">Scope</button>
+          </div>
+        </div>
+        <div class="pop-row"><span>Theme</span><div class="seg theme" id="theme" role="group" aria-label="Theme"></div></div>
+        <hr>
+        <label class="check"><input type="checkbox" id="showProject"> Show project skills</label>
+        <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
+      </div>
+    </div>
   </div>
   <div class="bar2">
     <div class="seg" id="view" role="group" aria-label="Show">
@@ -465,12 +652,6 @@
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
     </div>
-    <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
-      <button data-g="source" aria-pressed="true">By source</button>
-      <button data-g="type" aria-pressed="false">By scope</button>
-    </div>
-    <label class="check"><input type="checkbox" id="showProject"> Project skills</label>
-    <label class="check"><input type="checkbox" id="showStale"> Old plugin versions</label>
     <div class="meta" id="meta"></div>
   </div>
   <div class="band" id="band" hidden>Read-only build. Run <code>./atlas</code> to change skills.</div>
@@ -483,6 +664,7 @@
 </main>
 <div id="toast" role="status" hidden></div>
 <div id="announce" class="vh" aria-live="polite"></div>
+<dialog id="viewer" aria-label="Skill file"></dialog>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -513,10 +695,13 @@ const ui = {
   root: ROOT_LABELS[0], view: 'all', q: '', showProject: false, showStale: false, selected: null,
   groupBy: localStorage.getItem('atlas.groupBy') || 'source',
   compact: localStorage.getItem('atlas.compact') === '1',
-  menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, previewOpen: false, descOpen: false, restored: new Set(),
+  layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
+  menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
 const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
+const groupLabel = s => (s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? s.plugin : s.scope === 'project' ? s.project : sourceOf(s));
+const groupId = s => (s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : sourceOf(s));
 const isLocalGroup = source => source === NO_SOURCE || source.endsWith('-*');
 const live = s => s.scope === 'personal' && s.config_roots.includes(ui.root);
 
@@ -530,6 +715,88 @@ const ICON = {
   close: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   alert: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.8v3.6M8 10.9v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
+
+ICON.folder = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+ICON.expand = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+ICON.sun = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+ICON.moon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.5 5.5 0 0 1 6.4 2.5a5.5 5.5 0 1 0 7.1 7.1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+ICON.auto = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 14h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+
+// ---------------------------------------------------------------- source identity: hue, avatar, banner
+// Fixed, evenly spread hues; lightness and chroma come from the theme tokens.
+const HUES = [250, 205, 170, 145, 105, 75, 45, 20, 350, 320, 290];
+function hue(key) {
+  let h = 5381;
+  for (const c of String(key)) h = (h * 33 + c.charCodeAt(0)) >>> 0;
+  return HUES[h % HUES.length];
+}
+const REPOS = {};
+const repoPending = new Set();
+const ghRepo = v => (String(v || '').match(/github\.com[/:]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/) || [])[1] || (/^[\w.-]+\/[\w.-]+$/.test(v || '') ? v : null);
+function repoOf(s) {
+  if (s.kind === 'avail') return s.repo;
+  if (s.origin?.source) return s.origin.source;
+  const ms = s.marketplace_source || {};
+  return s.scope === 'plugin' ? ghRepo(ms.url) || ghRepo(ms.repo) : null;
+}
+const RAW = (repo, p) => `https://raw.githubusercontent.com/${repo}/HEAD/${p.split('/').map(encodeURIComponent).join('/')}`;
+const BANNERISH = /(social|og[-_]?(card|image)?|hero|banner|cover|card|preview|screenshot|demo)[^/]*$/i;
+const ICONISH = /(logo|icon|favicon|mark|badge|avatar|sponsor)[^/]*$/i;
+const pickImage = paths => paths.find(p => BANNERISH.test(p)) || paths.find(p => !ICONISH.test(p));
+function repoBanner(repo) {
+  const m = REPOS[repo] || {};
+  if (m.custom_banner) return m.banner;
+  const top = (m.images || []).filter(p => p.split('/').length <= 2 && BANNERISH.test(p));
+  return top.length ? RAW(repo, top[0]) : m.banner || `https://opengraph.githubassets.com/1/${repo}`;
+}
+// A picture from the skill's own folder when it has one, else the repo's banner.
+function skillBanner(s) {
+  const repo = repoOf(s);
+  if (!repo) return null;
+  const imgs = REPOS[repo]?.images || [];
+  const folder = s.kind === 'avail' ? s.path.replace(/\/?SKILL\.md$/, '') : (s.origin?.skillPath || '').replace(/\/?SKILL\.md$/, '');
+  const own = s.scope === 'plugin'
+    ? imgs.filter(p => p.split('/').slice(0, -1).includes(s.plugin))
+    : folder ? imgs.filter(p => p.startsWith(folder + '/')) : [];
+  const pick = pickImage(own);
+  return pick ? { url: RAW(repo, pick), own: true } : { url: repoBanner(repo), own: false };
+}
+function avatarUrl(repo) {
+  const a = REPOS[repo]?.avatar;
+  return a ? a + (a.includes('?') ? '&' : '?') + 's=64' : `https://github.com/${repo.split('/')[0]}.png?size=64`;
+}
+const monogram = label => (String(label).replace(/^[^A-Za-z0-9]+/, '')[0] || '?');
+function avatar(label, repo, lg = false) {
+  const img = repo ? `<img src="${esc(avatarUrl(repo))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+  const face = label === NO_SOURCE ? ICON.folder : esc(monogram(label));
+  return `<span class="ava${lg ? ' lg' : ''}" data-k="ava" data-leaf aria-hidden="true">${face}${img}</span>`;
+}
+function bannerHtml(s, label) {
+  const b = skillBanner(s);
+  const cap = b?.own ? '<span class="cap">From this skill</span>' : '';
+  const img = b ? `<img src="${esc(b.url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+  // GitHub's card service fails for some repos; the owner's avatar stays underneath.
+  const repo = repoOf(s);
+  const face = repo ? `<img class="ban-ava" src="${esc(avatarUrl(repo).replace(/s(ize)?=64/, 's$1=160'))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+    : label === NO_SOURCE ? '' : esc(monogram(label));
+  return `<div class="banner" data-k="ban" data-leaf aria-hidden="true">${face}${img}${cap}</div>`;
+}
+function sourceLine(repo) {
+  const m = REPOS[repo];
+  if (!m) return '';
+  const stars = m.stars ? `<span class="star">★ ${m.stars >= 1000 ? (m.stars / 1000).toFixed(m.stars >= 10000 ? 0 : 1) + 'k' : m.stars}</span>` : '';
+  return `<p class="src-line" data-k="srcl" data-leaf>${m.description ? esc(m.description) : `<b>${esc(repo)}</b>`}${stars}</p>`;
+}
+// Ask the server for repos this render showed that it has not described yet.
+async function loadRepos(repos) {
+  const want = [...new Set(repos)].filter(r => r && !(r in REPOS) && !repoPending.has(r));
+  if (!WRITABLE || !want.length) return;
+  want.forEach(r => repoPending.add(r));
+  try { Object.assign(REPOS, await api('/api/repos', { repos: want })); }
+  catch { want.forEach(r => { REPOS[r] = {}; }); }
+  finally { want.forEach(r => repoPending.delete(r)); }
+  rerender();
+}
 
 // Leading boilerplate shared by most descriptions; the detail panel keeps the full text.
 const BOILER = /^(when the user (wants|asks|needs)( help)?( to| with| for)?|use (this skill )?when( the user)?|use this when|this skill should be used when|use for)\s+/i;
@@ -640,7 +907,7 @@ function highlight(text) {
 // ---------------------------------------------------------------- keyed patching
 // Nodes with the same data-k survive a render, so transitions, focus, and scroll carry over.
 function morph(from, to) {
-  // `open` belongs to <details> and `style` to runtime motion; templates never set either.
+  // `open` belongs to <details> and `style` to runtime motion, so neither is removed here.
   for (const a of [...from.attributes]) if (!to.hasAttribute(a.name) && a.name !== 'open' && a.name !== 'style') from.removeAttribute(a.name);
   for (const a of to.attributes) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
   if (to.hasAttribute('data-leaf')) { if (from.innerHTML !== to.innerHTML) from.innerHTML = to.innerHTML; return; }
@@ -702,7 +969,7 @@ function tagsHtml(s, st) {
     s.local_edits ? '<span class="tag edited" title="Changed after install. Updating replaces your changes.">edited</span>' : '',
     updStatus(s) === 'unknown' ? '<span class="tag gone" title="Not found in the source repo. It may have moved or been removed.">not upstream</span>' : '',
     isOutdated(s) && !WRITABLE ? '<span class="tag update">update</span>' : '',
-    s.manual_only ? '<span class="tag" title="disable-model-invocation: Claude never calls it on its own">you only</span>' : '',
+    s.manual_only ? '<span class="tag manual" title="disable-model-invocation: Claude never calls it on its own">you only</span>' : '',
     st.mode && !['on', 'off', 'not set', 'project only'].includes(st.mode) ? `<span class="tag">${esc(st.mode)}</span>` : '',
     s.status === 'stale' ? `<span class="tag">v${esc(s.plugin_version)}</span>` : '',
     s._dupes?.length ? `<span class="tag" title="Same description as ${esc(s._dupes.join(', '))}">same as ${esc(s._dupes[0])}</span>` : '',
@@ -742,6 +1009,14 @@ function updateSlot(s, primary = false) {
   return `<button class="btn ${primary ? 'primary' : 'accent'}" data-k="upd" data-update="${esc(name)}">Update</button>`;
 }
 
+// Cards show a picture only when the skill's own folder has one; otherwise a slim bar in the source's hue.
+function thumbHtml(s, name) {
+  if (ui.layout !== 'cards') return '';
+  const b = skillBanner(s);
+  if (!b?.own) return '<span class="thumb strip" aria-hidden="true"></span>';
+  return `<span class="thumb" aria-hidden="true">${esc(monogram(name))}<img src="${esc(b.url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>`;
+}
+
 function row(s) {
   const st = state(s);
   const ctl = s.scope === 'personal'
@@ -750,7 +1025,7 @@ function row(s) {
   const hints = s.scope === 'personal' && WRITABLE ? `<span class="kh" aria-hidden="true"><kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}</span>` : '<span></span>';
   const cls = ui.restored.has(s.path) ? 'row enter restored' : 'row';
   return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'} aria-current="${ui.selected === s}">
-    <button class="open" data-id="${s.id}" data-leaf><span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
+    <button class="open" data-id="${s.id}" data-leaf>${thumbHtml(s, s.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
     ${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
   </div>`;
 }
@@ -774,8 +1049,8 @@ function section(id, title, count, body, groupIds = [], extraTools = '') {
   </section>`;
 }
 
-function group(id, headInner, body, open = isOpen(id)) {
-  return `<div class="group${open ? '' : ' collapsed'}" data-k="${esc(id)}">
+function group(id, headInner, body, open = isOpen(id), h = hue(id)) {
+  return `<div class="group${open ? '' : ' collapsed'}" data-k="${esc(id)}" style="--h: ${h}">
     <div class="group-head" data-k="h">${headInner}</div>${open ? body : ''}
   </div>`;
 }
@@ -850,7 +1125,7 @@ function availRow(repo, a) {
   const hints = !a.taken && WRITABLE ? '<span class="kh" aria-hidden="true"><kbd>i</kbd></span>' : '<span></span>';
   const tag = a.new ? '<span class="tags"><span class="tag update">new</span></span>' : '';
   return `<div class="row avail" data-k="${esc(key)}" data-st="${js === 'done' ? 'done' : RUNNING.has(js) ? 'busy' : a.new ? 'outdated' : 'avail'}" aria-current="${selKey(ui.selected) === key}">
-    <button class="open" data-avail="${esc(repo)}" data-path="${esc(a.path)}" data-leaf><span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(a.name)}</span>${tag}</span><span class="desc">${desc}</span></button>
+    <button class="open" data-avail="${esc(repo)}" data-path="${esc(a.path)}" data-leaf>${thumbHtml({ kind: 'avail', repo, path: a.path }, a.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(a.name)}</span>${tag}</span><span class="desc">${desc}</span></button>
     ${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
   </div>`;
 }
@@ -909,14 +1184,14 @@ function sourceGroups(personal) {
       ? `<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length && ui.view !== 'new' ? ` · ${list.length} shown` : ''}`
       : 'watching';
     const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
-    const head = `${fold(id, `<span class="gname" data-leaf>${highlight(source)}</span>`, source, ui.view === 'new' || isOpen(id))}
+    const head = `${fold(id, `${avatar(source, local ? null : source)}<span class="gname" data-leaf>${highlight(source)}</span>`, source, ui.view === 'new' || isOpen(id))}
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
       <span class="gsub" data-leaf>${meta}</span>
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
       ${all.length ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
     const block = local ? '' : availBlock(source, availShown(source), all.length);
-    return group(id, head, form + list.map(row).join('') + block, ui.view === 'new' || isOpen(id));
+    return group(id, head, form + list.map(row).join('') + block, ui.view === 'new' || isOpen(id), hue(source));
   }).join('');
 }
 
@@ -973,7 +1248,7 @@ function render() {
       const ctl = lv.status === 'stale' ? '' :
         switchHtml(st.on, `Plugin ${lv.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
       const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
-      const head = `${fold('plg:' + ref, `<span class="gname" data-leaf>${highlight(lv.plugin)}</span>`, lv.plugin)}
+      const head = `${fold('plg:' + ref, `${avatar(lv.plugin, repoOf(lv))}<span class="gname" data-leaf>${highlight(lv.plugin)}</span>`, lv.plugin)}
         <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span><span class="gctl" data-k="c">${ctl}</span>`;
       return group('plg:' + ref, head, list.map(row).join(''));
     });
@@ -984,7 +1259,7 @@ function render() {
   if (project.length) {
     const byProject = groupMap(project, s => s.project).sort(([a], [b]) => a.localeCompare(b));
     const groups = byProject.map(([name, list]) => group('prj:' + name,
-      `${fold('prj:' + name, `<span class="gname" data-leaf>${esc(name)}</span>`, name)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
+      `${fold('prj:' + name, `${avatar(name, null)}<span class="gname" data-leaf>${esc(name)}</span>`, name)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
       list.map(row).join('')));
     out.push(section('sec:project', 'Project skills', project.length, groups.join(''), byProject.map(([n]) => 'prj:' + n)));
   }
@@ -992,6 +1267,7 @@ function render() {
   patch(el('list'), out.join('') || emptyHtml());
   renderChrome();
   for (const repo of needDescs) loadDescs(repo);
+  loadRepos([...personal.map(repoOf), ...plugins.map(repoOf), ...offered]);
 }
 
 function renderChrome() {
@@ -1007,7 +1283,6 @@ function renderChrome() {
   document.title = WRITABLE && badge ? `(${badge}) Skill Atlas` : 'Skill Atlas';
 
   patch(el('meta'), [
-    `<span><b>${on}</b> on · <b>${lv.length - on}</b> off</span>`,
     DATA.bundled_skills_disabled ? '<span>built-ins off</span>' : '',
     `<span>writes <code>${esc(tilde(DATA.settings[ui.root]?.path))}</code></span>`,
   ].join(''));
@@ -1056,20 +1331,20 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['c'], 'Compact rows'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
 function inventoryHtml() {
   const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
   const personal = lv.filter(s => s.scope === 'personal');
-  const stat = (n, label) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`;
+  const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
   return `<div class="inv" data-k="inv" data-leaf>
     <h3>Inventory</h3>
     <div class="stats">
-      ${stat(lv.filter(s => state(s).on).length, 'on')}${stat(lv.filter(s => !state(s).on).length, 'off')}
-      ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
-      ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited')}
+      ${stat(lv.filter(s => state(s).on).length, 'on', 'on')}${stat(lv.filter(s => !state(s).on).length, 'off')}
+      ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates', WRITABLE ? 'accent' : '')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
+      ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
     <div class="d-sec"><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
@@ -1091,9 +1366,10 @@ function availDetailHtml(s) {
     : a.taken ? `A skill named ${esc(a.name)} is already installed, so this one cannot go in next to it.`
     : `Installs into ~/.agents/skills/${esc(a.name)} and tracks ${esc(s.repo)} for updates.`;
   const gh = `https://github.com/${s.repo}/tree/HEAD/${s.path.replace(/\/?SKILL\.md$/, '')}`;
-  return `
+  return `${bannerHtml(s, s.repo)}${sourceLine(s.repo)}
     <div class="d-top" data-k="top">
       <h2 class="d-title" data-leaf><span class="slash">/</span>${esc(a.name)}</h2>
+      <button class="btn ghost icon" data-k="vw" data-view aria-label="Read the whole SKILL.md" title="Read the whole SKILL.md (v)">${ICON.expand}</button>
       <button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">${ICON.close}</button>
     </div>
     <p class="d-sub" data-k="sub" data-leaf>${esc(s.repo)} · ${a.new ? 'new, ' : ''}not installed</p>
@@ -1104,6 +1380,7 @@ function availDetailHtml(s) {
       ${field('Source', s.repo, true)}
       ${field('Path', s.path, true)}
     </dl></div>
+    <div class="d-sec" data-k="pv"><button class="btn" data-k="vwb" data-view>Read SKILL.md <kbd>v</kbd></button></div>
     <div class="d-sec danger-zone" data-k="dz"><a class="btn ghost" data-k="repo" href="${esc(gh)}" target="_blank" rel="noreferrer">Open on GitHub ↗</a></div>`;
 }
 
@@ -1141,9 +1418,11 @@ function detailHtml(s) {
   const long = (s.description || '').length > 420;
   const confirm = ui.confirm === 'skill:' + s.dir_name;
   const sub = s.scope === 'plugin' ? s.plugin_ref : s.scope === 'project' ? `${s.project} · project` : sourceOf(s);
-  return `
+  const label = groupLabel(s);
+  return `${s.scope === 'project' ? '' : bannerHtml(s, label)}${repoOf(s) ? sourceLine(repoOf(s)) : ''}
     <div class="d-top" data-k="top">
       <h2 class="d-title" data-leaf><span class="slash">/</span>${esc(s.invoke)}</h2>
+      <button class="btn ghost icon" data-k="vw" data-view aria-label="Read the whole SKILL.md" title="Read the whole SKILL.md (v)">${ICON.expand}</button>
       <button class="btn ghost icon" data-k="cp" data-copy="/${esc(s.invoke)}" aria-label="Copy /${esc(s.invoke)}" title="Copy">${ICON.copy}</button>
       <button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">${ICON.close}</button>
     </div>
@@ -1161,7 +1440,7 @@ function detailHtml(s) {
       ${field('Size', `${s.words.toLocaleString()} words · ${plural(s.file_count, 'file')}`)}
       ${field('Path', tilde(s.path), true)}
     </dl></div>
-    <div class="d-sec" data-k="pv"><details data-k="det"${ui.previewOpen ? ' open' : ''}><summary>Preview SKILL.md</summary><pre class="body" data-leaf>${esc(s.body_preview)}</pre></details></div>
+    <div class="d-sec" data-k="pv"><button class="btn" data-k="vwb" data-view>Read SKILL.md <kbd>v</kbd></button></div>
     <div class="d-sec danger-zone" data-k="dz">
       ${src && /^https?:/.test(src) ? `<a class="btn ghost" data-k="repo" href="${esc(String(src).replace(/\.git$/, ''))}" target="_blank" rel="noreferrer">Open repo ↗</a>` : ''}
       ${WRITABLE ? `<button class="btn ghost" data-k="rv" data-reveal="${esc(s.path)}">Reveal in Finder</button>` : ''}
@@ -1182,10 +1461,327 @@ function renderDetail() {
     patch(d, html);
   }
   if (s) d.setAttribute('data-open', ''); else d.removeAttribute('data-open');
+  d.style.setProperty('--h', s ? hue(groupId(s)) : 250);
+  if (s) loadRepos([repoOf(s)]);
   for (const repo of needDescs) loadDescs(repo);
 }
 
 function rerender() { render(); renderDetail(); }
+
+// ---------------------------------------------------------------- skill viewer
+// A small GFM subset for SKILL.md files. Raw HTML is always escaped.
+function renderMarkdown(src, { link = null, img = null } = {}) {
+  let text = String(src || '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ');
+  const front = [];
+  const fm = text.match(/^---\n([\s\S]*?)\n---[ \t]*(?:\n|$)/);
+  if (fm) {
+    text = text.slice(fm[0].length);
+    let block = false;
+    for (const ln of fm[1].split('\n')) {
+      const m = ln.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
+      if (m) {
+        block = /^[|][-+]?$/.test(m[2]);
+        front.push([m[1], /^[|>][-+]?$/.test(m[2]) ? '' : m[2].replace(/^(["'])(.*)\1$/, '$2')]);
+      } else if (front.length && ln.trim()) {
+        const f = front[front.length - 1];
+        f[1] = f[1] ? f[1] + (block ? '\n' : ' ') + ln.trim() : ln.trim();
+      }
+    }
+  }
+
+  const toc = [], ids = {};
+  const plain = h => h.replace(/<[^>]+>/g, '').replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' }[e]));
+  const slug = t => {
+    const base = 'md-' + (t.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') || 'section');
+    ids[base] = (ids[base] || 0) + 1;
+    return ids[base] > 1 ? `${base}-${ids[base] - 1}` : base;
+  };
+  // [kind, url]: abs keeps the url, rel goes through a resolver, bad drops it.
+  const classify = u => /^(https?:|mailto:)/i.test(u) || u.startsWith('#') ? ['abs', u]
+    : /^[a-z][\w+.-]*:/i.test(u) || u.startsWith('//') ? ['bad', null] : ['rel', u];
+
+  function inline(s) {
+    const keep = [];
+    const stash = h => `\u0000${keep.push(h) - 1}\u0000`;
+    s = s.replace(/\\([\\`*_{}[\]()#+\-.!|~<>])/g, (_, c) => stash(esc(c)));
+    s = s.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, __, c) => stash(`<code>${esc(/^ .* $/.test(c) ? c.slice(1, -1) : c)}</code>`));
+    s = s.replace(/<(https?:\/\/[^\s>]+)>/g, (_, u) => stash(`<a href="${esc(u)}" target="_blank" rel="noreferrer">${esc(u)}</a>`));
+    s = s.replace(/!\[([^\]]*)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))*)>?(?:\s+"[^"]*")?\s*\)/g, (_, alt, u) => {
+      const [kind, v] = classify(u);
+      const out = kind === 'abs' ? v : kind === 'rel' && img ? img(v) : null;
+      return stash(out && kind !== 'bad' ? `<img src="${esc(out)}" alt="${esc(alt)}" loading="lazy">` : `<em>${esc(alt)}</em>`);
+    });
+    s = s.replace(/\[([^\]]+)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))*)>?(?:\s+"[^"]*")?\s*\)/g, (_, t, u) => {
+      const [kind, v] = classify(u);
+      if (kind === 'bad') return t;
+      const out = kind === 'abs' ? v : link ? link(v) : null;
+      if (!out) return stash(`<span class="md-rel" title="${esc(u)}">`) + t + stash('</span>');
+      const ext = /^(https?:|mailto:)/i.test(out) ? ' target="_blank" rel="noreferrer"' : '';
+      return stash(`<a href="${esc(out)}"${ext}>`) + t + stash('</a>');
+    });
+    s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]*[^\s<).,;:!?'"*_])/g, (_, pre, u) => pre + stash(`<a href="${esc(u)}" target="_blank" rel="noreferrer">${esc(u)}</a>`));
+    s = esc(s)
+      .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^\w])__(?=\S)([\s\S]*?\S)__(?!\w)/g, '$1<strong>$2</strong>')
+      .replace(/(^|[^\w*])\*(?=[^\s*])([^*]*?[^\s*])\*(?![\w*])/g, '$1<em>$2</em>')
+      .replace(/(^|[^\w])_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/g, '$1<em>$2</em>')
+      .replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<del>$1</del>')
+      .replace(/ {2,}\n/g, '<br>\n');
+    while (/\u0000\d+\u0000/.test(s)) s = s.replace(/\u0000(\d+)\u0000/g, (_, i) => keep[i]);
+    return s;
+  }
+
+  const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([^`\s]*)/;
+  const HEAD = /^ {0,3}(#{1,6})(?:\s+(.*?))?(?:\s+#+)?\s*$/;
+  const HR = /^ {0,3}([-*_])(?: *\1){2,} *$/;
+  const QUOTE = /^ {0,3}> ?/;
+  const ITEM = /^( *)([-*+]|\d{1,9}[.)])( +|$)(.*)$/;
+  const SEP = /^ {0,3}\|?\s*:?-+:?\s*(\|\s*:?-*:?\s*)*\|?\s*$/;
+  const isTable = (ls, i) => ls[i].includes('|') && i + 1 < ls.length && ls[i + 1].includes('-') && SEP.test(ls[i + 1]);
+  const starts = (ls, i) => FENCE.test(ls[i]) || HEAD.test(ls[i]) || HR.test(ls[i]) || QUOTE.test(ls[i]) || isTable(ls, i)
+    || (ITEM.test(ls[i]) && /^ *([-*+]|1[.)]) +\S/.test(ls[i]));
+  const indentOf = l => l.match(/^ */)[0].length;
+
+  function cells(row) {
+    const out = [];
+    let cur = '', tick = 0;
+    row = row.trim().replace(/^\|/, '').replace(/(^|[^\\])\|$/, '$1');
+    for (let i = 0; i < row.length; i++) {
+      const c = row[i];
+      if (c === '\\' && row[i + 1] === '|') { cur += '\\|'; i++; continue; }
+      if (c === '`') { let n = 1; while (row[i + n] === '`') n++; tick = tick === n ? 0 : tick || n; cur += '`'.repeat(n); i += n - 1; continue; }
+      if (c === '|' && !tick) { out.push(cur.trim()); cur = ''; continue; }
+      cur += c;
+    }
+    out.push(cur.trim());
+    return out.map(x => x.replace(/\\\|/g, '|'));
+  }
+
+  function list(ls, i) {
+    const first = ls[i].match(ITEM);
+    const base = first[1].length, ordered = /\d/.test(first[2]);
+    const items = [];
+    let loose = false;
+    const sibling = l => { const m = l?.match(ITEM); return Boolean(m) && m[1].length === base && /\d/.test(m[2]) === ordered && !HR.test(l); };
+    while (i < ls.length && sibling(ls[i])) {
+      const m = ls[i].match(ITEM);
+      const pad = m[3].length > 4 || !m[4] ? 1 : m[3].length;
+      const inner = m[1].length + m[2].length + pad;
+      const body = [m[4]];
+      i++;
+      while (i < ls.length) {
+        const l = ls[i];
+        if (!l.trim()) { body.push(''); i++; continue; }
+        const ind = indentOf(l);
+        if (ind > base) { body.push(l.slice(Math.min(ind, inner))); i++; continue; }
+        if (body[body.length - 1] !== '' && ind === indentOf(l) && !starts(ls, i) && !ITEM.test(l)) { body.push(l.trim()); i++; continue; }
+        break;
+      }
+      let end = body.length;
+      while (end && body[end - 1] === '') end--;
+      if (end < body.length && sibling(ls[i])) loose = true;
+      const kept = body.slice(0, end);
+      if (gapOutsideFence(kept)) loose = true;
+      items.push({ n: first[2], body: kept });
+      if (end < body.length && !sibling(ls[i])) break;
+    }
+    const start = ordered && parseInt(first[2], 10) !== 1 ? ` start="${parseInt(first[2], 10)}"` : '';
+    const lis = items.map(({ body }) => {
+      const task = body[0].match(/^\[([ xX])\]\s+(.*)$/);
+      if (task) body = [task[2], ...body.slice(1)];
+      const box = task ? `<input type="checkbox" disabled${task[1] === ' ' ? '' : ' checked'}> ` : '';
+      return `<li${task ? ' class="task"' : ''}>${box}${blocks(body, !loose)}</li>`;
+    }).join('');
+    return [`<${ordered ? 'ol' : 'ul'}${start}>${lis}</${ordered ? 'ol' : 'ul'}>`, i];
+  }
+  // Blank lines inside a code fence do not make a list loose.
+  function gapOutsideFence(body) {
+    let open = false;
+    for (const l of body) {
+      if (FENCE.test(l)) open = !open;
+      else if (l === '' && !open) return true;
+    }
+    return false;
+  }
+
+  function blocks(ls, tight = false) {
+    let out = '', i = 0, m;
+    while (i < ls.length) {
+      const ln = ls[i];
+      if (!ln.trim()) { i++; continue; }
+      if ((m = ln.match(FENCE))) {
+        const close = new RegExp(`^ {0,3}${m[1][0] === '`' ? '`' : '~'}{${m[1].length},}\\s*$`);
+        const ind = indentOf(ln), body = [];
+        for (i++; i < ls.length && !close.test(ls[i]); i++) body.push(ls[i].slice(Math.min(ind, indentOf(ls[i]))));
+        i++;
+        out += `<pre><code${m[2] ? ` data-lang="${esc(m[2])}"` : ''}>${esc(body.join('\n'))}</code></pre>`;
+      } else if ((m = ln.match(HEAD))) {
+        const n = m[1].length, h = inline(m[2] || ''), t = plain(h), id = slug(t);
+        if (n === 2 || n === 3) toc.push({ level: n, text: t, id });
+        out += `<h${n} id="${id}">${h}</h${n}>`;
+        i++;
+      } else if (HR.test(ln)) {
+        out += '<hr>'; i++;
+      } else if (QUOTE.test(ln)) {
+        const body = [];
+        while (i < ls.length && QUOTE.test(ls[i])) body.push(ls[i++].replace(QUOTE, ''));
+        out += `<blockquote>${blocks(body)}</blockquote>`;
+      } else if (isTable(ls, i)) {
+        const head = cells(ls[i]);
+        const align = cells(ls[i + 1]).map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : c.startsWith(':') ? 'left' : '');
+        const td = (tag, c, k) => `<${tag}${align[k] ? ` style="text-align:${align[k]}"` : ''}>${inline(c || '')}</${tag}>`;
+        let rows = '';
+        for (i += 2; i < ls.length && ls[i].trim() && ls[i].includes('|'); i++) {
+          const r = cells(ls[i]);
+          rows += `<tr>${head.map((_, k) => td('td', r[k], k)).join('')}</tr>`;
+        }
+        out += `<div class="md-table"><table><thead><tr>${head.map((c, k) => td('th', c, k)).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      } else if (ITEM.test(ln)) {
+        const [html, next] = list(ls, i);
+        out += html; i = next;
+      } else {
+        const para = [ln.replace(/^ +/, '')];
+        for (i++; i < ls.length && ls[i].trim() && !starts(ls, i); i++) para.push(ls[i].replace(/^ +/, ''));
+        const h = inline(para.join('\n').replace(/\s+$/, ''));
+        out += tight ? h : `<p>${h}</p>`;
+      }
+    }
+    return out;
+  }
+
+  return { html: blocks(text.split('\n')), toc, front };
+}
+
+const viewer = { s: null, text: '', note: '', loading: false, raw: localStorage.getItem('atlas.raw') === '1', back: null };
+
+// Where relative links and images in a skill point: its folder on GitHub, when it has one.
+function skillBase(s) {
+  const repo = repoOf(s);
+  if (!repo || s.scope === 'plugin') return null;
+  const file = s.kind === 'avail' ? s.path : s.origin?.skillPath;
+  return file ? { repo, dir: file.replace(/\/?SKILL\.md$/, '') } : null;
+}
+function joinPath(dir, rel) {
+  const out = dir ? dir.split('/') : [];
+  for (const part of rel.replace(/[?#].*$/, '').split('/')) {
+    if (part === '..') out.pop(); else if (part && part !== '.') out.push(part);
+  }
+  return out.join('/');
+}
+
+async function openViewer(s) {
+  if (!s) return;
+  const dlg = el('viewer');
+  viewer.back = document.activeElement;
+  Object.assign(viewer, { s, text: '', note: '', loading: true });
+  renderViewer();
+  if (!dlg.open) dlg.showModal();
+  dlg.querySelector('.v-scroll')?.focus({ preventScroll: true });
+  try {
+    if (s.kind === 'avail') {
+      const res = await fetch(RAW(s.repo, s.path));
+      if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
+      viewer.text = await res.text();
+    } else if (WRITABLE) {
+      viewer.text = (await api('/api/skill?path=' + encodeURIComponent(s.path))).text;
+    } else {
+      viewer.text = s.body_preview;
+      viewer.note = 'This read-only build has only the first lines. Run ./atlas to read the whole file.';
+    }
+  } catch (err) {
+    viewer.note = `Could not load the file: ${err.message}`;
+  }
+  if (viewer.s !== s) return;
+  viewer.loading = false;
+  renderViewer();
+}
+
+function renderViewer() {
+  const { s } = viewer;
+  const dlg = el('viewer');
+  dlg.style.setProperty('--h', hue(groupId(s)));
+  const base = skillBase(s);
+  const out = viewer.loading ? null : renderMarkdown(viewer.text, base ? {
+    link: href => `https://github.com/${base.repo}/blob/HEAD/${joinPath(base.dir, href)}${href.includes('#') ? href.slice(href.indexOf('#')) : ''}`,
+    img: src => RAW(base.repo, joinPath(base.dir, src)),
+  } : {});
+  const name = s.kind === 'avail' ? s.a.name : s.invoke;
+  const where = s.kind === 'avail' ? `${s.repo} · ${s.path}` : tilde(s.path);
+  const repo = repoOf(s);
+  const gh = base ? `https://github.com/${base.repo}/blob/HEAD/${base.dir ? base.dir + '/' : ''}SKILL.md` : '';
+  const toc = !viewer.raw && out?.toc.length > 2;
+  const front = out?.front.length
+    ? `<dl class="md-front">${out.front.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
+  const body = viewer.loading ? '<p class="v-load">Loading…</p>'
+    : viewer.raw ? `<pre class="raw">${viewer.text.split('\n').map(l => `<span>${esc(l)}</span>`).join('')}</pre>`
+    : `<article class="md">${front}${out.html}</article>`;
+  dlg.innerHTML = `
+    <div class="v-head">
+      ${avatar(groupLabel(s), repo, true)}
+      <div class="v-title"><h2 id="vTitle"><span class="slash">/</span>${esc(name)}</h2><p>${esc(where)}</p></div>
+      <div class="v-acts">
+        <div class="mode" role="group" aria-label="Show as"${viewer.raw ? ' data-raw' : ''}>
+          <button data-mode="md" aria-pressed="${!viewer.raw}">Formatted</button><button data-mode="raw" aria-pressed="${viewer.raw}">Markdown</button>
+        </div>
+        <button class="btn ghost icon" data-copy-raw aria-label="Copy the Markdown" title="Copy the Markdown"${viewer.loading ? ' disabled' : ''}>${ICON.copy}</button>
+        ${gh ? `<a class="btn ghost" href="${esc(gh)}" target="_blank" rel="noreferrer">GitHub ↗</a>` : ''}
+        ${WRITABLE && s.kind !== 'avail' ? `<button class="btn ghost" data-reveal="${esc(s.path)}">Reveal</button>` : ''}
+        <button class="btn ghost icon" data-viewer-close aria-label="Close" title="Close (esc)">${ICON.close}</button>
+      </div>
+    </div>
+    <div class="v-body${toc ? '' : ' no-toc'}">
+      ${toc ? `<nav class="v-toc" aria-label="Sections"><h3>On this page</h3>${out.toc.map(t => `<a href="#${esc(t.id)}" class="l${t.level}">${esc(t.text)}</a>`).join('')}</nav>` : ''}
+      <div class="v-scroll" tabindex="-1">${viewer.note ? `<p class="v-note" role="status">${esc(viewer.note)}</p>` : ''}${body}</div>
+    </div>`;
+  dlg.setAttribute('aria-labelledby', 'vTitle');
+}
+
+function setRaw(on) {
+  viewer.raw = on;
+  localStorage.setItem('atlas.raw', on ? '1' : '0');
+  renderViewer();
+  el('viewer').querySelector('.v-scroll')?.focus({ preventScroll: true });
+}
+
+el('viewer').addEventListener('close', () => { viewer.s = null; viewer.back?.focus?.({ preventScroll: true }); });
+el('viewer').addEventListener('click', async e => {
+  const t = e.target;
+  if (t === el('viewer')) return el('viewer').close();
+  if (t.closest('[data-viewer-close]')) return el('viewer').close();
+  const m = t.closest('[data-mode]');
+  if (m) return setRaw(m.dataset.mode === 'raw');
+  const a = t.closest('.v-toc a');
+  if (a) {
+    e.preventDefault();
+    el('viewer').querySelector('#' + CSS.escape(a.getAttribute('href').slice(1)))?.scrollIntoView({ block: 'start', behavior: REDUCED.matches ? 'auto' : 'smooth' });
+    return;
+  }
+  const cp = t.closest('[data-copy-raw]');
+  if (cp) {
+    await navigator.clipboard.writeText(viewer.text).catch(() => {});
+    cp.innerHTML = ICON.check; cp.style.color = 'var(--on)';
+    setTimeout(() => { cp.innerHTML = ICON.copy; cp.style.color = ''; }, 1500);
+  }
+});
+
+// ---------------------------------------------------------------- theme
+const THEMES = [['system', ICON.auto, 'Match the system'], ['light', ICON.sun, 'Light'], ['dark', ICON.moon, 'Dark']];
+const SYSTEM_LIGHT = matchMedia('(prefers-color-scheme: light)');
+let themePick = localStorage.getItem('atlas.theme') || 'system';
+function applyTheme() {
+  const root = document.documentElement;
+  // Every element has its own transition; switching all of them at once would ripple.
+  root.classList.add('theming');
+  root.dataset.theme = themePick === 'system' ? (SYSTEM_LIGHT.matches ? 'light' : 'dark') : themePick;
+  setSeg('theme', 't', themePick);
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theming')));
+}
+el('theme').innerHTML = THEMES.map(([t, icon, label]) => `<button data-t="${t}" aria-pressed="false" aria-label="${label}" title="${label}">${icon}</button>`).join('');
+el('theme').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  themePick = b.dataset.t; localStorage.setItem('atlas.theme', themePick); applyTheme();
+});
+SYSTEM_LIGHT.addEventListener('change', () => { if (themePick === 'system') applyTheme(); });
 
 // ---------------------------------------------------------------- toast
 let toastTimer, toastGone, toastUndo = null;
@@ -1641,6 +2237,7 @@ document.addEventListener('click', async e => {
   if (open && open.dataset.avail) return selectAvail(open.dataset.avail, open.dataset.path);
   if (open) return select(SKILLS[+open.dataset.id]);
   if (t.closest('[data-close]')) { const k = selKey(ui.selected); select(null); focusRow(k); return; }
+  if (t.closest('[data-view]')) return openViewer(ui.selected);
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');
@@ -1651,13 +2248,9 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.closest('[data-clear]')) return reset();
-  if (t.closest('[data-show-project]')) { el('showProject').checked = true; ui.showProject = true; return render(); }
+  if (t.closest('[data-show-project]')) { el('showProject').checked = true; ui.showProject = true; markDisplay(); return render(); }
   if (t.closest('[data-help-close]') || t.id === 'help') return closeHelp();
 });
-
-document.addEventListener('toggle', e => {
-  if (e.target.matches?.('#detail details')) ui.previewOpen = e.target.open;
-}, true);
 
 document.addEventListener('submit', e => {
   const form = e.target.closest('.linkform');
@@ -1693,13 +2286,36 @@ el('groupBy').addEventListener('click', e => {
 function reset() {
   el('q').value = ''; ui.q = ''; ui.view = 'all'; setSeg('view', 'v', 'all');
   ui.showProject = ui.showStale = false; el('showProject').checked = el('showStale').checked = false;
-  render();
+  markDisplay(); render();
 }
 
 function setCompact(on) {
   ui.compact = on; document.body.classList.toggle('compact', on);
   localStorage.setItem('atlas.compact', on ? '1' : '0');
 }
+
+function setLayout(layout) {
+  ui.layout = layout; document.body.classList.toggle('cards', layout === 'cards');
+  localStorage.setItem('atlas.layout', layout);
+  setSeg('layout', 'l', layout);
+}
+el('layout').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setLayout(b.dataset.l); render();
+});
+
+function setDisplay(open, focusButton = false) {
+  el('display').hidden = !open;
+  el('displayBtn').setAttribute('aria-expanded', open);
+  if (open) el('display').querySelector('[aria-pressed="true"]')?.focus();
+  else if (focusButton) el('displayBtn').focus();
+}
+// The dot says a Display option is showing skills that are hidden by default.
+const markDisplay = () => { el('displayDot').hidden = !(ui.showProject || ui.showStale); };
+el('displayBtn').addEventListener('click', () => setDisplay(el('display').hidden));
+document.addEventListener('pointerdown', e => { if (!el('display').hidden && !e.target.closest('#displayWrap')) setDisplay(false); });
+el('display').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); setDisplay(false, true); } });
+el('display').addEventListener('change', markDisplay);
 
 let helpReturn;
 function openHelp() {
@@ -1748,6 +2364,10 @@ document.addEventListener('keydown', e => {
   const typing = t.matches('input[type="search"], input[type="text"], input:not([type]), textarea');
   const mod = e.metaKey || e.ctrlKey;
 
+  if (el('viewer').open) {
+    if (!typing && !mod && e.key === 'r') { e.preventDefault(); setRaw(!viewer.raw); }
+    return;
+  }
   if (!el('help').hidden) {
     if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); closeHelp(); }
     if (e.key === 'Tab') e.preventDefault();
@@ -1776,6 +2396,13 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === 'g') { setLayout(ui.layout === 'cards' ? 'list' : 'cards'); render(); return; }
+  if (e.key === 'v') {
+    const o = t.matches?.('.open') ? t : null;
+    const s = o ? (o.dataset.avail ? null : SKILLS[+o.dataset.id]) : ui.selected;
+    if (o?.dataset.avail) { selectAvail(o.dataset.avail, o.dataset.path); return openViewer(ui.selected); }
+    return openViewer(s);
+  }
   if (e.key === 'j' || e.key === 'k') { e.preventDefault(); moveCursor(e.key === 'j' ? 1 : -1); return; }
   if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && (t.matches('.open') || t === document.body)) {
     e.preventDefault(); moveCursor(e.key === 'ArrowDown' ? 1 : -1); return;
@@ -1799,6 +2426,8 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', 
 el('band').hidden = WRITABLE;
 document.body.classList.toggle('ro', !WRITABLE);
 setCompact(ui.compact);
+setLayout(ui.layout);
+applyTheme();
 render();
 renderDetail();
 if (WRITABLE) checkUpdates();

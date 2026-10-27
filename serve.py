@@ -13,7 +13,9 @@ import subprocess
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
 
+import assets
 import remove
 import updates
 from build import render_page
@@ -83,6 +85,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(
                 200, updates.check(list(ROOTS.values()), refresh="refresh=1" in query)
             )
+        if path == "/api/skill":
+            # Only files the scan itself reported, so the page cannot read arbitrary files.
+            want = parse_qs(query).get("path", [""])[0]
+            if want not in {s["path"] for s in scan(REPO)["skills"]}:
+                return self._json(400, {"error": "unknown skill path"})
+            return self._json(200, {"text": Path(want).read_text(errors="replace")})
         if path.startswith("/api/jobs/") and path[10:] in updates.JOBS:
             return self._json(200, updates.job_view(updates.JOBS[path[10:]]))
         self._send(404, b"not found", "text/plain")
@@ -104,6 +112,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("unknown skill path")
                 subprocess.run(["open", "-R", path], check=False)
                 return self._json(200, {"ok": True})
+            if self.path == "/api/repos":
+                repos = sorted({updates.parse_repo(str(r)) for r in req["repos"]})[:50]
+                return self._json(200, assets.fetch(repos))
             if self.path == "/api/watch":
                 return self._json(
                     200,
