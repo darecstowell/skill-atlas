@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import harnesses
+import tokens
 
 HOME = Path.home()
 
@@ -300,6 +301,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "body_preview": "\n".join(ln for ln in body.split("\n") if ln.strip())[:600],
     }
     rec.update(bundle_stats(skill_dir))
+    rec.update(tokens.costs(str(rec["name"]), str(rec["description"]), body))
     rec.update(extra)
     rec.setdefault("invoke", rec["name"])
     return rec
