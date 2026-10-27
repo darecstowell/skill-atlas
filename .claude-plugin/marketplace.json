@@ -1,0 +1,12 @@
+{
+  "name": "skill-atlas",
+  "description": "Skill Atlas, a local page for the agent skills on this machine",
+  "owner": { "name": "Darec Stowell" },
+  "plugins": [
+    {
+      "name": "skill-atlas",
+      "source": "./",
+      "description": "Adds /skills-atlas, which starts Skill Atlas and prints its URL"
+    }
+  ]
+}

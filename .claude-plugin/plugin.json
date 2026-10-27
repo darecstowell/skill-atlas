@@ -1,0 +1,15 @@
+{
+  "name": "skill-atlas",
+  "version": "0.1.0",
+  "description": "Open Skill Atlas: browse, toggle, update, and clean up the agent skills on this machine",
+  "author": {
+    "name": "Darec Stowell"
+  },
+  "homepage": "https://github.com/darecstowell/skill-atlas",
+  "repository": "https://github.com/darecstowell/skill-atlas",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "inventory"
+  ]
+}
