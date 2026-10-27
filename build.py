@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import shutil
 import sys
 import webbrowser
 from pathlib import Path
@@ -37,6 +38,7 @@ def main() -> int:
 
     page = OUT / "index.html"
     page.write_text(render_page(data), encoding="utf-8")
+    shutil.copytree(REPO / "template" / "bg", OUT / "bg", dirs_exist_ok=True)
 
     print(f"{data['count']} skills -> {page}")
     if args.open:

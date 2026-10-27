@@ -42,7 +42,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
 | **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
 | **See where it comes from** | Each source shows its owner's GitHub avatar. A source's panel shows the repo's banner, and a skill's panel shows a picture from its own folder when it has one. |
-| **List or cards** | Switch between dense rows and a card grid. Pick light, dark, or the system theme. |
+| **Make it yours** | Switch between dense rows and a card grid. Pick light, dark, or the system theme, one of five palettes, and a quiet background texture. |
 | **Act on many at once** | Tick skills one by one, shift-click a range, or tick a whole source. Then turn them on or off, update, link, copy them as a prompt, or delete them. |
 | **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 
