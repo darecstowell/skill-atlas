@@ -11,7 +11,7 @@
     const pick = localStorage.getItem('atlas.theme') || 'system';
     document.documentElement.dataset.theme = pick === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pick;
     document.documentElement.dataset.palette = localStorage.getItem('atlas.palette') || 'atlas';
-    document.documentElement.dataset.bg = localStorage.getItem('atlas.bg') || 'none';
+    document.documentElement.dataset.bg = localStorage.getItem('atlas.bg') || 'paper';
     document.documentElement.dataset.scale = localStorage.getItem('atlas.scale') || 'default';
   } catch { document.documentElement.dataset.theme = 'dark'; }
 </script>

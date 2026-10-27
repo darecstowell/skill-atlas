@@ -202,25 +202,6 @@ The tool uses only the Python standard library. Dev tools run through
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
 ```
 
-| File | Job |
-| --- | --- |
-| `src/skill_atlas/scan.py` | Reads the config roots and makes one record per skill |
-| `src/skill_atlas/serve.py` | Local server and the only writer of `settings.json` |
-| `src/skill_atlas/updates.py` | Update checks, updates, installs, and watched sources |
-| `src/skill_atlas/assets.py` | Avatars, banners, and image paths for source repos |
-| `src/skill_atlas/harnesses.py` | Where each harness looks for skills, and how its switch reads and writes |
-| `src/skill_atlas/usage.py` | Counts skill use from session logs of Claude Code, Codex, Gemini CLI, Copilot CLI, and OpenCode |
-| `src/skill_atlas/remove.py` | Moves skills to the Trash, and puts them back |
-| `src/skill_atlas/tokens.py` | Estimates the context cost of each skill |
-| `src/skill_atlas/health.py` | Finds problems in SKILL.md files and in the store |
-| `src/skill_atlas/overlap.py` | Finds similar skills and copies that differ |
-| `src/skill_atlas/security.py` | Read-only scan for risky patterns in skill folders |
-| `src/skill_atlas/history.py` | Diffs before an update, snapshots, and rollback |
-| `src/skill_atlas/profiles.py` | Saves and applies named sets of switches |
-| `src/skill_atlas/manifest.py` | Export, import, and restore of a skill set |
-| `src/skill_atlas/build.py` | Puts the records into `web/index.html` |
-| `src/skill_atlas/web/index.html` | The page: one file of HTML, CSS, and JavaScript |
-
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
 ## Credits
