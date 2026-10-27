@@ -1,6 +1,6 @@
 [project]
 name = "skill-atlas"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Browse, toggle, update, and clean up your Claude Code skills"
 readme = "README.md"
 license = "MIT"
@@ -13,6 +13,9 @@ skill-atlas = "skill_atlas.__main__:main"
 [build-system]
 requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/skill_atlas/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/skill_atlas"]

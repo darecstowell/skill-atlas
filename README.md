@@ -20,18 +20,45 @@ follow, and move old skills to the Trash.
 
 ## Quick start
 
+Skill Atlas needs Python 3.10 or later and nothing else. Use one of these methods. Each one starts
+a server on `127.0.0.1:7381` and opens the page.
+
+**Clone and run**
+
 ```bash
 git clone https://github.com/darecstowell/skill-atlas.git
 cd skill-atlas
 ./atlas
 ```
 
-`./atlas` starts a server on `127.0.0.1:7381` and opens the page. It needs Python 3.10 or later and
-nothing else. For a short command, add an alias:
+For a short command, add an alias: `alias atlas='~/path/to/skill-atlas/atlas'`.
+
+**Run with uv, no clone**
 
 ```bash
-alias atlas='~/path/to/skill-atlas/atlas'
+uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas
 ```
+
+**Claude Code plugin**
+
+```text
+/plugin marketplace add darecstowell/skill-atlas
+/plugin install skill-atlas@skill-atlas
+```
+
+Then type `/skills-atlas`. It starts the atlas in the background and shows the URL. It uses `uvx`
+when you have it, and the plugin's own copy when you do not.
+
+**Single file**
+
+Download `skill-atlas.pyz` from [Releases](https://github.com/darecstowell/skill-atlas/releases),
+then run it:
+
+```bash
+python3 skill-atlas.pyz
+```
+
+Use `--port` to set a different port, and `--no-open` to keep the browser closed.
 
 ## What it does
 
