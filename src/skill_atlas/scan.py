@@ -599,6 +599,7 @@ def scan(repo: Path) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "host": platform.node(),
+        "home": str(Path.home()),
         "config_roots": {h.label: str(h.root) for h in hosts},
         "bundled_skills_disabled": bundled_off,
         "harnesses": {
