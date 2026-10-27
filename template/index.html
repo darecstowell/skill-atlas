@@ -152,6 +152,26 @@
   .cluster { margin-left: auto; display: flex; align-items: center; gap: var(--s2); font-size: 12px; color: var(--text-2); white-space: nowrap; }
   .cluster b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
   .cluster .warn { color: var(--warn); }
+  .check-btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 10px; border: 0; border-radius: var(--r-md);
+    background: transparent; color: var(--text-2); font: 500 12px var(--sans); cursor: pointer;
+    transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), scale 150ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) { .check-btn:hover { background: var(--surface-2); color: var(--text); } }
+  .check-btn:active { scale: .97; }
+  .check-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .check-btn[data-busy] { cursor: progress; }
+  .check-btn[data-busy]:active { scale: 1; }
+  .ck-label, .ck-icon { display: inline-grid; place-items: center; animation: ck-in 180ms var(--ease-out); }
+  .ck-icon svg { width: 14px; height: 14px; }
+  .ck-icon.done { color: var(--on); }
+  .check-btn[data-busy] .ck-icon svg { animation: ck-spin 800ms linear infinite; }
+  @keyframes ck-in { from { opacity: 0; transform: translateY(2px); filter: blur(2px); } }
+  @keyframes ck-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ck-label, .ck-icon, .check-btn[data-busy] .ck-icon svg { animation: none; }
+    .check-btn { transition: none; }
+  }
   .meta { margin-left: auto; display: flex; gap: var(--s3); font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
   .meta b { color: var(--text-2); font-weight: 500; font-variant-numeric: tabular-nums; }
   .meta code { font: 11.5px var(--mono); color: var(--text-2); }
@@ -1111,7 +1131,7 @@ function index() {
 index();
 
 // Update state for GitHub-tracked skills, keyed by their lock name (the folder name).
-const upd = { status: {}, errors: {}, checking: false, checkedAt: null, job: null, confirm: null, available: {}, watched: [], descs: {} };
+const upd = { status: {}, errors: {}, checking: false, justChecked: 0, checkedAt: null, job: null, confirm: null, available: {}, watched: [], descs: {} };
 const RUNNING = new Set(['queued', 'downloading', 'installing']);
 const jobState = name => upd.job?.items[name]?.state;
 const isBusy = name => RUNNING.has(jobState(name));
@@ -1656,17 +1676,26 @@ function renderChrome() {
         ? `<span data-k="t">${ed} <b>${items.filter(i => i.state === 'done').length}</b> of <b>${items.length}</b></span>`
         : `<span data-k="t">${ing} <b>${finished}</b> of <b>${items.length}</b>…</span>`;
     } else if (upd.checking) {
-      cluster = '<span data-k="t">Checking for updates…</span>';
+      cluster = checkButton();
     } else if (upd.checkedAt) {
       const chip = fresh && ui.view !== 'new' ? `<button class="chip" data-k="nw" data-view-new>${plural(fresh, 'new skill')}</button>` : '';
       cluster = chip + (outdated.length
         ? `<span data-k="t"><b>${outdated.length}</b> ${outdated.length === 1 ? 'update' : 'updates'}</span>${warn}${groupUpdateButton(lv, 'data-update-all', { label: 'Update all', cls: 'btn primary', count: false })}${again}`
-        : `<span data-k="t">Up to date</span>${warn}${again}`);
+        : `${warn}${checkButton()}`);
     }
   }
   patch(el('cluster'), cluster);
   renderBulk();
   renderBar();
+}
+
+// "Up to date" and its refresh arrow as one button: the arrow spins while checking, then turns into a tick.
+function checkButton() {
+  const done = !upd.checking && Date.now() - upd.justChecked < 1400;
+  const label = upd.checking ? 'Checking…' : 'Up to date';
+  const icon = done ? ICON.check : ICON.refresh;
+  return `<button class="check-btn" data-k="ck" data-recheck${upd.checking ? ' aria-busy="true" data-busy' : ''} aria-label="${upd.checking ? 'Checking for updates' : 'Up to date. Check again'}" title="${upd.checking ? '' : 'Check again'}">
+    <span class="ck-label" data-k="l" data-leaf>${label}</span><span class="ck-icon${done ? ' done' : ''}" data-k="i" data-leaf>${icon}</span></button>`;
 }
 
 function renderBar() {
@@ -2669,6 +2698,7 @@ async function checkUpdates(refresh = false) {
   try {
     const data = await api('/api/updates' + (refresh ? '?refresh=1' : ''));
     Object.assign(upd, { status: data.skills, errors: data.errors, checkedAt: data.checked_at, available: data.available || {}, watched: data.watched || [] });
+    if (refresh) { upd.justChecked = Date.now(); setTimeout(renderChrome, 1450); }
     // Drop cached descriptions that miss a path the repo now offers.
     for (const [repo, d] of Object.entries(upd.descs)) {
       if (d.skills && (upd.available[repo] || []).some(a => !d.skills[a.path])) delete upd.descs[repo];
@@ -2998,7 +3028,7 @@ document.addEventListener('click', async e => {
   if (t.closest('[data-update-all]')) return updateBatch(SKILLS.filter(live));
   const us = t.closest('[data-update-source]');
   if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
-  if (t.closest('[data-recheck]')) return checkUpdates(true);
+  if (t.closest('[data-recheck]')) return upd.checking ? undefined : checkUpdates(true);
   if (t.closest('[data-view-new]')) return showView('new');
   const io = t.closest('[data-install-one]');
   if (io) {
