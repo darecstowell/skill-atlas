@@ -50,7 +50,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 
 **Sources.** A skill is tracked when it has a GitHub source in `~/.agents/.skill-lock.json`
 (written by `npx skills`) or in `~/.agents/.atlas-lock.json` (written by **Link to GitHub…**).
-Untracked skills that share a name prefix, such as `emil-*`, get their own group.
+Untracked skills that share a name prefix, such as `acme-*`, get their own group.
 
 **Update checks.** On load, the atlas reads each source repo's file tree from GitHub (through `gh`,
 then anonymous HTTPS). A skill is out of date when its folder SHA is different from the SHA in the
