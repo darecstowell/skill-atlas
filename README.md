@@ -50,6 +50,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Find problems** | The **Issues** view lists skills with bad frontmatter, a wrong name, a long description, or links to files that are not there. The inventory panel shows lock entries with no folder and folders with no SKILL.md. The atlas does not fix them. |
 | **Profiles** | Save which skills are on and off as a named profile, from the **Profiles** menu or from a selection. Apply shows what changes in each harness first, and you can undo it. Profiles go in `~/.config/skill-atlas/profiles.json`. |
 | **Move your set** | **Export** in the Inventory panel saves your skills, sources, watched repos, and off switches to a JSON file. **Import** shows what it will install and change, then does it. **Restore** installs again the skills in the lock file that have no folder. |
+| **Check before you trust** | A read-only scan tags skills that run code, and marks **review** on high-risk patterns: piped installs, secret reads, hidden instructions. The skill panel lists each finding with its file and line. It is a heuristic, not a guarantee. |
 | **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 | **Find overlap** | A **similar** tag marks skills with descriptions so close that the agent can pick the wrong one. A **diverged** tag marks copies of a skill whose SKILL.md is different in another folder. **Compare** shows the line diff. |
 
