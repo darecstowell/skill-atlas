@@ -1,15 +1,18 @@
-"""Scan every place Claude Code loads skills from and emit one record per skill."""
+"""Scan every place agent harnesses load skills from and emit one record per skill."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import platform
 import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from . import REPO, harnesses, health, overlap, security, tokens
 
 HOME = Path.home()
 
@@ -30,7 +33,7 @@ def _unquote(v: str) -> str:
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """Minimal YAML subset: scalars, quoted scalars, block scalars, one nesting level, lists."""
-    lines = text.split("\n")
+    lines = text.removeprefix("\ufeff").split("\n")
     if not lines or lines[0].strip() != "---":
         return {}, text
 
@@ -113,16 +116,35 @@ def as_list(v) -> list[str]:
     return [str(v)]
 
 
+def as_dict(v) -> dict:
+    return v if isinstance(v, dict) else {}
+
+
 # --------------------------------------------------------------------------
 # host config
 # --------------------------------------------------------------------------
 
 
 def read_json(path: Path) -> dict:
+    """The JSON object in a file, or {} when it is missing, unreadable, or not an object."""
     try:
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+    return data if isinstance(data, dict) else {}
+
+
+def read_json_strict(path: Path) -> dict:
+    """Like read_json, but for writers: a file that exists and is not a JSON object is an error."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"cannot read {path}: {e}. Fix the file, then try again.") from e
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} does not hold a JSON object. Fix the file, then try again.")
+    return data
 
 
 @dataclass
@@ -141,17 +163,19 @@ class HostConfig:
             label=label,
             root=root,
             settings=read_json(root / "settings.json"),
-            installed_plugins=read_json(root / "plugins" / "installed_plugins.json").get(
-                "plugins", {}
+            installed_plugins=as_dict(
+                read_json(root / "plugins" / "installed_plugins.json").get("plugins")
             ),
             marketplaces=read_json(root / "plugins" / "known_marketplaces.json"),
         )
 
     def plugin_enabled(self, ref: str):
-        return self.settings.get("enabledPlugins", {}).get(ref)
+        plugins = self.settings.get("enabledPlugins")
+        return plugins.get(ref) if isinstance(plugins, dict) else None
 
     def plugin_installs(self, ref: str) -> list[dict]:
-        return self.installed_plugins.get(ref, [])
+        installs = self.installed_plugins.get(ref)
+        return [i for i in installs if isinstance(i, dict)] if isinstance(installs, list) else []
 
 
 def settings_state(root: Path) -> dict:
@@ -159,8 +183,8 @@ def settings_state(root: Path) -> dict:
     s = read_json(root / "settings.json")
     return {
         "path": str(root / "settings.json"),
-        "skillOverrides": s.get("skillOverrides", {}),
-        "enabledPlugins": s.get("enabledPlugins", {}),
+        "skillOverrides": as_dict(s.get("skillOverrides")),
+        "enabledPlugins": as_dict(s.get("enabledPlugins")),
     }
 
 
@@ -173,13 +197,18 @@ def iso(ts: float) -> str:
 # --------------------------------------------------------------------------
 
 
-def git_tree_hash(path: Path) -> str:
+def git_tree_hash(path: Path, skip: tuple[str, ...] = ()) -> str:
     """The git tree SHA of a folder, as GitHub reports it, to spot local edits."""
     entries = []
     for child in path.iterdir():
-        if child.name == ".git":
+        if child.name == ".git" or child.name in skip:
             continue
-        if child.is_dir():
+        if child.is_symlink():
+            # Git stores a link as its target text, and following it could loop.
+            data = os.readlink(child).encode()
+            mode, key = b"120000", child.name
+            sha = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+        elif child.is_dir():
             mode, sha, key = b"40000", git_tree_hash(child), child.name + "/"
         else:
             data = child.read_bytes()
@@ -213,8 +242,17 @@ def bundle_stats(skill_dir: Path) -> dict:
     return {"file_count": files, "bytes": total, "subdirs": sorted(kinds)}
 
 
+def _record(skill_md: Path, **kw) -> dict | None:
+    """One skill's record, or None when its files cannot be read."""
+    try:
+        return build_record(skill_md, **kw)
+    except OSError as e:
+        print(f"skill-atlas: skipped {skill_md}: {e}", file=sys.stderr)
+        return None
+
+
 def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
-    text = skill_md.read_text(errors="replace")
+    text = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, body = parse_frontmatter(text)
     skill_dir = skill_md.parent
     meta = fm.get("metadata")
@@ -234,6 +272,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "model",
         "compatibility",
         "disable-model-invocation",
+        "user-invocable",
     }
     stat = skill_md.stat()
     headings = len(re.findall(r"^##+ ", body, re.M))
@@ -244,6 +283,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "description": re.sub(r"\s+", " ", str(fm.get("description", ""))).strip(),
         "scope": scope,
         "manual_only": str(fm.get("disable-model-invocation", "")).lower() == "true",
+        "claude_only": str(fm.get("user-invocable", "")).lower() == "false",
         "version": str(fm.get("version") or meta.get("version") or ""),
         "license": str(fm.get("license") or ""),
         "model": str(fm.get("model") or ""),
@@ -258,8 +298,11 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "headings": headings,
         "extra_frontmatter": {k: v for k, v in fm.items() if k not in known},
         "body_preview": "\n".join(ln for ln in body.split("\n") if ln.strip())[:600],
+        "problems": health.skill_problems(skill_md, text, fm, body),
     }
     rec.update(bundle_stats(skill_dir))
+    rec.update(tokens.costs(str(rec["name"]), str(rec["description"]), body))
+    rec["security"] = security.summary(skill_dir, as_list(fm.get("allowed-tools")))
     rec.update(extra)
     rec.setdefault("invoke", rec["name"])
     return rec
@@ -270,33 +313,78 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
 # --------------------------------------------------------------------------
 
 
-def collect_personal(host: HostConfig, lock_index: dict, seen: dict) -> list[dict]:
-    root = host.root / "skills"
-    if not root.exists():
-        return []
-    real = root.resolve()
+def global_dirs(found: list[harnesses.Harness]) -> dict[Path, list[harnesses.Harness]]:
+    """Each real skill folder, with the harnesses that read it. Symlinked folders count once."""
+    dirs: dict[Path, list[harnesses.Harness]] = {}
+    for h in found:
+        for d in h.dirs:
+            if d.is_dir():
+                dirs.setdefault(d.resolve(), []).append(h)
+    return dirs
+
+
+def lock_entries(skills_dir: Path, cache: dict) -> dict:
+    """The lock entries kept beside one real skills folder. Atlas links first, so npx wins."""
+    if skills_dir not in cache:
+        lock = skills_dir.parent / ".skill-lock.json"
+        entries: dict = {}
+        for path in (lock.with_name(ATLAS_LOCK), lock):
+            found = as_dict(read_json(path).get("skills"))
+            entries.update({k: v for k, v in found.items() if isinstance(v, dict)})
+        cache[skills_dir] = entries
+    return cache[skills_dir]
+
+
+def store_home(roots: dict[str, Path]) -> Path | None:
+    """Where installs and deletes happen: ~/.agents, as npx skills uses, else the first root."""
+    agents = Path.home() / ".agents"
+    if (agents / "skills").is_dir():
+        return agents
+    return next(iter(roots.values()), None)
+
+
+def collect_global(
+    dirs: dict[Path, list[harnesses.Harness]], store: Path | None, seen: dict
+) -> list[dict]:
     out = []
-    for skill_md in sorted(real.glob("*/SKILL.md")):
-        key = str(skill_md.resolve())
-        if key in seen:
-            seen[key]["config_roots"].append(host.label)
-            continue
-        rec = build_record(
-            skill_md,
-            scope="personal",
-            config_roots=[host.label],
-            status="enabled",
-            source_root=str(real),
-            origin=lock_index.get(skill_md.parent.name, {}),
-        )
-        locked = rec["origin"].get("skillFolderHash", "")
-        rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
-        seen[key] = rec
-        out.append(rec)
+    locks: dict = {}
+    for real, readers in dirs.items():
+        ids = [h.id for h in readers]
+        roots = [
+            h.label.removeprefix("Claude Code · ") or "main"
+            for h in readers
+            if h.switch == "claude"
+        ]
+        for skill_md in sorted(real.glob("*/SKILL.md")):
+            key = str(skill_md.resolve())
+            if key in seen:
+                seen[key]["harnesses"] += ids
+                seen[key]["config_roots"] += roots
+                continue
+            home = skill_md.resolve().parent.parent
+            rec = _record(
+                skill_md,
+                scope="personal",
+                harnesses=list(ids),
+                config_roots=list(roots),
+                status="enabled",
+                source_root=str(real),
+                store=home == store,
+                origin=lock_entries(home, locks).get(skill_md.parent.name, {}),
+            )
+            if rec is None:
+                continue
+            locked = rec["origin"].get("skillFolderHash", "")
+            try:
+                rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
+            except OSError:
+                rec["local_edits"] = False
+            seen[key] = rec
+            out.append(rec)
     return out
 
 
-def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
+def collect_plugins(host: HostConfig, harness_id: str, seen: dict) -> list[dict]:
     cache = host.root / "plugins" / "cache"
     if not cache.exists():
         return []
@@ -325,16 +413,18 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                     key = str(skill_md.resolve())
                     if key in seen:
                         seen[key]["config_roots"].append(host.label)
+                        seen[key]["harnesses"].append(harness_id)
                         continue
-                    rec = build_record(
+                    rec = _record(
                         skill_md,
                         scope="plugin",
                         config_roots=[host.label],
+                        harnesses=[harness_id],
                         status=status,
                         plugin=plugin_dir.name,
                         plugin_ref=ref,
                         marketplace=marketplace_dir.name,
-                        marketplace_source=(host.marketplaces.get(marketplace_dir.name) or {}).get(
+                        marketplace_source=as_dict(host.marketplaces.get(marketplace_dir.name)).get(
                             "source", {}
                         ),
                         plugin_version=version_dir.name,
@@ -345,6 +435,8 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                         commit=(install.get("gitCommitSha") or "")[:7],
                         source_root=str(version_dir),
                     )
+                    if rec is None:
+                        continue
                     rec["invoke"] = f"{plugin_dir.name}:{rec['name']}"
                     seen[key] = rec
                     out.append(rec)
@@ -369,16 +461,19 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
                 key = str(skill_md.resolve())
                 if key in seen:
                     continue
-                rec = build_record(
+                rec = _record(
                     skill_md,
                     scope="project",
                     config_roots=[],
+                    harnesses=[],
                     status="project-only",
                     project=project_dir.name,
                     project_path=str(project_dir),
                     holder=holder,
                     source_root=str(skills_dir),
                 )
+                if rec is None:
+                    continue
                 seen[key] = rec
                 out.append(rec)
     return out
@@ -387,12 +482,80 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
 # --------------------------------------------------------------------------
 
 
+def user_config_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
+    return Path(base).expanduser() / "skill-atlas" / "config.json"
+
+
+def config_path(repo: Path) -> Path:
+    """$SKILL_ATLAS_CONFIG, else the user file, else a config.json next to the code."""
+    env = os.environ.get("SKILL_ATLAS_CONFIG")
+    if env:
+        return Path(env).expanduser()
+    user = user_config_path()
+    return user if user.exists() else repo / "config.json"
+
+
 def load_config(repo: Path) -> dict:
-    cfg = read_json(repo / "config.json")
-    cfg.setdefault("config_roots", {"personal": "~/.claude"})
-    cfg.setdefault("project_roots", [])
-    cfg.setdefault("project_scan_depth", 3)
-    return cfg
+    """The config with defaults. Wrong types fall back, and CLAUDE_CONFIG_DIR joins the roots."""
+    cfg = read_json(config_path(repo))
+    roots = cfg.get("config_roots")
+    if not isinstance(roots, dict) or not roots:
+        roots = {"main": "~/.claude"}
+    roots = {str(k): str(v) for k, v in roots.items() if isinstance(v, str) and v}
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env and Path(env).expanduser().resolve() not in {
+        Path(p).expanduser().resolve() for p in roots.values()
+    }:
+        label = Path(env).expanduser().name.lstrip(".") or "config"
+        while label in roots:
+            label += "-env"
+        roots[label] = env
+    projects = cfg.get("project_roots")
+    if isinstance(projects, str):
+        projects = [projects]
+    if not isinstance(projects, list):
+        projects = []
+    try:
+        depth = int(cfg.get("project_scan_depth", 3))
+    except (TypeError, ValueError):
+        depth = 3
+    only = cfg.get("harnesses")
+    return {
+        **cfg,
+        "harnesses": [str(h) for h in only] if isinstance(only, list) else None,
+        "config_roots": roots,
+        "project_roots": [str(p) for p in projects if isinstance(p, str) and p],
+        "project_scan_depth": depth,
+    }
+
+
+# Copies people keep around, not roots Claude Code runs from.
+SPARE = re.compile(r"archive|backup|bak|old|stale|copy", re.I)
+
+
+def detect_roots() -> dict[str, str]:
+    """~/.claude, CLAUDE_CONFIG_DIR, and each ~/.claude-<name> that has a settings.json."""
+    home = Path.home()
+    roots = {"main": "~/.claude"} if (home / ".claude").is_dir() else {}
+    for d in sorted(home.glob(".claude-*")):
+        if d.is_dir() and (d / "settings.json").is_file() and not SPARE.search(d.name):
+            roots[d.name.removeprefix(".claude-")] = "~/" + d.name
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env and env not in roots.values():
+        roots.setdefault(Path(env).expanduser().name.lstrip(".") or "config", env)
+    return roots or {"main": "~/.claude"}
+
+
+def write_user_config(force: bool = False) -> Path:
+    """Write a starter config with the roots found here. Never replaces a file unasked."""
+    path = user_config_path()
+    if path.exists() and not force:
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = {"config_roots": detect_roots(), "project_roots": [], "project_scan_depth": 3}
+    path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def scan(repo: Path) -> dict:
@@ -400,24 +563,19 @@ def scan(repo: Path) -> dict:
     hosts = [
         HostConfig.load(label, Path(os.path.expanduser(p)))
         for label, p in cfg["config_roots"].items()
-        if Path(os.path.expanduser(p)).exists()
+        if Path(os.path.expanduser(p)).is_dir()
     ]
 
-    lock_index: dict = {}
-    for host in hosts:
-        skills_dir = host.root / "skills"
-        if skills_dir.exists():
-            # Skills linked in the atlas first, so the npx lock wins on a clash.
-            lock_index.update(
-                read_json(skill_lock_path(host.root).with_name(ATLAS_LOCK)).get("skills", {})
-            )
-            lock_index.update(read_json(skill_lock_path(host.root)).get("skills", {}))
+    found = harnesses.detect({h.label: h.root for h in hosts}, cfg["harnesses"])
+    claude_ids = {h.home: h.id for h in found if h.switch == "claude"}
+    home = store_home({h.label: h.root for h in hosts})
+    store = (home / "skills").resolve() if home else None
 
     seen: dict = {}
-    records: list[dict] = []
+    records: list[dict] = collect_global(global_dirs(found), store, seen)
     for host in hosts:
-        records += collect_personal(host, lock_index, seen)
-        records += collect_plugins(host, seen)
+        if host.root in claude_ids:
+            records += collect_plugins(host, claude_ids[host.root], seen)
     records += collect_projects(
         [Path(os.path.expanduser(p)) for p in cfg["project_roots"]],
         int(cfg["project_scan_depth"]),
@@ -426,23 +584,39 @@ def scan(repo: Path) -> dict:
 
     for r in records:
         r["config_roots"] = sorted(set(r.get("config_roots") or []))
-        r["invocation"] = "manual only" if r["manual_only"] else "auto + manual"
+        r["harnesses"] = list(dict.fromkeys(r.get("harnesses") or []))
+        r["invocation"] = {
+            (False, False): "auto + manual",
+            (True, False): "manual only",
+            (False, True): "auto only",
+            (True, True): "neither",
+        }[(r["manual_only"], r["claude_only"])]
 
     records.sort(key=lambda r: (r["scope"], r["name"].lower()))
+    overlap.annotate(records)
     bundled_off = any(h.settings.get("disableBundledSkills") for h in hosts)
 
     return {
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
-        "host": os.uname().nodename,
+        "host": platform.node(),
+        "home": str(Path.home()),
         "config_roots": {h.label: str(h.root) for h in hosts},
         "bundled_skills_disabled": bundled_off,
-        "settings": {h.label: settings_state(h.root) for h in hosts},
+        "harnesses": {
+            h.id: {**h.view(), "store": any(d.is_dir() and d.resolve() == store for d in h.dirs)}
+            for h in found
+        },
+        "store": str(home) if home else "",
+        "settings": {
+            h.id: settings_state(h.home) if h.switch == "claude" else harnesses.state(h, records)
+            for h in found
+        },
+        "health": health.store_health(list(global_dirs(found)), store),
         "count": len(records),
         "skills": records,
     }
 
 
 if __name__ == "__main__":
-    repo = Path(__file__).resolve().parent
-    json.dump(scan(repo), sys.stdout, indent=2)
+    json.dump(scan(REPO), sys.stdout, indent=2)
     print()

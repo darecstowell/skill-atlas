@@ -1,18 +1,32 @@
 [project]
 name = "skill-atlas"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Browse, toggle, update, and clean up your Claude Code skills"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
+
+[project.scripts]
+skill-atlas = "skill_atlas.__main__:main"
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/skill_atlas/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skill_atlas"]
 
 [dependency-groups]
 dev = ["mypy>=1.11", "pytest>=8", "ruff>=0.6"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
+src = ["src", "tests"]
 extend-exclude = ["out"]
 
 [tool.ruff.lint]
@@ -21,9 +35,10 @@ ignore = ["RUF001", "RUF003", "SIM105"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["*.py"]
+files = ["src"]
 check_untyped_defs = true
 warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]

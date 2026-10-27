@@ -1,7 +1,9 @@
 out/
+dist/
 __pycache__/
 .DS_Store
 .venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+config.json
