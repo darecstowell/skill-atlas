@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import harnesses
+import health
 import tokens
 
 HOME = Path.home()
@@ -299,6 +300,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "headings": headings,
         "extra_frontmatter": {k: v for k, v in fm.items() if k not in known},
         "body_preview": "\n".join(ln for ln in body.split("\n") if ln.strip())[:600],
+        "problems": health.skill_problems(skill_md, text, fm, body),
     }
     rec.update(bundle_stats(skill_dir))
     rec.update(tokens.costs(str(rec["name"]), str(rec["description"]), body))
@@ -608,6 +610,7 @@ def scan(repo: Path) -> dict:
             h.id: settings_state(h.home) if h.switch == "claude" else harnesses.state(h, records)
             for h in found
         },
+        "health": health.store_health(list(global_dirs(found)), store),
         "count": len(records),
         "skills": records,
     }

@@ -683,6 +683,33 @@
   .cost-top .tnum, .cost-per .tnum { white-space: nowrap; }
   .cost-per .hn { color: var(--text-2); }
   .cost-flag { color: var(--warn); }
+  /* ---------- health: SKILL.md and store problems ---------- */
+  :root { --tint-danger: color-mix(in oklab, var(--danger) 12%, var(--surface-1)); }
+  .tag.issue { color: var(--warn); background: var(--tint-warn); border-color: transparent; }
+  .tag.issue[data-lvl="error"] { color: var(--danger); background: var(--tint-danger); }
+  .card.probs { display: block; background: var(--tint-warn); }
+  .card.probs[data-lvl="error"] { background: var(--tint-danger); }
+  .probs ul { display: grid; gap: var(--s2); margin: var(--s2) 0 0; padding: 0; list-style: none; }
+  .probs li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--s2); align-items: baseline; }
+  .probs .lvl { font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--warn); }
+  .probs .lvl[data-lvl="error"] { color: var(--danger); }
+  .probs .msg { color: var(--text); overflow-wrap: anywhere; }
+  .probs .hint { grid-column: 2; font-size: 12px; color: var(--text-3); }
+  .probs .path { font: 11.5px var(--mono); overflow-wrap: anywhere; }
+  .hl { display: grid; gap: var(--s2); }
+  .hl summary { display: flex; align-items: center; gap: var(--s2); min-height: 32px; padding: 0 8px; margin: 0 -8px; list-style: none; cursor: pointer; font-size: 12.5px; color: var(--text-2); border-radius: var(--r-md); transition: background-color 120ms ease, color 120ms ease; }
+  .hl summary::-webkit-details-marker { display: none; }
+  .hl summary .cr { width: 12px; height: 12px; margin-left: auto; color: var(--text-3); transition: transform 150ms var(--ease-out); }
+  .hl[open] summary .cr { transform: rotate(90deg); }
+  @media (hover: hover) and (pointer: fine) { .hl summary:hover { background: var(--surface-2); color: var(--text); } }
+  @media (prefers-reduced-motion: reduce) { .hl summary .cr { transition: none; } }
+  .hl summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .hl p { display: flex; align-items: center; gap: var(--s2); margin: 0; font-size: 12.5px; color: var(--text-3); }
+  .hl i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .hl i[data-lvl="error"] { background: var(--danger); }
+  .hl i[data-lvl="ok"] { background: var(--on); }
+  .hl .probs { padding: var(--s3); border-radius: var(--r-lg); background: var(--surface-2); font-size: 12.5px; color: var(--text-2); }
+  .hl .probs ul { margin: 0; }
 
   /* ---------- toast ---------- */
   #toast {
@@ -957,6 +984,7 @@
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
       <button data-v="off" aria-pressed="false">Off <span class="n" data-n="off"></span></button>
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
+      <button data-v="issues" aria-pressed="false" id="viewIssues" title="Skills with SKILL.md problems" hidden>Issues <span class="n" data-n="issues"></span></button>
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
       <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
       <button data-v="costly" aria-pressed="false" id="viewCostly" hidden title="On, costly, and not used in 90 days">Costly <span class="n" data-n="costly"></span></button>
@@ -1211,6 +1239,7 @@ function visible(s) {
   if (!inView(s)) return false;
   if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
+  else if (ui.view === 'issues') { if (!s.problems?.length) return false; }
   else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view === 'costly') { if (!costlyUnused().has(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
@@ -1295,6 +1324,7 @@ function switchHtml(on, label, attrs) {
 
 function tagsHtml(s, st) {
   const tags = [
+    issueTag(s),
     s.local_edits ? '<span class="tag edited" title="Changed after install. Updating replaces your changes.">edited</span>' : '',
     updStatus(s) === 'unknown' ? '<span class="tag gone" title="Not found in the source repo. It may have moved or been removed.">not upstream</span>' : '',
     isOutdated(s) && !WRITABLE ? '<span class="tag update">update</span>' : '',
@@ -1591,6 +1621,7 @@ function emptyHtml() {
       <p>${when}${ui.view === 'new' ? ' Your sources have not added skills since you last looked.' : ''}</p>
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
+  if (ui.view === 'issues') return '<div class="empty" data-k="empty"><h2>No problems found</h2><p>Each SKILL.md in this view has valid frontmatter, and each file it names is there.</p></div>';
   if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
   if (ui.view === 'costly') return '<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
@@ -1663,6 +1694,8 @@ function renderChrome() {
   const fresh = newTotal();
   const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
   counts.costly = costlyUnused().size; el('viewCostly').hidden = ui.view !== 'costly';
+  counts.issues = lv.filter(s => s.problems?.length).length;
+  el('viewIssues').hidden = !counts.issues && ui.view !== 'issues';
   patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
@@ -1750,10 +1783,40 @@ function inventoryHtml() {
       ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates', WRITABLE ? 'accent' : '')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
+    ${storeHealthHtml()}
     ${inventoryUsageHtml(lv)}
     ${costHtml()}
     <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
+}
+
+// Health: problems in one SKILL.md, and in the skill store.
+const worst = list => (list.some(p => p.level === 'error') ? 'error' : 'warn');
+const probItems = list => `<ul>${list.map(p => `<li><span class="lvl" data-lvl="${esc(p.level)}">${p.level === 'error' ? 'Error' : 'Warning'}</span>
+  <span class="msg">${esc(p.message)}</span><span class="hint">${esc(p.hint)}</span>${p.path?.startsWith('/') ? `<span class="hint path">${esc(tilde(p.path))}</span>` : ''}</li>`).join('')}</ul>`;
+function issueTag(s) {
+  const list = s.problems || [];
+  if (!list.length) return '';
+  return `<span class="tag issue" data-lvl="${worst(list)}" title="${esc(list.map(p => p.message).join('\n'))}">${plural(list.length, 'problem')}</span>`;
+}
+function problemsHtml(s) {
+  const list = s.problems || [];
+  if (!list.length) return '';
+  return `<div class="d-sec" data-k="prob"><div class="card probs" data-lvl="${worst(list)}" data-leaf role="group" aria-label="Problems">
+    <strong>${list.length === 1 ? '1 problem to fix' : `${list.length} problems to fix`}</strong>${probItems(list)}</div></div>`;
+}
+// Keyed patching drops attributes the markup leaves out, so the open state lives here.
+let healthOpen = false;
+document.addEventListener('toggle', e => { if (e.target.matches?.('details.hl')) healthOpen = e.target.open; }, true);
+function storeHealthHtml() {
+  const list = DATA.health?.problems;
+  if (!list) return '';
+  if (!list.length) return '<div class="d-sec hl" data-k="hl" data-leaf><p><i data-lvl="ok"></i>No problems in the skill folders or lock files.</p></div>';
+  const ghosts = list.filter(p => p.code === 'ghost-lock').length;
+  const broken = list.length - ghosts;
+  const parts = [ghosts ? `${ghosts} lock ${ghosts === 1 ? 'entry' : 'entries'} with no folder` : '', broken ? `${plural(broken, 'folder')} that no harness can load` : ''];
+  return `<details class="d-sec hl" data-k="hl"${healthOpen ? ' open' : ''}><summary data-leaf><i data-lvl="${worst(list)}"></i>${parts.filter(Boolean).join(' · ')}${ICON.chevR}</summary>
+    <div class="probs" data-leaf>${probItems(list)}</div></details>`;
 }
 
 const groupKeyOf = s => (s.kind === 'avail' ? 'src:' + s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : 'src:' + sourceOf(s));
@@ -1860,6 +1923,7 @@ function detailHtml(s) {
       ${gh ? ghLink(gh) : ''}
       ${WRITABLE ? `<button class="btn ghost" data-k="rv" data-reveal="${esc(s.path)}">Reveal</button>` : ''}
     </div>
+    ${problemsHtml(s)}
     ${cards.length ? `<div class="d-sec" data-k="cards">${cards.join('')}</div>` : ''}
     ${s.scope === 'personal' ? loadedHtml(s) : ''}
     ${usageHtml(s)}
