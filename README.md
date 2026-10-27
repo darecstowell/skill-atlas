@@ -51,6 +51,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Profiles** | Save which skills are on and off as a named profile, from the **Profiles** menu or from a selection. Apply shows what changes in each harness first, and you can undo it. Profiles go in `~/.config/skill-atlas/profiles.json`. |
 | **Move your set** | **Export** in the Inventory panel saves your skills, sources, watched repos, and off switches to a JSON file. **Import** shows what it will install and change, then does it. **Restore** installs again the skills in the lock file that have no folder. |
 | **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
+| **Find overlap** | A **similar** tag marks skills with descriptions so close that the agent can pick the wrong one. A **diverged** tag marks copies of a skill whose SKILL.md is different in another folder. **Compare** shows the line diff. |
 
 ## How it works
 
