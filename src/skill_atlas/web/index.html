@@ -2060,6 +2060,10 @@ function attentionItems(lv) {
   const high = SKILLS.filter(inView).filter(isRisky).length;
   if (high) items.push({ tone: 'danger', text: `${plural(high, 'skill')} to review`,
     html: attnRow('a-sec', 'error', `${plural(high, 'skill')} with high-risk security findings.`, '<button class="linkbtn" data-view-review>Show them</button>') });
+  const bad = lv.filter(s => s.problems.length);
+  const err = bad.some(s => worst(s.problems) === 'error');
+  if (bad.length) items.push({ tone: err ? 'danger' : 'warn', text: `${plural(bad.length, 'skill')} with problems`,
+    html: attnRow('a-prob', err ? 'error' : 'warn', `${plural(bad.length, 'skill')} with SKILL.md problems.`, '<button class="linkbtn" data-view-issues>Show them</button>') });
   const n = SS.missing.length;
   if (WRITABLE && n) items.push({ tone: 'warn', text: `${n} missing`, html: missingHtml(n) });
   const diverged = overlapCounts(lv).diverged;
@@ -3950,6 +3954,7 @@ document.addEventListener('click', async e => {
   const ch = t.closest('[data-cost-harness]');
   if (ch) { el('harness').value = ch.dataset.costHarness; el('harness').dispatchEvent(new Event('change')); return; }
   if (t.closest('[data-view-review]')) return showView('review');
+  if (t.closest('[data-view-issues]')) return showView('issues');
   if (t.closest('[data-sec-retry]') && ui.selected) { SEC.by.delete(ui.selected.path); return renderDetail(); }
   const hr = t.closest('[data-hist-retry]');
   if (hr) { delete hist[hr.dataset.histRetry]; return renderDetail(); }
