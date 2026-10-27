@@ -22,6 +22,7 @@ from urllib.parse import parse_qs
 import assets
 import harnesses
 import history
+import manifest
 import profiles
 import remove
 import updates
@@ -271,6 +272,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/diff":
                 return self._json(200, history.diff(name, roots()))
             return self._json(200, history.listing(name))
+        if path == "/api/export":
+            return self._json(200, manifest.export(scan(REPO), roots()))
+        if path == "/api/restore":
+            return self._json(200, manifest.missing(roots()))
         if path.startswith("/api/jobs/"):
             job = updates.JOBS.get(path[10:])
             if job is None:
@@ -314,6 +319,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, history.rollback(name, str(req["id"]), roots()))
         if path.startswith("/api/profiles/") and path[14:] in profiles.ACTIONS:
             return self._json(200, profile_call(path[14:], req))
+        if path in ("/api/import/plan", "/api/import/apply"):
+            data, rs = scan(REPO), roots()
+            full = (
+                manifest.missing(rs)
+                if req.get("restore")
+                else manifest.plan(dict(req["manifest"]), data, rs)
+            )
+            if path == "/api/import/plan":
+                return self._json(200, full)
+            found = harnesses.detect(dict(ROOTS))
+            return self._json(200, manifest.apply(full, req, data, rs, found, write_setting))
         if path == "/api/undo-delete":
             return self._json(200, remove.undo())
         if path in ("/api/update", "/api/link", "/api/delete"):
