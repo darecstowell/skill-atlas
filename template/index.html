@@ -811,6 +811,57 @@
   .hs-list code { font: 11.5px var(--mono); }
   .hs .note { margin: 0; }
   @media (prefers-reduced-motion: reduce) { #histDlg, #histDlg::backdrop, .hd-file summary .chev { transition: none; } }
+  /* ---------- profiles ---------- */
+  #profWrap[hidden] { display: none; }
+  #profBtn svg { width: 14px; height: 14px; }
+  .pf-pop { width: 320px; gap: var(--s2); padding: var(--s2); }
+  .pf-head { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 6px 0; font-size: 12px; font-weight: 600; color: var(--text); }
+  .pf-head span { font-weight: 400; color: var(--text-3); }
+  .pf-list { display: grid; gap: 2px; max-height: min(320px, 50dvh); margin: 0; padding: 0; overflow: auto; list-style: none; }
+  .pf-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 2px; padding: 3px 3px 3px 8px; border-radius: var(--r-md); }
+  .pf-row:hover, .pf-row:focus-within { background: var(--surface-3); }
+  .pf-name { display: grid; min-width: 0; }
+  .pf-name b { overflow: hidden; font-size: 12.5px; font-weight: 500; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+  .pf-name span { font-size: 11.5px; color: var(--text-3); }
+  .pf-row .btn.icon svg { width: 13px; height: 13px; }
+  .pf-msg { margin: 0; padding: 4px 6px; font-size: 12px; color: var(--text-2); text-wrap: pretty; }
+  .pf-msg.err { display: flex; gap: 6px; align-items: flex-start; color: var(--danger); }
+  .pf-msg.err svg { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+  .pf-pop hr { margin: 0 2px; }
+  .pf-pop > .btn { justify-content: flex-start; }
+  #profileDlg {
+    width: min(460px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 14px;
+    background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop);
+    opacity: 1; transform: none; transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  }
+  @starting-style { #profileDlg[open] { opacity: 0; transform: scale(.97); } }
+  #profileDlg::backdrop { background: oklch(0 0 0 / .45); transition: opacity 180ms var(--ease-out); }
+  @starting-style { #profileDlg[open]::backdrop { opacity: 0; } }
+  #profileDlg form { padding: 20px var(--s5) var(--s4); }
+  #profileDlg h2 { margin: 0; font-size: 15px; font-weight: 600; text-wrap: balance; }
+  .pf-field { display: grid; gap: 6px; margin-top: var(--s3); font-size: 12px; color: var(--text-2); }
+  .pf-field input {
+    height: 32px; padding: 0 10px; border-radius: var(--r-md); border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13px; min-width: 0;
+  }
+  .pf-field input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .pf-field input[aria-invalid="true"] { border-color: var(--danger); }
+  .pf-check { display: flex; gap: 8px; align-items: flex-start; margin-top: var(--s3); font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+  .pf-check input { margin: 2px 0 0; accent-color: var(--accent); }
+  #profileDlg .note { margin: 6px 0 0; }
+  #profileDlg .err { display: flex; gap: 6px; align-items: center; margin: var(--s3) 0 0; font-size: 12px; color: var(--danger); }
+  #profileDlg .err svg { width: 14px; height: 14px; flex: none; }
+  .pf-h { display: flex; gap: 8px; align-items: baseline; margin: var(--s3) 0 6px; font-size: 12.5px; font-weight: 600; }
+  .pf-h span { font-weight: 400; color: var(--text-3); }
+  .pf-ch li { grid-template-columns: 34px minmax(0, 1fr); }
+  .pf-to { font-size: 11.5px; font-weight: 500; color: var(--text-3); }
+  .pf-to.on { color: var(--on); }
+  .pf-ch .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 720px) {
+    #profBtn .lbl { display: none; }
+    #profBtn { width: 28px; padding: 0; }
+    .pf-field input { font-size: 16px; }
+  }
 
   #viewer {
     width: min(1120px, calc(100vw - 32px)); height: min(900px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
@@ -970,6 +1021,10 @@
   <div class="bar1">
     <h1 class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="var(--accent)"/><path d="M19.6 7.2 12.4 24.8" stroke="var(--bg)" stroke-width="3.4" stroke-linecap="round"/></svg><span>Skill Atlas</span></h1>
     <label class="harness"><span class="vh">Harness</span><select id="harness"></select></label>
+    <div class="pop-wrap" id="profWrap" hidden>
+      <button class="btn ghost" id="profBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="profPop"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="9.5" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="10.8" cy="4.75" r=".9" fill="currentColor"/><circle cx="5.2" cy="11.25" r=".9" fill="currentColor"/></svg><span class="lbl">Profiles</span></button>
+      <div class="pop pf-pop" id="profPop" role="dialog" aria-label="Profiles" hidden></div>
+    </div>
     <div class="search">
       <svg class="glass" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <input type="search" id="q" placeholder="Search skills, sources, paths" aria-label="Search skills" autocomplete="off" spellcheck="false">
@@ -1055,6 +1110,7 @@
 <dialog id="viewer" aria-label="Skill file"></dialog>
 <dialog id="confirmDel" aria-labelledby="cdTitle"></dialog>
 <dialog id="histDlg" aria-labelledby="hdTitle"></dialog>
+<dialog id="profileDlg" aria-labelledby="pfTitle"></dialog>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -2732,6 +2788,7 @@ function renderBulk() {
       btn('up', 'Update', b.update.length, 'data-bulk="update"', 'btn accent'),
       btn('ln', 'Link to GitHub…', b.link.length, 'data-bulk="link"'),
       `<button class="btn ghost" data-k="cp" data-bulk="copy">${ICON.copy}Copy as prompt</button>`,
+      btn('pf', 'Save as profile…', profilePicked().count, 'data-bulk="profile"'),
       btn('del', 'Delete…', b.del.length, 'data-bulk="delete"', 'btn danger'),
     ].join('');
   patch(el('bulk'), `${allMarkHtml()}<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
@@ -2771,6 +2828,7 @@ async function bulk(action) {
   if (action === 'clear') return setMarks([...ui.marked], false);
   if (action === 'on' || action === 'off') return bulkToggle(action === 'on').catch(err => { rerender(); toast(`Could not save: ${esc(err.message)}`); });
   if (action === 'update') return updateBatch(b.update);
+  if (action === 'profile') return openProfileDialog({ mode: 'selection' });
   if (action === 'link') { ui.bulkLink = true; ui.bulkErr = null; renderBulk(); el('bulk').querySelector('input')?.focus(); return; }
   if (action === 'copy') {
     const text = b.list.map(s => '/' + s.invoke).join(' ');
@@ -3538,6 +3596,204 @@ document.addEventListener('pointerdown', e => { if (!el('display').hidden && !e.
 el('display').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); setDisplay(false, true); } });
 el('display').addEventListener('change', markDisplay);
 
+// ---------------------------------------------------------------- profiles
+const PROF = { list: null, error: null };
+const PF_ICON = {
+  pen: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.2 12.8 5.5 6 12.3l-3 .7.7-3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+const pfWhere = () => (ui.root === 'all' ? 'each harness' : harness().label);
+const pfCan = () => ui.root === 'all' || switchable();
+
+// The marked skills a profile can switch: own skills by name, plugin skills by plugin.
+function profilePicked() {
+  const list = pfCan() ? markedSkills().filter(s => s.status !== 'stale') : [];
+  const skills = [...new Set(list.filter(s => s.scope === 'personal').map(s => s.name))];
+  const plugins = [...new Set(list.filter(s => s.scope === 'plugin').map(s => s.plugin_ref))];
+  return { skills, plugins, count: skills.length + plugins.length };
+}
+
+function profileMeta(p) {
+  const ids = Object.keys(p.harnesses);
+  const where = ids.length === 1 ? harness(ids[0])?.label || ids[0] : `${ids.length} harnesses`;
+  return `${p.on} on · ${p.off} off · ${where}`;
+}
+
+function renderProfiles() {
+  let body;
+  if (PROF.error) {
+    body = `<p class="pf-msg err" role="alert">${ICON.alert}<span>Could not read the profiles. ${esc(PROF.error)}</span></p><button class="btn ghost" data-pf-reload>Try again</button>`;
+  } else if (!PROF.list) {
+    body = '<p class="pf-msg" role="status">Loading profiles…</p>';
+  } else if (!PROF.list.length) {
+    body = '<p class="pf-msg">No profiles yet. A profile keeps which skills are on and off, so you can switch them all in one step.</p>';
+  } else {
+    body = `<ul class="pf-list">${PROF.list.map(p => `<li class="pf-row"><span class="pf-name"><b title="${esc(p.name)}">${esc(p.name)}</b><span class="tnum">${esc(profileMeta(p))}</span></span>
+      <button class="btn accent" data-pf-apply="${esc(p.name)}">Apply…</button>
+      <button class="btn ghost icon" data-pf-rename="${esc(p.name)}" aria-label="Rename ${esc(p.name)}" title="Rename">${PF_ICON.pen}</button>
+      <button class="btn ghost icon" data-pf-delete="${esc(p.name)}" aria-label="Delete ${esc(p.name)}" title="Delete">${PF_ICON.trash}</button></li>`).join('')}</ul>`;
+  }
+  const save = pfCan()
+    ? '<button class="btn ghost" data-pf-save>Save current as profile…</button>'
+    : `<p class="pf-msg">${esc(harness().label)} has no on/off switch for skills. Pick another harness to save a profile.</p>`;
+  el('profPop').innerHTML = `<div class="pf-head">Profiles${PROF.list?.length ? `<span class="tnum">${PROF.list.length}</span>` : ''}</div>${body}<hr>${save}`;
+}
+
+async function loadProfiles() {
+  try { PROF.list = (await api('/api/profiles')).profiles; PROF.error = null; }
+  catch (err) { PROF.error = err.message; }
+  if (el('profPop').hidden) return;
+  const had = el('profPop').contains(document.activeElement);
+  renderProfiles();
+  if (had) el('profPop').querySelector('button')?.focus();
+}
+
+function setProfiles(open, focusButton = false) {
+  el('profPop').hidden = !open;
+  el('profBtn').setAttribute('aria-expanded', open);
+  if (open) { renderProfiles(); el('profPop').querySelector('button')?.focus(); loadProfiles(); }
+  else if (focusButton) el('profBtn').focus();
+}
+
+// One dialog for save, rename, and apply. `run` gets the form; a throw shows its message in the dialog.
+function profileDialog(html, acts, run) {
+  const dlg = el('profileDlg');
+  dlg.innerHTML = `<form method="dialog">${html}<p class="err" role="alert" data-pf-err hidden></p><div class="cd-acts">${acts}</div></form>`;
+  const form = dlg.querySelector('form');
+  dlg.returnValue = '';
+  dlg.onclick = e => { if (e.target === dlg || e.target.closest('[data-pf-cancel]')) dlg.close('cancel'); };
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const btn = form.querySelector('button[value="ok"]');
+    if (!run || !btn) return dlg.close('ok');
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = btn.dataset.busy;
+    try {
+      await run(form);
+      dlg.close('ok');
+    } catch (err) {
+      const box = form.querySelector('[data-pf-err]');
+      box.innerHTML = `${ICON.alert}<span>${esc(err.message)}</span>`; box.hidden = false;
+      btn.disabled = false; btn.textContent = label;
+    }
+  };
+  dlg.showModal();
+  return form;
+}
+
+function openProfileDialog({ mode, name = '' }) {
+  if (!PROF.list) loadProfiles();
+  const rename = mode === 'rename';
+  const picked = mode === 'selection' ? profilePicked() : null;
+  const title = rename ? 'Rename profile' : picked ? `Save ${plural(picked.count, 'selected skill')} as a profile` : 'Save current switches as a profile';
+  const lead = rename ? '' : picked ? `Applying the profile turns these on in ${esc(pfWhere())}.` : `The profile keeps which skills are on and off in ${esc(pfWhere())} now.`;
+  const verb = rename ? 'Rename' : 'Save profile';
+  const form = profileDialog(`<h2 id="pfTitle">${title}</h2>${lead ? `<p class="cd-lead">${lead}</p>` : ''}
+    <label class="pf-field">Name<input name="pname" value="${esc(name)}" maxlength="60" required autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true"></label>
+    <p class="note warn" data-pf-exists hidden></p>
+    ${picked ? `<label class="pf-check"><input type="checkbox" name="restOff"><span>Also turn off all other skills in ${esc(pfWhere())}</span></label>` : ''}`,
+  `<button type="button" class="btn" data-pf-cancel>Cancel</button><button class="btn primary" value="ok" data-busy="${rename ? 'Renaming…' : 'Saving…'}">${verb}</button>`,
+  async f => {
+    const to = f.elements.pname.value.trim();
+    if (rename) {
+      PROF.list = (await api('/api/profiles/rename', { name, to })).profiles;
+      return toast(`Renamed the profile to <b>${esc(to)}</b>.`);
+    }
+    const body = { name: to, replace: Boolean(PROF.list?.some(p => p.name === to)) };
+    if (ui.root !== 'all') body.harnesses = [ui.root];
+    if (picked) Object.assign(body, { picked: { skills: picked.skills, plugins: picked.plugins }, rest_off: f.elements.restOff.checked });
+    const r = await api('/api/profiles/save', body);
+    PROF.list = r.profiles;
+    toast(`Saved the profile <b>${esc(r.saved)}</b>.`);
+  });
+  const input = form.elements.pname, note = form.querySelector('[data-pf-exists]'), ok = form.querySelector('[value="ok"]');
+  input.addEventListener('input', () => {
+    const v = input.value.trim().replace(/\s+/g, ' ');
+    const taken = v !== name && PROF.list?.some(p => p.name === v);
+    note.hidden = !taken;
+    note.textContent = rename ? 'Another profile has this name. Use a different name.' : 'A profile with this name exists. Saving replaces it.';
+    ok.textContent = taken && !rename ? 'Replace profile' : verb;
+    ok.disabled = Boolean(taken && rename);
+    input.setAttribute('aria-invalid', Boolean(taken && rename));
+  });
+  if (rename) input.select();
+}
+
+function previewHtml(id, r) {
+  const items = [
+    ...r.on.map(x => ['on', x]), ...r.plugins_on.map(x => ['on', `plugin ${x.split('@')[0]}`]),
+    ...r.off.map(x => ['off', x]), ...r.plugins_off.map(x => ['off', `plugin ${x.split('@')[0]}`]),
+  ];
+  if (!items.length && !r.missing.length) return '';
+  const ons = r.on.length + r.plugins_on.length, offs = items.length - ons;
+  const label = harness(id)?.label || r.label;
+  const gone = r.found ? `${plural(r.missing.length, 'item')} in the profile ${r.missing.length === 1 ? 'is' : 'are'} not installed here` : `${label} is not on this computer`;
+  return `<h3 class="pf-h">${esc(label)}${items.length ? `<span class="tnum">${ons} on · ${offs} off</span>` : ''}</h3>
+    ${items.length ? `<ul class="cd-list pf-ch">${items.map(([to, x]) => `<li><span class="pf-to ${to}">${to === 'on' ? 'On' : 'Off'}</span><span class="nm" title="${esc(x)}">${esc(x)}</span></li>`).join('')}</ul>` : ''}
+    ${r.missing.length ? `<p class="note">${esc(gone)}, so the atlas skips: ${esc(r.missing.join(', '))}.</p>` : ''}`;
+}
+
+async function previewProfile(name) {
+  let p;
+  try { p = await api('/api/profiles/preview', { name }); }
+  catch (err) { return toast(`Could not read the profile: ${esc(err.message)}`); }
+  const n = p.changed;
+  const hs = Object.values(p.harnesses).filter(r => r.on.length + r.off.length + r.plugins_on.length + r.plugins_off.length).length;
+  const lead = n
+    ? `${n} ${n === 1 ? 'switch changes' : 'switches change'} in ${hs} ${hs === 1 ? 'harness' : 'harnesses'}. You can undo this from the toast.`
+    : 'All switches already match this profile. Nothing changes.';
+  profileDialog(`<h2 id="pfTitle">${n ? 'Apply' : 'Profile'} <q>${esc(name)}</q>${n ? '?' : ' already matches'}</h2>
+    <p class="cd-lead">${lead}</p>
+    ${Object.entries(p.harnesses).map(([id, r]) => previewHtml(id, r)).join('')}`,
+  n ? `<button type="button" class="btn" data-pf-cancel>Cancel</button><button class="btn primary" value="ok" data-busy="Applying…">Apply ${plural(n, 'change')}</button>`
+    : '<button type="button" class="btn" data-pf-cancel>Close</button>',
+  async () => {
+    const r = await api('/api/profiles/apply', { name });
+    applyProfileSettings(r);
+    toast(`Applied <b>${esc(name)}</b>: ${plural(r.changed, 'change')}. Restart agent sessions to pick it up.`, () => undoProfile(r.previous, name));
+  });
+}
+
+function applyProfileSettings(r) {
+  const here = r.preview?.[ui.root];
+  if (here) { cascade(rowSwitches(here.on), true); cascade(rowSwitches(here.off), false); }
+  Object.assign(DATA.settings, r.settings);
+  rerender();
+}
+
+async function undoProfile(previous, name) {
+  try {
+    applyProfileSettings(await api('/api/profiles/apply', { states: previous }));
+    toast(`Put back the switches from before <b>${esc(name)}</b>.`);
+  } catch (err) { toast(`Could not undo: ${esc(err.message)}`); }
+}
+
+async function deleteProfile(name) {
+  let r;
+  try { r = await api('/api/profiles/delete', { name }); }
+  catch (err) { return toast(`Could not delete the profile: ${esc(err.message)}`); }
+  PROF.list = r.profiles;
+  toast(`Deleted the profile <b>${esc(name)}</b>.`, async () => {
+    try { PROF.list = (await api('/api/profiles/restore', { profile: r.deleted })).profiles; toast(`Put back the profile <b>${esc(name)}</b>.`); }
+    catch (err) { toast(`Could not undo: ${esc(err.message)}`); }
+  });
+}
+
+el('profWrap').hidden = !WRITABLE;
+el('profBtn').addEventListener('click', () => setProfiles(el('profPop').hidden));
+document.addEventListener('pointerdown', e => { if (!el('profPop').hidden && !e.target.closest('#profWrap')) setProfiles(false); });
+el('profPop').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); setProfiles(false, true); } });
+el('profPop').addEventListener('click', e => {
+  const d = e.target.closest('button')?.dataset;
+  if (!d) return;
+  if ('pfReload' in d) { PROF.error = null; renderProfiles(); return loadProfiles(); }
+  setProfiles(false, true);
+  if ('pfSave' in d) openProfileDialog({ mode: 'current' });
+  else if (d.pfApply) previewProfile(d.pfApply);
+  else if (d.pfRename) openProfileDialog({ mode: 'rename', name: d.pfRename });
+  else if (d.pfDelete) deleteProfile(d.pfDelete);
+});
+
 let helpReturn;
 function openHelp() {
   helpReturn = document.activeElement;
@@ -3585,7 +3841,7 @@ document.addEventListener('keydown', e => {
   const typing = t.matches('input[type="search"], input[type="text"], input:not([type]), textarea');
   const mod = e.metaKey || e.ctrlKey;
 
-  if (el('confirmDel').open || el('histDlg').open) return;
+  if (el('confirmDel').open || el('histDlg').open || el('profileDlg').open) return;
   if (el('viewer').open) {
     if (!typing && !mod && e.key === 'r') { e.preventDefault(); setRaw(!viewer.raw); }
     return;

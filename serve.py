@@ -22,6 +22,7 @@ from urllib.parse import parse_qs
 import assets
 import harnesses
 import history
+import profiles
 import remove
 import updates
 import usage
@@ -57,8 +58,14 @@ def server_info() -> dict:
 
 
 def write_setting(root: Path, kind: str, names: list[str], on: bool) -> None:
-    if kind not in ("skill", "plugin"):
-        raise ValueError(f"unknown kind {kind!r}")
+    write_settings(root, {kind: dict.fromkeys(names, on)})
+
+
+def write_settings(root: Path, changes: dict[str, dict[str, bool]]) -> None:
+    """Skill and plugin switches, {kind: {name: on}}, in one write of settings.json."""
+    for kind in changes:
+        if kind not in ("skill", "plugin"):
+            raise ValueError(f"unknown kind {kind!r}")
     path = root / "settings.json"
     # Write through a symlink, so a settings file kept in a dotfiles repo stays linked.
     target = path.resolve()
@@ -69,22 +76,23 @@ def write_setting(root: Path, kind: str, names: list[str], on: bool) -> None:
     if target.exists() and not backup.exists():
         shutil.copy2(target, backup)
 
-    key = "skillOverrides" if kind == "skill" else "enabledPlugins"
-    section = settings.get(key, {})
-    if not isinstance(section, dict):
-        raise ValueError(f"{key} in {target} is not an object. Fix the file, then try again.")
-    if kind == "skill":
-        for name in names:
-            if on:
-                section.pop(name, None)
-            else:
-                section[name] = "off"
-    else:
-        section.update(dict.fromkeys(names, on))
-    if section:
-        settings[key] = section
-    else:
-        settings.pop(key, None)
+    for kind, states in changes.items():
+        key = "skillOverrides" if kind == "skill" else "enabledPlugins"
+        section = settings.get(key, {})
+        if not isinstance(section, dict):
+            raise ValueError(f"{key} in {target} is not an object. Fix the file, then try again.")
+        if kind == "skill":
+            for name, on in states.items():
+                if on:
+                    section.pop(name, None)
+                else:
+                    section[name] = "off"
+        else:
+            section.update(states)
+        if section:
+            settings[key] = section
+        else:
+            settings.pop(key, None)
 
     tmp = target.with_name("settings.json.atlas-tmp")
     tmp.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
@@ -137,6 +145,16 @@ def toggle(req: dict) -> dict:
         raise ValueError(f"{h.name} does not load {', '.join(names)}")
     harnesses.set_skills(h, mine, bool(req["on"]))
     return harnesses.state(h, scan(REPO)["skills"])
+
+
+def profile_call(action: str, req: dict) -> dict:
+    return profiles.handle(
+        action,
+        req,
+        lambda: harnesses.detect(dict(ROOTS)),
+        lambda: scan(REPO)["skills"],
+        write_settings,
+    )
 
 
 def scanned_path(path: str) -> str:
@@ -236,6 +254,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, server_info())
         if path == "/api/data":
             return self._json(200, {**scan(REPO), "server": server_info()})
+        if path == "/api/profiles":
+            return self._json(200, profiles.listing())
         if path == "/api/usage":
             return self._json(200, usage.snapshot(list(ROOTS.values())))
         if path == "/api/updates":
@@ -292,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_NAME.match(name):
                 raise ValueError("bad skill name")
             return self._json(200, history.rollback(name, str(req["id"]), roots()))
+        if path.startswith("/api/profiles/") and path[14:] in profiles.ACTIONS:
+            return self._json(200, profile_call(path[14:], req))
         if path == "/api/undo-delete":
             return self._json(200, remove.undo())
         if path in ("/api/update", "/api/link", "/api/delete"):

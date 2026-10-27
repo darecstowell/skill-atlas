@@ -250,11 +250,16 @@ def _write_json(path: Path, data: dict) -> None:
 
 def set_skills(h: Harness, skills: list[dict], on: bool) -> None:
     """Turn these skills on or off in one harness's own config file."""
+    set_skill_states(h, [(s, on) for s in skills])
+
+
+def set_skill_states(h: Harness, changes: list[tuple[dict, bool]]) -> None:
+    """Turn each skill on or off, with one write of the harness's config file."""
     if not h.switch or h.switch == "claude" or h.config is None:
         raise NotImplementedError(f"{h.name} has no per-skill switch")
-    names = sorted({s["name"] for s in skills})
+    want = {s["name"]: on for s, on in changes}
     if h.switch == "codex":
-        _set_codex(h.config, skills, on)
+        _set_codex(h.config, changes)
         return
     cfg = scan.read_json_strict(h.config.resolve())
     if h.switch in ("gemini", "copilot"):
@@ -267,11 +272,8 @@ def set_skills(h: Harness, skills: list[dict], on: bool) -> None:
             holder, key = section, "disabled"
         else:
             holder, key = cfg, "disabledSkills"
-        current = _str_list(holder.get(key))
-        if on:
-            holder[key] = [n for n in current if n not in names]
-        else:
-            holder[key] = current + [n for n in names if n not in current]
+        current = [n for n in _str_list(holder.get(key)) if want.get(n) is not True]
+        holder[key] = current + sorted(n for n, on in want.items() if not on and n not in current)
         _write_json(h.config, cfg)
         return
     perm = cfg.setdefault("permission", {})
@@ -284,7 +286,7 @@ def set_skills(h: Harness, skills: list[dict], on: bool) -> None:
         raise ValueError(
             f"permission.skill in {h.config} is not an object. Fix the file, then try again."
         )
-    for name in names:
+    for name, on in sorted(want.items()):
         rules.pop(name, None)
         if on and _opencode_action(cfg, name) == "deny":
             rules[name] = "allow"
@@ -293,8 +295,9 @@ def set_skills(h: Harness, skills: list[dict], on: bool) -> None:
     _write_json(h.config, cfg)
 
 
-def _set_codex(config: Path, skills: list[dict], on: bool) -> None:
+def _set_codex(config: Path, changes: list[tuple[dict, bool]]) -> None:
     """Off adds an enabled = false table per SKILL.md path; on removes the tables that match."""
+    skills = [s for s, _ in changes]
     try:
         text = config.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -309,7 +312,8 @@ def _set_codex(config: Path, skills: list[dict], on: bool) -> None:
     kept = [ln for i, ln in enumerate(lines) if i not in drop]
     while kept and not kept[-1].strip():
         kept.pop()
-    if not on:
-        for path in sorted(want):
+    off = {_real(s["path"]) for s, on in changes if not on}
+    for path in sorted(want):
+        if path in off:
             kept += ["", "[[skills.config]]", f"path = {json.dumps(path)}", "enabled = false"]
     _write(config, "\n".join(kept) + "\n")
