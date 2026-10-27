@@ -177,6 +177,7 @@
   }
   .band[hidden] { display: none; }
   .band code { font: 11.5px var(--mono); color: var(--text); }
+  .band .linkbtn { color: inherit; }
 
   /* ---------- layout ---------- */
   main { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: start; }
@@ -781,6 +782,7 @@
     <div class="meta" id="meta"></div>
   </div>
   <div class="band" id="band" hidden>Read-only build. Run <code>./atlas</code> to change skills.</div>
+  <div class="band" id="stale" role="alert" hidden></div>
   <div id="bar" aria-hidden="true"><i></i></div>
 </header>
 
@@ -2158,6 +2160,7 @@ function heatmap(days, key) {
 
 function waitHtml() {
   if (USE.status === 'error') return '<p class="use-note" data-k="uw">This server cannot read usage. Restart ./atlas to load the new version.</p>';
+  if (USE.error) return `<p class="use-note" data-k="uw">Could not read usage: ${esc(USE.error)}</p>`;
   const [done, all] = USE.progress;
   return `<div class="use-wait" data-k="uw"><span>Reading your Claude Code sessions… <span class="tnum">${done.toLocaleString()} of ${all.toLocaleString()}</span></span>
     <span class="track"><i style="transform:scaleX(${all ? (done / all).toFixed(3) : 0})"></i></span></div>`;
@@ -2215,7 +2218,7 @@ function countUp(node) {
 async function loadUsage() {
   try {
     const d = await api('/api/usage');
-    USE.status = d.status; USE.progress = d.progress;
+    USE.status = d.status; USE.progress = d.progress; USE.error = d.error || null;
     indexUsage(d);
     USE.ready = d.status === 'ready';
   } catch { USE.status = 'error'; }
@@ -2263,12 +2266,24 @@ function runUndo() {
 }
 
 // ---------------------------------------------------------------- server calls
+// Says when this page and the server no longer match: the code changed, or the server restarted.
+function staleBand(kind) {
+  const b = el('stale');
+  b.innerHTML = kind === 'restarted'
+    ? 'The server restarted, so this page is out of date. <button class="linkbtn" data-reload>Reload the page</button>'
+    : 'Skill Atlas changed on disk. Stop <code>./atlas</code> (Ctrl-C) and start it again.';
+  b.hidden = false;
+}
+
 async function api(path, body) {
   const res = await fetch(path, body === undefined
     ? { headers: { 'X-Atlas-Token': DATA.api_token } }
     : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Atlas-Token': DATA.api_token }, body: JSON.stringify(body) });
+  const build = res.headers.get('X-Atlas-Build');
+  if (build && DATA.server?.build && build !== DATA.server.build) staleBand('restarted');
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
+  if (data.server?.stale) staleBand('changed');
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data, status: res.status });
   return data;
 }
 
@@ -2378,7 +2393,11 @@ async function runJob(kind, start, names, note = '', repo = '') {
   while (!upd.job.done) {
     await sleep(300);
     const prev = JSON.stringify(upd.job.items);
-    upd.job = { ...(await api('/api/jobs/' + upd.job.id).catch(() => upd.job)), kind };
+    upd.job = { ...(await api('/api/jobs/' + upd.job.id).catch(err => {
+      if (err.status !== 404) return upd.job;
+      for (const i of Object.values(upd.job.items)) if (RUNNING.has(i.state)) Object.assign(i, { state: 'failed', error: err.message });
+      return { ...upd.job, done: true, seconds: 0 };
+    })), kind };
     if (prev !== JSON.stringify(upd.job.items) || upd.job.done) rerender();
   }
 
@@ -2688,6 +2707,7 @@ document.addEventListener('click', async e => {
   if (open && open.dataset.avail) return selectAvail(open.dataset.avail, open.dataset.path);
   if (open) return select(SKILLS[+open.dataset.id]);
   if (t.closest('[data-close]') || t.id === 'scrim') { const k = selKey(ui.selected); select(null); focusRow(k); return; }
+  if (t.closest('[data-reload]')) return location.reload();
   if (t.closest('[data-view]')) return openViewer(ui.selected);
   const go = t.closest('[data-group]');
   if (go) return selectGroup(go.dataset.group);
@@ -2887,6 +2907,7 @@ document.addEventListener('keydown', e => {
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));
 el('band').hidden = WRITABLE;
+if (WRITABLE && DATA.server?.stale) staleBand('changed');
 document.body.classList.toggle('ro', !WRITABLE);
 setCompact(ui.compact);
 setLayout(ui.layout);
