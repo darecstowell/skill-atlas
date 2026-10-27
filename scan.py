@@ -14,6 +14,7 @@ from pathlib import Path
 
 import harnesses
 import health
+import overlap
 import tokens
 
 HOME = Path.home()
@@ -594,6 +595,7 @@ def scan(repo: Path) -> dict:
         }[(r["manual_only"], r["claude_only"])]
 
     records.sort(key=lambda r: (r["scope"], r["name"].lower()))
+    overlap.annotate(records)
     bundled_off = any(h.settings.get("disableBundledSkills") for h in hosts)
 
     return {

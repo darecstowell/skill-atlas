@@ -1026,6 +1026,68 @@
     .search { order: 1; flex-basis: 100%; max-width: none; }
   }
 
+  /* ---------- overlap: similar skills and diverged copies ---------- */
+  .tag.div { color: var(--warn); background: var(--tint-warn); border-color: transparent; }
+  .ovl { gap: 2px; }
+  .ovl h3 { margin-bottom: 6px; }
+  .ovl .note { margin: 0 0 6px; }
+  .sim {
+    all: unset; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) 64px 36px; align-items: center; gap: var(--s3);
+    min-height: 32px; padding: 0 8px; margin: 0 -8px; border-radius: var(--r-md); cursor: pointer; font-size: 12.5px; color: var(--text-2);
+    transition: background-color 150ms ease;
+  }
+  .sim:hover { background: var(--surface-2); color: var(--text); }
+  .sim:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .sim .nm { font: 500 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sim .meter { height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .sim .meter i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+  .sim .pct { text-align: right; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .cpy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px var(--s3); padding: 8px 10px; border-radius: var(--r-lg); background: var(--surface-2); }
+  .cpy + .cpy { margin-top: 4px; }
+  .cpy .where { font: 12px var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
+  .cpy .why { grid-column: 1; font-size: 12px; color: var(--text-3); }
+  .cpy .btn { grid-row: 1 / span 2; grid-column: 2; }
+  .stat.go { all: unset; box-sizing: border-box; display: block; text-align: left; padding: 10px var(--s3); border-radius: var(--r-lg); background: var(--surface-2); cursor: pointer; transition: background-color 150ms ease; }
+  .stat.go[data-tone="warn"] { background: var(--tint-warn); }
+  .stat.go:hover { background: var(--surface-3); }
+  .stat.go:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .stat.go[aria-disabled="true"] { cursor: default; }
+  .stat.go[aria-disabled="true"]:hover { background: var(--surface-2); }
+  .ovl-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  #diffDlg {
+    width: min(960px, calc(100vw - 32px)); height: min(820px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
+    border-radius: 14px; background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop); overflow: hidden;
+    opacity: 1; transform: none; transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  }
+  #diffDlg[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  @starting-style { #diffDlg[open] { opacity: 0; transform: scale(.97); } }
+  #diffDlg::backdrop { background: oklch(0 0 0 / .45); transition: opacity 180ms var(--ease-out); }
+  @starting-style { #diffDlg[open]::backdrop { opacity: 0; } }
+  .df-head { display: flex; align-items: flex-start; gap: var(--s3); padding: 14px var(--s3) 12px var(--s4); border-bottom: 1px solid var(--border); }
+  .df-title { flex: 1; min-width: 0; display: grid; gap: 4px; }
+  .df-title h2 { margin: 0; font: 600 15px/1.3 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .df-file { display: flex; align-items: baseline; gap: 6px; min-width: 0; font: 12px var(--mono); color: var(--text-3); }
+  .df-file b { flex: none; width: 1ch; font-weight: 600; }
+  .df-file.del b { color: var(--danger); } .df-file.add b { color: var(--on); }
+  .df-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .df-file .tag { align-self: center; }
+  .df-sum { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .df-sum .a { color: var(--on); } .df-sum .r { color: var(--danger); }
+  .df-body { overflow: auto; overscroll-behavior: contain; min-height: 0; }
+  .df-body:focus-visible { outline: none; }
+  .df-lines { margin: 0; padding: var(--s2) 0 var(--s5); font: 12.5px/1.6 var(--mono); color: var(--text-2); }
+  .df-lines span { display: block; padding: 0 var(--s4) 0 calc(var(--s4) + 2ch); text-indent: -2ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .df-lines span::before { content: " "; display: inline-block; width: 2ch; text-indent: 0; color: var(--text-3); }
+  .df-lines .add { background: color-mix(in oklab, var(--on) 12%, transparent); color: var(--text); }
+  .df-lines .add::before { content: "+"; color: var(--on); }
+  .df-lines .del { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--text); }
+  .df-lines .del::before { content: "−"; color: var(--danger); }
+  .df-lines .hunk { margin-top: var(--s2); padding-block: 2px; background: var(--surface-2); color: var(--text-3); }
+  .df-lines .hunk::before { content: ""; }
+  .df-msg { padding: var(--s6); color: var(--text-3); font-size: 13px; }
+  .df-msg.warn { color: var(--warn); }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-property: color, background-color, border-color, box-shadow !important; animation: none !important; }
     .switch, .switch::after { transition-delay: 0ms !important; }
@@ -1110,6 +1172,8 @@
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
       <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
       <button data-v="costly" aria-pressed="false" id="viewCostly" hidden title="On, costly, and not used in 90 days">Costly <span class="n" data-n="costly"></span></button>
+      <button data-v="similar" aria-pressed="false" id="view-similar" hidden>Similar</button>
+      <button data-v="diverged" aria-pressed="false" id="view-diverged" hidden>Diverged</button>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -1131,6 +1195,7 @@
 <dialog id="histDlg" aria-labelledby="hdTitle"></dialog>
 <dialog id="profileDlg" aria-labelledby="pfTitle"></dialog>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
+<dialog id="diffDlg" aria-labelledby="dfTitle"></dialog>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -1367,6 +1432,7 @@ function visible(s) {
   else if (ui.view === 'issues') { if (!s.problems?.length) return false; }
   else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view === 'costly') { if (!costlyUnused().has(s)) return false; }
+  else if (ui.view === 'similar' || ui.view === 'diverged') { if (!overlapView(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
   return terms.every(t => s._hay.includes(t));
@@ -1458,6 +1524,7 @@ function tagsHtml(s, st) {
     st.mode && !['on', 'off', 'not set', 'project only'].includes(st.mode) ? `<span class="tag">${esc(st.mode)}</span>` : '',
     s.status === 'stale' ? `<span class="tag">v${esc(s.plugin_version)}</span>` : '',
     s._dupes?.length ? `<span class="tag" title="Same description as ${esc(s._dupes.join(', '))}">same as ${esc(s._dupes[0])}</span>` : '',
+    ...overlapTags(s),
   ].filter(Boolean);
   if (!tags.length) return '';
   const extra = tags.length - 2;
@@ -1747,6 +1814,7 @@ function emptyHtml() {
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
   if (ui.view === 'issues') return '<div class="empty" data-k="empty"><h2>No problems found</h2><p>Each SKILL.md in this view has valid frontmatter, and each file it names is there.</p></div>';
+  if (ui.view === 'similar' || ui.view === 'diverged') return overlapEmpty();
   if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
   if (ui.view === 'costly') return '<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
@@ -1826,6 +1894,7 @@ function renderChrome() {
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
   el('viewUpdates').hidden = !WRITABLE;
+  overlapChrome();
   el('viewNew').hidden = !WRITABLE || (!fresh && ui.view !== 'new');
   const badge = [outdated.length ? `${outdated.length}↑` : '', fresh ? `${fresh} new` : ''].filter(Boolean).join(' · ');
   document.title = WRITABLE && badge ? `(${badge}) Skill Atlas` : 'Skill Atlas';
@@ -1909,6 +1978,7 @@ function inventoryHtml() {
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
     ${storeHealthHtml()}
+    ${overlapInvHtml(lv)}
     ${inventoryUsageHtml(lv)}
     ${costHtml()}
     ${skillSetHtml()}
@@ -2053,6 +2123,7 @@ function detailHtml(s) {
     ${problemsHtml(s)}
     ${cards.length ? `<div class="d-sec" data-k="cards">${cards.join('')}</div>` : ''}
     ${s.scope === 'personal' ? loadedHtml(s) : ''}
+    ${overlapHtml(s)}
     ${usageHtml(s)}
     <div class="d-sec" data-k="facts"><dl data-leaf>
       ${field('Version', s.plugin_version || s.version, true)}
@@ -3664,6 +3735,10 @@ document.addEventListener('click', async e => {
   }
   const rv = t.closest('[data-reveal]');
   if (rv) return api('/api/reveal', { path: rv.dataset.reveal }).catch(err => toast(`Could not reveal: ${esc(err.message)}`));
+  const ov = t.closest('[data-overlap-view]');
+  if (ov) return ov.getAttribute('aria-disabled') === 'true' ? undefined : showView(ov.dataset.overlapView);
+  const cmp = t.closest('[data-compare]');
+  if (cmp) return openCompare(ui.selected, cmp.dataset.compare);
   const open = t.closest('.open');
   if (open && open.dataset.avail) return selectAvail(open.dataset.avail, open.dataset.path);
   if (open) return select(SKILLS[+open.dataset.id]);
@@ -4043,7 +4118,7 @@ document.addEventListener('keydown', e => {
   const typing = t.matches('input[type="search"], input[type="text"], input:not([type]), textarea');
   const mod = e.metaKey || e.ctrlKey;
 
-  if (el('confirmDel').open || el('histDlg').open || el('profileDlg').open) return;
+  if (el('confirmDel').open || el('histDlg').open || el('profileDlg').open || el('diffDlg').open) return;
   if (el('viewer').open) {
     if (!typing && !mod && e.key === 'r') { e.preventDefault(); setRaw(!viewer.raw); }
     return;
@@ -4113,6 +4188,108 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'i') rowEl.querySelector('[data-install-one]')?.click();
 });
+
+// ---------------------------------------------------------------- overlap: similar skills and diverged copies
+function ovlIndex() {
+  if (ovlIndex.src !== SKILLS) {
+    ovlIndex.src = SKILLS;
+    ovlIndex.path = new Map(SKILLS.map(s => [s.path, s]));
+    ovlIndex.byName = new Map(groupMap(SKILLS, s => s.name));
+  }
+  return ovlIndex;
+}
+// Similar skills that load in the harness in view, through any copy of that name.
+function simOf(s) {
+  const ix = ovlIndex();
+  return (s.similar || []).map(x => ({ ...x, s: [ix.path.get(x.path), ...(ix.byName.get(x.name) || [])].find(y => y && loads(y)) })).filter(x => x.s);
+}
+function overlapView(s) {
+  return (ui.view === 'similar' ? simOf(s) : s.copies).length > 0;
+}
+function overlapTags(s) {
+  const sim = simOf(s), cp = s.copies;
+  return [
+    sim.length ? `<span class="tag" title="Its description is close to ${esc(sim.map(x => x.name).join(', '))}. The agent may pick the wrong one.">similar</span>` : '',
+    cp.length ? `<span class="tag div" title="${plural(cp.length, 'other copy')} with this name ${cp.length === 1 ? 'has' : 'have'} a different SKILL.md">diverged</span>` : '',
+  ];
+}
+function overlapCounts(list) {
+  const pairs = new Set(), names = new Set();
+  for (const s of list) {
+    for (const x of simOf(s)) pairs.add([s.name, x.name].sort().join('\n'));
+    if (s.copies.length) names.add(s.name);
+  }
+  return { similar: pairs.size, diverged: names.size };
+}
+function overlapInvHtml(list) {
+  const n = overlapCounts(list);
+  const go = (count, view, label, tone) => `<button class="stat go" data-overlap-view="${view}"${count ? '' : ' aria-disabled="true"'}${tone && count ? ` data-tone="${tone}"` : ''}
+    title="${count ? `Show only these skills` : `No ${label}`}"><b>${count}</b><span>${label}</span></button>`;
+  return `<div class="d-sec" data-k="ovl"><h3 data-leaf>Overlap</h3><div class="stats ovl-stats" data-leaf>
+    ${go(n.similar, 'similar', n.similar === 1 ? 'similar pair' : 'similar pairs')}${go(n.diverged, 'diverged', n.diverged === 1 ? 'diverged name' : 'diverged names', 'warn')}</div></div>`;
+}
+function overlapEmpty() {
+  if (ui.view === 'similar') return '<div class="empty" data-k="empty"><h2>No similar skills</h2><p>No two skills in this harness have descriptions that overlap a lot.</p><span class="acts"><button class="btn" data-overlap-view="all">Show all skills</button></span></div>';
+  return '<div class="empty" data-k="empty"><h2>No diverged copies</h2><p>Each copy of a skill has the same SKILL.md as the others.</p><span class="acts"><button class="btn" data-overlap-view="all">Show all skills</button></span></div>';
+}
+function overlapChrome() {
+  for (const v of ['similar', 'diverged']) {
+    const b = el('view-' + v);
+    if (b) b.hidden = ui.view !== v;
+  }
+}
+function newerText(c) { return c.newer === 'other' ? 'That copy is newer' : c.newer === 'this' ? 'This copy is newer' : 'Same date'; }
+function overlapHtml(s) {
+  const sim = simOf(s), cp = s.copies;
+  const out = [];
+  if (sim.length) {
+    out.push(`<div class="d-sec ovl" data-k="sim"><h3 data-leaf>Similar skills</h3>
+      <p class="note" data-leaf>The descriptions overlap, so the agent may load the wrong one.</p>
+      ${sim.map(x => `<button class="sim" data-k="sim:${esc(x.path)}" data-pick="${x.s.id}" data-leaf title="${esc(tilde(x.path))}">
+        <span class="nm">/${esc(x.s.invoke)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.round(x.score * 100)}%"></i></span>
+        <span class="pct" aria-label="${Math.round(x.score * 100)} percent overlap">${Math.round(x.score * 100)}%</span></button>`).join('')}</div>`);
+  }
+  if (cp.length) {
+    out.push(`<div class="d-sec ovl" data-k="cpy"><h3 data-leaf>Copies</h3>
+      <p class="note" data-leaf>Other folders have a skill with this name and a different SKILL.md.</p>
+      ${cp.map(c => `<div class="cpy" data-k="cpy:${esc(c.path)}" data-leaf>
+        <span class="where">${esc(tilde(c.dir)).replace(/\//g, '/<wbr>')}</span>
+        <span class="why">${newerText(c)} · ${c.trees_differ ? 'Other files differ too' : 'Only SKILL.md differs'}</span>
+        ${WRITABLE ? `<button class="btn" data-compare="${esc(c.path)}">Compare</button>` : ''}</div>`).join('')}
+      ${WRITABLE ? '' : '<p class="note" data-leaf>Run ./atlas to compare the files.</p>'}</div>`);
+  }
+  return out.join('');
+}
+async function openCompare(s, otherPath) {
+  const dlg = el('diffDlg');
+  const c = s.copies.find(x => x.path === otherPath);
+  if (!c) return;
+  const back = document.activeElement;
+  const run = (openCompare.run = (openCompare.run || 0) + 1);
+  const file = (cls, sign, path, newer) => `<div class="df-file ${cls}"><b aria-hidden="true">${sign}</b><span title="${esc(path)}">${esc(tilde(path))}</span>${newer ? '<span class="tag update">newer</span>' : ''}</div>`;
+  const draw = (body, sum = '') => {
+    dlg.innerHTML = `<div class="df-head"><div class="df-title"><h2 id="dfTitle"><span class="slash">/</span>${esc(s.invoke)}</h2>
+      ${file('del', '−', s.path, c.newer === 'this')}${file('add', '+', c.path, c.newer === 'other')}${sum}</div>
+      <button class="btn ghost icon" data-diff-close aria-label="Close" title="Close (esc)">${ICON.close}</button></div>
+      <div class="df-body" tabindex="-1">${body}</div>`;
+  };
+  draw('<p class="df-msg">Loading the diff…</p>');
+  dlg.onclick = e => { if (e.target === dlg || e.target.closest('[data-diff-close]')) dlg.close(); };
+  dlg.addEventListener('close', () => back?.focus?.(), { once: true });
+  if (!dlg.open) dlg.showModal();
+  dlg.querySelector('.df-body').focus({ preventScroll: true });
+  try {
+    const d = await api(`/api/compare?a=${encodeURIComponent(s.path)}&b=${encodeURIComponent(c.path)}`);
+    if (run !== openCompare.run) return;
+    const cls = { '+': 'add', '-': 'del', '@': 'hunk' };
+    const sum = `<p class="df-sum"><span class="a">+${d.added}</span> <span class="r">−${d.removed}</span> lines</p>`;
+    if (!d.lines.length) return draw('<p class="df-msg">The two files are the same now. Reload the page to update the list.</p>');
+    draw(`<pre class="df-lines">${d.lines.map(l => `<span${cls[l.op] ? ` class="${cls[l.op]}"` : ''}>${esc(l.text)}</span>`).join('')}</pre>
+      ${d.truncated ? '<p class="df-msg">The diff is too long to show in full.</p>' : ''}`, sum);
+  } catch (err) {
+    draw(`<p class="df-msg warn" role="alert">Could not compare the files: ${esc(err.message)}</p>`);
+  }
+}
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));
 el('band').hidden = WRITABLE;

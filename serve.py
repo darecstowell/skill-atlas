@@ -23,6 +23,7 @@ import assets
 import harnesses
 import history
 import manifest
+import overlap
 import profiles
 import remove
 import updates
@@ -276,6 +277,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, manifest.export(scan(REPO), roots()))
         if path == "/api/restore":
             return self._json(200, manifest.missing(roots()))
+        if path == "/api/compare":
+            q = parse_qs(query)
+            a, b = (scanned_path(q.get(k, [""])[0]) for k in ("a", "b"))
+            return self._json(200, overlap.diff(a, b))
         if path.startswith("/api/jobs/"):
             job = updates.JOBS.get(path[10:])
             if job is None:
