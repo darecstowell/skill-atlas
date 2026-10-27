@@ -8,7 +8,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-import scan
+from . import scan
 
 # On ~400 real skills, pairs at 0.36+ do one job (to-prd, to-spec); most under it share a topic.
 THRESHOLD = 0.36

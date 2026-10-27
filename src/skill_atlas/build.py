@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Scan the skills and write out/skills.json plus a self-contained out/index.html."""
 
 import argparse
@@ -6,18 +5,17 @@ import json
 import shutil
 import sys
 import webbrowser
-from pathlib import Path
 
-from scan import scan
+from . import REPO, WEB
+from .scan import scan
 
-REPO = Path(__file__).resolve().parent
 OUT = REPO / "out"
 
 
 def render_page(data: dict, api_token: str = "") -> str:
     """Inline the records into the template. No token means a read-only page."""
     payload = json.dumps({**data, "api_token": api_token}).replace("</", "<\\/")
-    template = (REPO / "template" / "index.html").read_text(encoding="utf-8")
+    template = (WEB / "index.html").read_text(encoding="utf-8")
     return template.replace("__SKILL_ATLAS_DATA__", payload)
 
 
@@ -33,12 +31,12 @@ def main() -> int:
         print()
         return 0
 
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "skills.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     page = OUT / "index.html"
     page.write_text(render_page(data), encoding="utf-8")
-    shutil.copytree(REPO / "template" / "bg", OUT / "bg", dirs_exist_ok=True)
+    shutil.copytree(WEB / "bg", OUT / "bg", dirs_exist_ok=True)
 
     print(f"{data['count']} skills -> {page}")
     if args.open:

@@ -5,9 +5,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-import harnesses
-import updates
-from scan import git_tree_hash, skill_lock_path
+from . import harnesses, updates
+from .scan import git_tree_hash, skill_lock_path
 
 VERSION = 1
 KEY = "skill_atlas_manifest"

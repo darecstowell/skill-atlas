@@ -4,12 +4,10 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
-from conftest import get, post
 
-import harnesses
-import profiles
-import serve
-from scan import scan
+from conftest import get, post
+from skill_atlas import harnesses, profiles, serve
+from skill_atlas.scan import scan
 
 
 def skill(folder: Path, name: str) -> None:

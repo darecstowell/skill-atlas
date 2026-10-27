@@ -10,8 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from scan import ATLAS_LOCK, as_dict, read_json_strict, skill_lock_path
-from updates import write_json
+from .scan import ATLAS_LOCK, as_dict, read_json_strict, skill_lock_path
+from .updates import write_json
 
 
 def _default_trash() -> tuple[Path | None, Path | None]:

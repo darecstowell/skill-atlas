@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Skill Atlas" width="100%">
+  <img src="docs/images/banner.png" alt="Skill Atlas" width="100%">
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@ skills on and off per harness, update them from GitHub, install new skills from 
 follow, and move old skills to the Trash.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Skill Atlas, grouped by source, with updates and available skills" width="900">
+  <img src="docs/images/screenshot.png" alt="Skill Atlas, grouped by source, with updates and available skills" width="900">
 </p>
 
 ## Quick start
@@ -166,8 +166,8 @@ Skills that ship inside a harness binary are not on disk, so the atlas cannot li
 ## Without the server
 
 ```bash
-python3 build.py                        # write a read-only page to out/index.html
-python3 build.py --json > skills.json   # print the raw records
+PYTHONPATH=src python3 -m skill_atlas.build                        # write a read-only page to out/index.html
+PYTHONPATH=src python3 -m skill_atlas.build --json > skills.json   # print the raw records
 ```
 
 ## Development
@@ -181,15 +181,15 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 
 | File | Job |
 | --- | --- |
-| `scan.py` | Reads the config roots and makes one record per skill |
-| `serve.py` | Local server and the only writer of `settings.json` |
-| `updates.py` | Update checks, updates, installs, and watched sources |
-| `assets.py` | Avatars, banners, and image paths for source repos |
-| `harnesses.py` | Where each harness looks for skills, and how its switch reads and writes |
-| `usage.py` | Counts skill use from session logs of Claude Code, Codex, Gemini CLI, Copilot CLI, and OpenCode |
-| `remove.py` | Moves skills to the Trash, and puts them back |
-| `build.py` | Puts the records into `template/index.html` |
-| `template/index.html` | The page: one file of HTML, CSS, and JavaScript |
+| `src/skill_atlas/scan.py` | Reads the config roots and makes one record per skill |
+| `src/skill_atlas/serve.py` | Local server and the only writer of `settings.json` |
+| `src/skill_atlas/updates.py` | Update checks, updates, installs, and watched sources |
+| `src/skill_atlas/assets.py` | Avatars, banners, and image paths for source repos |
+| `src/skill_atlas/harnesses.py` | Where each harness looks for skills, and how its switch reads and writes |
+| `src/skill_atlas/usage.py` | Counts skill use from session logs of Claude Code, Codex, Gemini CLI, Copilot CLI, and OpenCode |
+| `src/skill_atlas/remove.py` | Moves skills to the Trash, and puts them back |
+| `src/skill_atlas/build.py` | Puts the records into `web/index.html` |
+| `src/skill_atlas/web/index.html` | The page: one file of HTML, CSS, and JavaScript |
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 

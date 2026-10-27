@@ -12,8 +12,8 @@ import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-import updates
-from scan import as_dict, git_tree_hash, read_json
+from . import updates
+from .scan import as_dict, git_tree_hash, read_json
 
 KEEP = 5
 MAX_TEXT_BYTES = 512 * 1024

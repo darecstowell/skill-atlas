@@ -3,13 +3,11 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import get, post
 
-import manifest
-import serve
-import updates
-from harnesses import detect
-from scan import git_tree_hash, scan
+from conftest import get, post
+from skill_atlas import manifest, serve, updates
+from skill_atlas.harnesses import detect
+from skill_atlas.scan import git_tree_hash, scan
 
 
 def skill(skills_dir: Path, name: str) -> Path:

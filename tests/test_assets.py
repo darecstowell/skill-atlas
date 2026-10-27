@@ -1,7 +1,7 @@
 import json
 import subprocess
 
-import assets
+from skill_atlas import assets
 
 
 def tree(*paths):

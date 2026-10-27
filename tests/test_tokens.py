@@ -1,5 +1,5 @@
-from scan import build_record
-from tokens import LIST_OVERHEAD, costs, estimate
+from skill_atlas.scan import build_record
+from skill_atlas.tokens import LIST_OVERHEAD, costs, estimate
 
 
 def test_estimate_rounds_up():

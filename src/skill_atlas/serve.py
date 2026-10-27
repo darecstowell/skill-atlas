@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Serve the atlas on localhost so it can toggle, update, link, and delete skills."""
 
 from __future__ import annotations
@@ -19,21 +18,25 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
-import assets
-import harnesses
-import history
-import manifest
-import overlap
-import profiles
-import remove
-import security
-import updates
-import usage
-from build import render_page
-from scan import config_path, read_json_strict, scan, settings_state, store_home, write_user_config
+from . import (
+    PACKAGE,
+    REPO,
+    WEB,
+    assets,
+    harnesses,
+    history,
+    manifest,
+    overlap,
+    profiles,
+    remove,
+    security,
+    updates,
+    usage,
+)
+from .build import render_page
+from .scan import config_path, read_json_strict, scan, settings_state, store_home, write_user_config
 
-REPO = Path(__file__).resolve().parent
-TEXTURES = REPO / "template" / "bg"
+TEXTURES = WEB / "bg"
 TOKEN = secrets.token_urlsafe(24)
 ROOTS: dict[str, Path] = {}
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][\w.-]*$")
@@ -44,7 +47,7 @@ RESTART = "Stop ./atlas (Ctrl-C) and start it again"
 def source_hash() -> str:
     """A hash of the Python files, so a server can tell that its code changed on disk."""
     h = hashlib.sha256()
-    for path in sorted(REPO.glob("*.py")):
+    for path in sorted(PACKAGE.glob("*.py")):
         try:
             h.update(path.name.encode() + b"\0" + path.read_bytes())
         except OSError:

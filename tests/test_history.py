@@ -4,11 +4,10 @@ import tarfile
 import time
 
 import pytest
-from conftest import get
 
-import history
-import updates
-from scan import git_tree_hash
+from conftest import get
+from skill_atlas import history, updates
+from skill_atlas.scan import git_tree_hash
 
 
 @pytest.fixture(autouse=True)

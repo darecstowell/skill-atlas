@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-import harnesses
-from scan import scan
+from skill_atlas import harnesses
+from skill_atlas.scan import scan
 
 
 def skill(folder: Path, name: str) -> Path:

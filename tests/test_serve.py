@@ -7,9 +7,9 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 
 import pytest
-from conftest import get, post, raw
 
-import serve
+from conftest import get, post, raw
+from skill_atlas import serve
 
 
 def test_skill_off_then_on(tmp_path):

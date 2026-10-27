@@ -9,7 +9,7 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from updates import fetch_tree
+from .updates import fetch_tree
 
 CACHE_SECONDS = 3600
 MAX_IMAGES = 200

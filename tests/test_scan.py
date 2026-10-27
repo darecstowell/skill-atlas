@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scan import as_list, git_tree_hash, parse_frontmatter, scan
+from skill_atlas.scan import as_list, git_tree_hash, parse_frontmatter, scan
 
 
 def test_frontmatter_scalars_lists_and_maps():
@@ -57,7 +57,7 @@ def test_git_tree_hash_matches_git(tmp_path):
 
 
 def test_read_json_shapes(tmp_path):
-    from scan import read_json, read_json_strict
+    from skill_atlas.scan import read_json, read_json_strict
 
     f = tmp_path / "f.json"
     assert read_json(f) == {} and read_json_strict(f) == {}
@@ -178,7 +178,7 @@ def test_scan_skips_unreadable_skill(tmp_path, home):
 
 
 def test_config_lookup_order(tmp_path, monkeypatch):
-    from scan import config_path
+    from skill_atlas.scan import config_path
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -194,7 +194,7 @@ def test_config_lookup_order(tmp_path, monkeypatch):
 
 
 def test_init_writes_detected_roots(tmp_path, monkeypatch):
-    from scan import write_user_config
+    from skill_atlas.scan import write_user_config
 
     home = tmp_path / "home"
     for d in (".claude", ".claude-work", ".claude-none", ".claude-STALE-archive"):

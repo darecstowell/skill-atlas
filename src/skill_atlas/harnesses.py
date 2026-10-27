@@ -10,7 +10,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-import scan
+from . import scan
 
 
 @dataclass

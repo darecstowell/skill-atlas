@@ -1,16 +1,12 @@
 import json
-import sys
 import threading
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import serve
+from skill_atlas import serve
 
 
 @pytest.fixture(autouse=True)
