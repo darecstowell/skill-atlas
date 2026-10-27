@@ -211,3 +211,18 @@ def test_init_writes_detected_roots(tmp_path, monkeypatch):
     with pytest.raises(FileExistsError):
         write_user_config()
     assert write_user_config(force=True) == path
+
+
+@pytest.mark.parametrize(
+    ("flags", "invocation"),
+    [
+        ("", "auto + manual"),
+        ("disable-model-invocation: true\n", "manual only"),
+        ("user-invocable: false\n", "auto only"),
+        ("disable-model-invocation: true\nuser-invocable: false\n", "neither"),
+    ],
+)
+def test_scan_invocation_flags(tmp_path, home, flags, invocation):
+    skill(home / ".claude", "demo", "---\nname: demo\ndescription: d\n" + flags + "---\nbody\n")
+    (rec,) = scan(repo_with(tmp_path, {}))["skills"]
+    assert rec["invocation"] == invocation

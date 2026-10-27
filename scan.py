@@ -270,6 +270,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "model",
         "compatibility",
         "disable-model-invocation",
+        "user-invocable",
     }
     stat = skill_md.stat()
     headings = len(re.findall(r"^##+ ", body, re.M))
@@ -280,6 +281,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
         "description": re.sub(r"\s+", " ", str(fm.get("description", ""))).strip(),
         "scope": scope,
         "manual_only": str(fm.get("disable-model-invocation", "")).lower() == "true",
+        "claude_only": str(fm.get("user-invocable", "")).lower() == "false",
         "version": str(fm.get("version") or meta.get("version") or ""),
         "license": str(fm.get("license") or ""),
         "model": str(fm.get("model") or ""),
@@ -537,7 +539,12 @@ def scan(repo: Path) -> dict:
 
     for r in records:
         r["config_roots"] = sorted(set(r.get("config_roots") or []))
-        r["invocation"] = "manual only" if r["manual_only"] else "auto + manual"
+        r["invocation"] = {
+            (False, False): "auto + manual",
+            (True, False): "manual only",
+            (False, True): "auto only",
+            (True, True): "neither",
+        }[(r["manual_only"], r["claude_only"])]
 
     records.sort(key=lambda r: (r["scope"], r["name"].lower()))
     bundled_off = any(h.settings.get("disableBundledSkills") for h in hosts)
