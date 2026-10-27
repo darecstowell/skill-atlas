@@ -3,8 +3,8 @@
 
 import argparse
 import json
-import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 
 from scan import scan
@@ -16,7 +16,7 @@ OUT = REPO / "out"
 def render_page(data: dict, api_token: str = "") -> str:
     """Inline the records into the template. No token means a read-only page."""
     payload = json.dumps({**data, "api_token": api_token}).replace("</", "<\\/")
-    template = (REPO / "template" / "index.html").read_text()
+    template = (REPO / "template" / "index.html").read_text(encoding="utf-8")
     return template.replace("__SKILL_ATLAS_DATA__", payload)
 
 
@@ -33,14 +33,14 @@ def main() -> int:
         return 0
 
     OUT.mkdir(exist_ok=True)
-    (OUT / "skills.json").write_text(json.dumps(data, indent=2))
+    (OUT / "skills.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     page = OUT / "index.html"
-    page.write_text(render_page(data))
+    page.write_text(render_page(data), encoding="utf-8")
 
     print(f"{data['count']} skills -> {page}")
     if args.open:
-        subprocess.run(["open", str(page)], check=False)
+        webbrowser.open(page.resolve().as_uri())
     return 0
 
 

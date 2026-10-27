@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import re
 import sys
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ def _unquote(v: str) -> str:
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """Minimal YAML subset: scalars, quoted scalars, block scalars, one nesting level, lists."""
-    lines = text.split("\n")
+    lines = text.removeprefix("\ufeff").split("\n")
     if not lines or lines[0].strip() != "---":
         return {}, text
 
@@ -113,16 +114,35 @@ def as_list(v) -> list[str]:
     return [str(v)]
 
 
+def as_dict(v) -> dict:
+    return v if isinstance(v, dict) else {}
+
+
 # --------------------------------------------------------------------------
 # host config
 # --------------------------------------------------------------------------
 
 
 def read_json(path: Path) -> dict:
+    """The JSON object in a file, or {} when it is missing, unreadable, or not an object."""
     try:
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+    return data if isinstance(data, dict) else {}
+
+
+def read_json_strict(path: Path) -> dict:
+    """Like read_json, but for writers: a file that exists and is not a JSON object is an error."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"cannot read {path}: {e}. Fix the file, then try again.") from e
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} does not hold a JSON object. Fix the file, then try again.")
+    return data
 
 
 @dataclass
@@ -141,17 +161,19 @@ class HostConfig:
             label=label,
             root=root,
             settings=read_json(root / "settings.json"),
-            installed_plugins=read_json(root / "plugins" / "installed_plugins.json").get(
-                "plugins", {}
+            installed_plugins=as_dict(
+                read_json(root / "plugins" / "installed_plugins.json").get("plugins")
             ),
             marketplaces=read_json(root / "plugins" / "known_marketplaces.json"),
         )
 
     def plugin_enabled(self, ref: str):
-        return self.settings.get("enabledPlugins", {}).get(ref)
+        plugins = self.settings.get("enabledPlugins")
+        return plugins.get(ref) if isinstance(plugins, dict) else None
 
     def plugin_installs(self, ref: str) -> list[dict]:
-        return self.installed_plugins.get(ref, [])
+        installs = self.installed_plugins.get(ref)
+        return [i for i in installs if isinstance(i, dict)] if isinstance(installs, list) else []
 
 
 def settings_state(root: Path) -> dict:
@@ -159,8 +181,8 @@ def settings_state(root: Path) -> dict:
     s = read_json(root / "settings.json")
     return {
         "path": str(root / "settings.json"),
-        "skillOverrides": s.get("skillOverrides", {}),
-        "enabledPlugins": s.get("enabledPlugins", {}),
+        "skillOverrides": as_dict(s.get("skillOverrides")),
+        "enabledPlugins": as_dict(s.get("enabledPlugins")),
     }
 
 
@@ -179,7 +201,12 @@ def git_tree_hash(path: Path) -> str:
     for child in path.iterdir():
         if child.name == ".git":
             continue
-        if child.is_dir():
+        if child.is_symlink():
+            # Git stores a link as its target text, and following it could loop.
+            data = os.readlink(child).encode()
+            mode, key = b"120000", child.name
+            sha = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+        elif child.is_dir():
             mode, sha, key = b"40000", git_tree_hash(child), child.name + "/"
         else:
             data = child.read_bytes()
@@ -213,8 +240,17 @@ def bundle_stats(skill_dir: Path) -> dict:
     return {"file_count": files, "bytes": total, "subdirs": sorted(kinds)}
 
 
+def _record(skill_md: Path, **kw) -> dict | None:
+    """One skill's record, or None when its files cannot be read."""
+    try:
+        return build_record(skill_md, **kw)
+    except OSError as e:
+        print(f"skill-atlas: skipped {skill_md}: {e}", file=sys.stderr)
+        return None
+
+
 def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
-    text = skill_md.read_text(errors="replace")
+    text = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, body = parse_frontmatter(text)
     skill_dir = skill_md.parent
     meta = fm.get("metadata")
@@ -281,7 +317,7 @@ def collect_personal(host: HostConfig, lock_index: dict, seen: dict) -> list[dic
         if key in seen:
             seen[key]["config_roots"].append(host.label)
             continue
-        rec = build_record(
+        rec = _record(
             skill_md,
             scope="personal",
             config_roots=[host.label],
@@ -289,8 +325,13 @@ def collect_personal(host: HostConfig, lock_index: dict, seen: dict) -> list[dic
             source_root=str(real),
             origin=lock_index.get(skill_md.parent.name, {}),
         )
+        if rec is None:
+            continue
         locked = rec["origin"].get("skillFolderHash", "")
-        rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
+        try:
+            rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
+        except OSError:
+            rec["local_edits"] = False
         seen[key] = rec
         out.append(rec)
     return out
@@ -326,7 +367,7 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                     if key in seen:
                         seen[key]["config_roots"].append(host.label)
                         continue
-                    rec = build_record(
+                    rec = _record(
                         skill_md,
                         scope="plugin",
                         config_roots=[host.label],
@@ -334,7 +375,7 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                         plugin=plugin_dir.name,
                         plugin_ref=ref,
                         marketplace=marketplace_dir.name,
-                        marketplace_source=(host.marketplaces.get(marketplace_dir.name) or {}).get(
+                        marketplace_source=as_dict(host.marketplaces.get(marketplace_dir.name)).get(
                             "source", {}
                         ),
                         plugin_version=version_dir.name,
@@ -345,6 +386,8 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                         commit=(install.get("gitCommitSha") or "")[:7],
                         source_root=str(version_dir),
                     )
+                    if rec is None:
+                        continue
                     rec["invoke"] = f"{plugin_dir.name}:{rec['name']}"
                     seen[key] = rec
                     out.append(rec)
@@ -369,7 +412,7 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
                 key = str(skill_md.resolve())
                 if key in seen:
                     continue
-                rec = build_record(
+                rec = _record(
                     skill_md,
                     scope="project",
                     config_roots=[],
@@ -379,6 +422,8 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
                     holder=holder,
                     source_root=str(skills_dir),
                 )
+                if rec is None:
+                    continue
                 seen[key] = rec
                 out.append(rec)
     return out
@@ -388,11 +433,35 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
 
 
 def load_config(repo: Path) -> dict:
+    """config.json with defaults. Wrong types fall back, and CLAUDE_CONFIG_DIR joins the roots."""
     cfg = read_json(repo / "config.json")
-    cfg.setdefault("config_roots", {"personal": "~/.claude"})
-    cfg.setdefault("project_roots", [])
-    cfg.setdefault("project_scan_depth", 3)
-    return cfg
+    roots = cfg.get("config_roots")
+    if not isinstance(roots, dict) or not roots:
+        roots = {"personal": "~/.claude"}
+    roots = {str(k): str(v) for k, v in roots.items() if isinstance(v, str) and v}
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env and Path(env).expanduser().resolve() not in {
+        Path(p).expanduser().resolve() for p in roots.values()
+    }:
+        label = Path(env).expanduser().name.lstrip(".") or "config"
+        while label in roots:
+            label += "-env"
+        roots[label] = env
+    projects = cfg.get("project_roots")
+    if isinstance(projects, str):
+        projects = [projects]
+    if not isinstance(projects, list):
+        projects = []
+    try:
+        depth = int(cfg.get("project_scan_depth", 3))
+    except (TypeError, ValueError):
+        depth = 3
+    return {
+        **cfg,
+        "config_roots": roots,
+        "project_roots": [str(p) for p in projects if isinstance(p, str) and p],
+        "project_scan_depth": depth,
+    }
 
 
 def scan(repo: Path) -> dict:
@@ -400,7 +469,7 @@ def scan(repo: Path) -> dict:
     hosts = [
         HostConfig.load(label, Path(os.path.expanduser(p)))
         for label, p in cfg["config_roots"].items()
-        if Path(os.path.expanduser(p)).exists()
+        if Path(os.path.expanduser(p)).is_dir()
     ]
 
     lock_index: dict = {}
@@ -408,10 +477,10 @@ def scan(repo: Path) -> dict:
         skills_dir = host.root / "skills"
         if skills_dir.exists():
             # Skills linked in the atlas first, so the npx lock wins on a clash.
-            lock_index.update(
-                read_json(skill_lock_path(host.root).with_name(ATLAS_LOCK)).get("skills", {})
-            )
-            lock_index.update(read_json(skill_lock_path(host.root)).get("skills", {}))
+            lock = skill_lock_path(host.root)
+            for path in (lock.with_name(ATLAS_LOCK), lock):
+                entries = as_dict(read_json(path).get("skills"))
+                lock_index.update({k: v for k, v in entries.items() if isinstance(v, dict)})
 
     seen: dict = {}
     records: list[dict] = []
@@ -433,7 +502,7 @@ def scan(repo: Path) -> dict:
 
     return {
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
-        "host": os.uname().nodename,
+        "host": platform.node(),
         "config_roots": {h.label: str(h.root) for h in hosts},
         "bundled_skills_disabled": bundled_off,
         "settings": {h.label: settings_state(h.root) for h in hosts},

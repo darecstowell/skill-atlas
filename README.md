@@ -41,9 +41,9 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Update from GitHub** | Marks skills whose upstream folder changed. Update one skill, one source, or all. About 40 skills update in 3 seconds. |
 | **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
 | **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
-| **See where it comes from** | Each source shows its owner's GitHub avatar, and the detail panel shows the repo's banner, or a picture from the skill's own folder. |
+| **See where it comes from** | Each source shows its owner's GitHub avatar. A source's panel shows the repo's banner, and a skill's panel shows a picture from its own folder when it has one. |
 | **List or cards** | Switch between dense rows and a card grid. Pick light, dark, or the system theme. |
-| **Tidy up** | Delete moves a skill to the macOS Trash, with Undo. A **same as** tag marks skills with the same description. |
+| **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 
 ## How it works
 
@@ -75,8 +75,8 @@ its skills installed yet.
 | Plugin | `enabledPlugins` in `settings.json` | A whole plugin. Plugin skills cannot be turned off one by one. |
 
 When you have more than one config root, the root picker sets which settings file to change
-(`personal` is `~/.claude`, `work` is `~/.claude-work`). Restart Claude Code sessions to load a
-change.
+(`personal` is `~/.claude`, `work` is `~/.claude-work`). When `CLAUDE_CONFIG_DIR` is set, that
+folder is a root too. Restart Claude Code sessions to load a change.
 
 ## Keyboard
 
@@ -121,7 +121,8 @@ Bundled skills are inside the Claude Code binary, not on disk, so the atlas cann
   the server starts, so other web pages cannot call it.
 - In `settings.json`, the atlas changes only `skillOverrides` and `enabledPlugins`. It makes a
   one-time backup at `settings.json.atlas-bak` before the first write.
-- Deletes go to the macOS Trash, never `rm`.
+- Deletes go to the Trash (`~/.Trash` on macOS, the freedesktop Trash on Linux), never `rm`.
+  Where there is no Trash, delete is not available.
 - Plugin skills are not checked for updates.
 - The page loads avatars, banners, and the SKILL.md of skills you have not installed straight
   from GitHub, so GitHub sees those requests.
@@ -148,6 +149,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 | `serve.py` | Local server and the only writer of `settings.json` |
 | `updates.py` | Update checks, updates, installs, and watched sources |
 | `assets.py` | Avatars, banners, and image paths for source repos |
+| `usage.py` | Counts skill use from Claude Code's counters and session transcripts |
 | `remove.py` | Moves skills to the Trash, and puts them back |
 | `build.py` | Puts the records into `template/index.html` |
 | `template/index.html` | The page: one file of HTML, CSS, and JavaScript |

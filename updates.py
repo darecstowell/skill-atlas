@@ -7,10 +7,13 @@ import json
 import os
 import re
 import shutil
+import socket
+import ssl
 import subprocess
 import tarfile
 import threading
 import time
+import urllib.error
 import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -19,17 +22,23 @@ from pathlib import Path
 
 from scan import (
     ATLAS_LOCK,
+    as_dict,
     git_tree_hash,
     parse_frontmatter,
     read_json,
+    read_json_strict,
     skill_lock_path,
 )
 
 CACHE_SECONDS = 600
+TREE_TIMEOUT = 20
 _cache: dict = {}
 _tarballs: dict[tuple[str, str], tuple[float, bytes]] = {}
 JOBS: dict[str, dict] = {}
 _job_lock = threading.Lock()
+# Why the last GitHub call in this thread failed, so errors can say more than "could not read".
+_net = threading.local()
+_why: dict[str, str] = {}
 
 
 # --------------------------------------------------------------------------
@@ -48,21 +57,43 @@ def parse_repo(text: str) -> str:
     return f"{m.group(1)}/{m.group(2)}"
 
 
-def _gh(args: list[str], binary: bool = False):
+def _gh(args: list[str], binary: bool = False, timeout: int = 60):
+    _net.timed_out = False
+    if not shutil.which("gh"):
+        return None
     try:
         out = subprocess.run(
             ["gh", "api", *args],
             capture_output=True,
-            timeout=60,
+            timeout=timeout,
             text=not binary,
             env={**os.environ, "GH_PROMPT_DISABLED": "1"},
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        _net.timed_out = True
+        return None
+    except OSError:
         return None
     return out.stdout if out.returncode == 0 else None
 
 
+def _reason(err: OSError) -> str:
+    if isinstance(err, urllib.error.HTTPError):
+        if err.code in (403, 429) and err.headers.get("X-RateLimit-Remaining") == "0":
+            return "GitHub rate limit reached. Run `gh auth login` to raise it"
+        if err.code == 404:
+            return "not found. A private repo needs `gh auth login`"
+        return f"GitHub answered {err.code}"
+    cause = getattr(err, "reason", err)
+    if isinstance(cause, ssl.SSLCertVerificationError):
+        return "Python cannot check GitHub's certificate. Install your Python's certificates"
+    if isinstance(cause, (socket.timeout, TimeoutError)):
+        return "GitHub did not answer in time"
+    return "no connection to GitHub"
+
+
 def _https(url: str, timeout: int = 30) -> bytes | None:
+    _net.reason = ""
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "skill-atlas", "Accept": "application/vnd.github+json"},
@@ -70,18 +101,38 @@ def _https(url: str, timeout: int = 30) -> bytes | None:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             return res.read()
-    except OSError:
+    except OSError as e:
+        _net.reason = _reason(e)
         return None
 
 
 def fetch_tree(repo: str, ref: str) -> dict | None:
     # gh first: it is signed in, so the 60-an-hour anonymous API limit does not apply.
-    out = _gh([f"repos/{repo}/git/trees/{ref}?recursive=1"])
+    out = _gh([f"repos/{repo}/git/trees/{ref}?recursive=1"], timeout=TREE_TIMEOUT)
+    if out is None and _net.timed_out:
+        # The network is the problem, so HTTPS would only wait again.
+        _why[repo] = "GitHub did not answer in time"
+        return None
     if out is None:
-        raw = _https(f"https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1")
-        out = raw.decode() if raw else None
-    tree = json.loads(out) if out else None
-    return tree if tree and "tree" in tree else None
+        url = f"https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1"
+        raw = _https(url, timeout=TREE_TIMEOUT)
+        if raw is None:
+            _why[repo] = _net.reason
+        out = raw.decode("utf-8", "replace") if raw else None
+    try:
+        tree = json.loads(out) if out else None
+    except ValueError:
+        tree = None
+    if isinstance(tree, dict) and isinstance(tree.get("tree"), list):
+        _why.pop(repo, None)
+        return tree
+    return None
+
+
+def tree_error(repo: str) -> str:
+    """A message for a repo whose tree could not be read."""
+    why = _why.get(repo)
+    return f"could not read {repo} from GitHub" + (f": {why}" if why else "")
 
 
 def fetch_tarball(repo: str, ref: str, max_age: float = 0) -> bytes | None:
@@ -121,9 +172,11 @@ def tracked(roots: list[Path]) -> dict[str, tuple[Path, dict]]:
     out: dict[str, tuple[Path, dict]] = {}
     for npx_lock in {skill_lock_path(r) for r in roots}:
         for lock in (npx_lock.with_name(ATLAS_LOCK), npx_lock):
-            for name, e in read_json(lock).get("skills", {}).items():
+            for name, e in as_dict(read_json(lock).get("skills")).items():
                 if (
-                    e.get("sourceType") == "github"
+                    isinstance(e, dict)
+                    and e.get("sourceType") == "github"
+                    and isinstance(e.get("source"), str)
                     and e.get("skillFolderHash")
                     and e.get("skillPath")
                 ):
@@ -131,47 +184,61 @@ def tracked(roots: list[Path]) -> dict[str, tuple[Path, dict]]:
     return out
 
 
+def write_json(path: Path, data: dict) -> None:
+    path = path.resolve()  # write through a symlink, so a linked lock stays linked
+    tmp = path.with_name(path.name + ".atlas-tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _read_lock(lock: Path) -> dict:
+    data = read_json_strict(lock) or {"version": 1}
+    data["skills"] = as_dict(data.get("skills"))
+    return data
+
+
 def write_lock_entries(lock: Path, entries: dict[str, dict]) -> None:
-    data = read_json(lock) or {"version": 1, "skills": {}}
-    data.setdefault("skills", {}).update(entries)
-    tmp = lock.with_name(lock.name + ".atlas-tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(tmp, lock)
+    data = _read_lock(lock)
+    data["skills"].update(entries)
+    write_json(lock, data)
 
 
 def _atlas_lock(roots: list[Path]) -> Path:
+    if not roots:
+        raise ValueError("no Claude config folder found. Set config_roots in config.json")
     return skill_lock_path(roots[0]).with_name(ATLAS_LOCK)
 
 
 def _edit_atlas_lock(roots: list[Path], change) -> None:
     lock = _atlas_lock(roots)
-    data = read_json(lock) or {"version": 1, "skills": {}}
+    data = _read_lock(lock)
     change(data)
-    tmp = lock.with_name(lock.name + ".atlas-tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n")
-    os.replace(tmp, lock)
+    write_json(lock, data)
 
 
 def mark_seen(roots: list[Path], repo: str, paths: list[str]) -> None:
     def change(data):
-        seen = data.setdefault("seen", {})
-        seen[repo] = sorted(set(seen.get(repo, [])) | set(paths))
+        seen = data["seen"] = as_dict(data.get("seen"))
+        seen[repo] = sorted(set(seen.get(repo) or []) | set(paths))
 
     _edit_atlas_lock(roots, change)
 
 
 def watched(roots: list[Path]) -> list[str]:
     """Repos you follow for new skills even when none of their skills is installed."""
-    return read_json(_atlas_lock(roots)).get("sources", [])
+    if not roots:
+        return []
+    sources = read_json(_atlas_lock(roots)).get("sources")
+    return [s for s in sources if isinstance(s, str)] if isinstance(sources, list) else []
 
 
 def watch(repo_text: str, on: bool, roots: list[Path]) -> dict:
     repo = parse_repo(repo_text)
     if on and not fetch_tree(repo, "HEAD"):
-        raise ValueError(f"could not read {repo} from GitHub")
+        raise ValueError(tree_error(repo))
 
     def change(data):
-        sources = set(data.get("sources", []))
+        sources = set(watched(roots))
         sources.add(repo) if on else sources.discard(repo)
         data["sources"] = sorted(sources)
 
@@ -254,13 +321,13 @@ def check(roots: list[Path], refresh: bool = False) -> dict:
         for p in (skill_lock_path(r).parent / "skills").glob("*")
         if p.is_dir()
     }
-    seen = read_json(_atlas_lock(roots)).get("seen", {})
+    seen = as_dict(read_json(_atlas_lock(roots)).get("seen")) if roots else {}
     with ThreadPoolExecutor(max_workers=8) as pool:
         trees = dict(zip(by_source, pool.map(lambda key: fetch_tree(*key), by_source), strict=True))
     for (repo, ref), tree in trees.items():
         if not tree:
             # No status at all, so a failed check never reads as "removed upstream".
-            errors[repo] = f"could not read {repo} from GitHub"
+            errors[repo] = tree_error(repo)
             continue
         for name, e in by_source[(repo, ref)].items():
             latest = folder_sha(tree, e["skillPath"])
@@ -428,7 +495,8 @@ def describe(repo: str, paths: list[str], roots: list[Path]) -> dict:
     """Name and description for each path, read from one tarball (cached for 10 minutes)."""
     blob = fetch_tarball(repo, _repo_ref(repo, roots), max_age=CACHE_SECONDS)
     if not blob:
-        raise ValueError(f"could not download {repo}")
+        why = getattr(_net, "reason", "")
+        raise ValueError(f"could not download {repo}" + (f": {why}" if why else ""))
     wanted = set(paths)
     out = {}
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
@@ -534,7 +602,7 @@ def link(names: list[str], repo_text: str, roots: list[Path]) -> dict:
     skills_dir = npx_lock.parent / "skills"
     tree = fetch_tree(repo, "HEAD")
     if not tree:
-        raise ValueError(f"could not read {repo} from GitHub")
+        raise ValueError(tree_error(repo))
     skill_mds = [
         e["path"]
         for e in tree["tree"]

@@ -25,16 +25,14 @@
     --tint-accent: color-mix(in oklab, var(--accent) 14%, var(--surface-1));
     --tint-on: color-mix(in oklab, var(--on) 12%, var(--surface-1));
     --tint-warn: color-mix(in oklab, var(--warn) 12%, var(--surface-1));
-    --tint-danger: color-mix(in oklab, var(--danger) 14%, var(--surface-1));
     --row-hover: var(--surface-1); --row-selected: var(--surface-2);
     --shadow-pop: 0 0 0 1px var(--border-strong), 0 2px 4px oklch(0 0 0 / .3), 0 12px 32px oklch(0 0 0 / .45);
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
     --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
     --ease-out: cubic-bezier(.23, 1, .32, 1);
     --ease-out-quart: cubic-bezier(.165, .84, .44, 1);
-    --ease-in-out-cubic: cubic-bezier(.645, .045, .355, 1);
     --ease-in-cubic: cubic-bezier(.55, .055, .675, .19);
     --ease-swap: cubic-bezier(.25, .1, 0, 1);
     --ease-drawer: cubic-bezier(.32, .72, 0, 1);
@@ -44,6 +42,7 @@
     --id-bg: .33 .07; --id-fg: .87 .1; --id-line: .68 .13; --id-tint: 7%;
     --img-edge: oklch(1 0 0 / .1);
     --tint-violet: color-mix(in oklab, oklch(.76 .11 300) 14%, var(--surface-1)); --violet: oklch(.8 .1 300);
+    --hl1: .34 .055; --hl2: .47 .09; --hl3: .61 .12; --hl4: .76 .14;
     --elevation-raised: 0 0 0 1px oklch(1 0 0 / .09);
     --elevation-raised-hover: 0 0 0 1px oklch(1 0 0 / .15);
   }
@@ -59,6 +58,7 @@
     --id-bg: .93 .045; --id-fg: .44 .12; --id-line: .6 .14; --id-tint: 6%;
     --img-edge: oklch(0 0 0 / .1);
     --tint-violet: oklch(.95 .03 300); --violet: oklch(.47 .14 300);
+    --hl1: .91 .045; --hl2: .8 .09; --hl3: .67 .13; --hl4: .53 .15;
     --elevation-raised: 0 0 0 1px oklch(0 0 0 / .05), 0 1px 3px oklch(0 0 0 / .05), 0 4px 10px -4px oklch(0 0 0 / .05);
     --elevation-raised-hover: 0 0 0 1px oklch(0 0 0 / .07), 0 1px 3px oklch(0 0 0 / .07), 0 4px 10px -4px oklch(0 0 0 / .08);
   }
@@ -86,7 +86,7 @@
   .btn {
     position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 28px; padding: 0 10px; border-radius: var(--r-md); border: 1px solid var(--border);
-    background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;
+    background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 500; white-space: nowrap; text-decoration: none; cursor: pointer;
     transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, scale 150ms var(--ease-out);
   }
   .btn::before { content: ""; position: absolute; inset: -6px -2px; }
@@ -95,7 +95,7 @@
   .btn.primary { background: var(--accent); border-color: transparent; color: var(--on-accent); }
   .btn.primary:hover { background: color-mix(in oklab, var(--accent) 88%, var(--text)); color: var(--on-accent); }
   .btn.ghost { background: transparent; border-color: transparent; }
-  .btn.ghost:hover { background: var(--surface-2); }
+  .btn.ghost:hover, .btn.ghost[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
   .btn.accent { background: transparent; border-color: transparent; color: var(--accent); }
   .btn.accent:hover { background: var(--tint-accent); }
   .btn.danger { color: var(--danger); }
@@ -144,6 +144,7 @@
     transition: color 120ms ease, background-color 120ms ease;
   }
   .seg button[hidden] { display: none; }
+  .seg button.wait { visibility: hidden; }
   .seg button:hover { color: var(--text); }
   .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); }
   .pop-wrap { position: relative; display: inline-flex; flex: none; }
@@ -174,6 +175,7 @@
   }
   .band[hidden] { display: none; }
   .band code { font: 11.5px var(--mono); color: var(--text); }
+  .band .linkbtn { color: inherit; }
 
   /* ---------- layout ---------- */
   main { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: start; }
@@ -184,7 +186,7 @@
     position: sticky; top: var(--head-h); z-index: var(--z-sticky); height: 32px; background: var(--bg);
     display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s2) 0 6px;
   }
-  .sec-head .fold { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .sec-head .fold { flex: none; white-space: nowrap; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .sec-head .fold .n { font-weight: 500; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
   .sec-head .tools { margin-left: auto; display: flex; gap: var(--s4); }
 
@@ -207,6 +209,12 @@
   .gsub .tnum { color: var(--text-2); }
   .gctl { display: flex; align-items: center; gap: var(--s2); flex: none; }
   .group.collapsed .group-head { border-bottom-color: transparent; }
+  .group-head[aria-current="true"] { box-shadow: inset 0 -2px 0 oklch(var(--id-line) var(--h, 250)); }
+  .gopen { all: unset; position: relative; display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; cursor: pointer; border-radius: var(--r-sm); }
+  .gopen::before { content: ""; position: absolute; inset: -9px -4px; }
+  .gopen:hover .gname { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+  .gopen:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .group-head .fold { padding: 4px; margin: -4px 0 -4px -4px; }
   /* Every sticky head is its own stacking layer; lift the one whose menu is open over its neighbors. */
   .group-head:has(.menu) { z-index: calc(var(--z-sticky) + 1); }
   .group > .group-head { background: color-mix(in oklab, oklch(var(--id-line) var(--h)) var(--id-tint), var(--bg)); }
@@ -221,7 +229,7 @@
 
   /* ---------- rows ---------- */
   .row {
-    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--s3);
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: var(--s3);
     min-height: 44px; padding: 4px var(--s2) 4px 15px; border-radius: var(--r-md);
     scroll-margin-top: calc(var(--head-h) + 76px); scroll-margin-bottom: 24px;
   }
@@ -248,7 +256,7 @@
   .row.restored { animation: restored 700ms ease-out; }
   @keyframes restored { from { background: color-mix(in oklab, var(--accent) 14%, transparent); } }
   .open { all: unset; cursor: pointer; min-width: 0; display: grid; gap: 1px; padding: 2px 0; }
-  .nm { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+  .nm { display: flex; align-items: center; gap: var(--s2); min-width: 0; min-height: 18px; }
   .nmt { font: 500 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .slash { color: var(--text-3); }
   .desc { color: var(--text-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -279,8 +287,9 @@
   }
   @media (hover: hover) and (pointer: fine) { body.cards .row:hover { background: var(--surface-1); box-shadow: var(--elevation-raised-hover); } }
   body.cards .row[aria-current="true"] { background: var(--surface-1); }
-  body.cards .row > :nth-child(2) { display: none; }
-  body.cards .row .open { grid-column: 1 / -1; align-self: start; display: grid; gap: 4px; padding: 0; }
+  body.cards .row > .kh, body.cards .row:has(.open:focus-visible) > .kh { display: none; }
+  body.cards .row .use { grid-column: 1; grid-row: 2; justify-content: flex-start; padding-left: 16px; min-width: 0; }
+  body.cards .row .open { grid-column: 1 / -1; grid-row: 1; align-self: start; display: grid; gap: 4px; padding: 0; }
   body.cards .row .uslot { grid-column: 2; grid-row: 2; min-width: 0; }
   body.cards .row > :last-child { grid-column: 3; grid-row: 2; }
   /* The state rail becomes a status dot in the card footer. */
@@ -297,6 +306,58 @@
   body.cards.compact .row .open { display: grid; }
   body.cards.compact .thumb { display: none; }
   body.cards.compact .row { padding-top: 10px; }
+
+  /* ---------- usage ---------- */
+  .use { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 64px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .use:empty { min-width: 0; }
+  .spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 14px; }
+  .spark i { width: 3px; height: 14px; border-radius: 1px; background: oklch(var(--id-line) var(--h, 250)); transform-origin: bottom; transform: scaleY(max(.08, var(--v))); opacity: calc(.35 + var(--v) * .65); }
+  .row[data-off] .spark i { background: var(--text-disabled); }
+  .gspark { flex: none; margin-left: auto; }
+  .gsub + .gspark { margin-left: 0; }
+  body.compact .use .spark { display: none; }
+
+  .uses h3, .inv h3.sub { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .use-stats { display: flex; gap: var(--s5); }
+  .use-stats div { display: grid; gap: 1px; }
+  .use-stats b { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .use-stats span { font-size: 12px; color: var(--text-3); }
+  .use-note { margin: 0; font-size: 12px; color: var(--text-3); }
+  .use-wait { display: grid; gap: 6px; font-size: 12px; color: var(--text-3); }
+  .use-wait .track { height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .use-wait .track i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 400ms var(--ease-out-quart); }
+
+  .heat { --cell: 11px; --gap: 3px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+  .heat-months, .heat-grid { display: grid; grid-template-columns: repeat(26, minmax(0, var(--cell))); column-gap: var(--gap); }
+  .heat-months { height: 14px; font-size: 10.5px; color: var(--text-3); }
+  .heat-months span { white-space: nowrap; }
+  .heat-grid { grid-template-rows: repeat(7, auto); row-gap: var(--gap); width: fit-content; max-width: 100%; }
+  .heat i { width: 100%; max-width: var(--cell); aspect-ratio: 1; border-radius: 3px; background: var(--surface-3); }
+  .heat i[data-l="1"] { background: oklch(var(--hl1) var(--h, 250)); }
+  .heat i[data-l="2"] { background: oklch(var(--hl2) var(--h, 250)); }
+  .heat i[data-l="3"] { background: oklch(var(--hl3) var(--h, 250)); }
+  .heat i[data-l="4"] { background: oklch(var(--hl4) var(--h, 250)); }
+  .heat-grid i[data-today] { box-shadow: 0 0 0 1px var(--surface-1), 0 0 0 2px var(--text-3); }
+  @media (hover: hover) and (pointer: fine) { .heat-grid i:hover { box-shadow: 0 0 0 1px var(--surface-1), 0 0 0 2px var(--text); } }
+  .heat-foot { display: flex; align-items: center; gap: var(--s2); font-size: 11.5px; color: var(--text-3); }
+  .heat-read { flex: 1; min-width: 0; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .heat-scale { display: inline-flex; align-items: center; gap: 3px; }
+  .heat-scale i { width: 9px; border-radius: 2px; }
+  /* One reveal per skill: a diagonal sweep from the oldest week to today. */
+  .heat.play .heat-grid i { animation: cell-in 260ms var(--ease-out) backwards; animation-delay: var(--d); }
+  @keyframes cell-in { from { opacity: 0; transform: scale(.4); } }
+  .proj { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--s3); align-items: center; font-size: 12px; }
+  .proj span { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj .bar { grid-column: 1 / -1; height: 4px; margin-top: -3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .proj .bar i { display: block; height: 100%; border-radius: inherit; background: oklch(var(--id-line) var(--h, 250)); transform-origin: left; transform: scaleX(var(--v)); }
+  .play .proj .bar i { animation: bar-in 420ms var(--ease-out) backwards; animation-delay: calc(140ms + var(--i) * 50ms); }
+  @keyframes bar-in { from { transform: scaleX(0); } }
+  .top { display: grid; gap: 2px; }
+  .top button { all: unset; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s3); align-items: center; padding: 5px 8px; margin: 0 -8px; border-radius: var(--r-md); cursor: pointer; font-size: 12.5px; }
+  .top button:hover { background: var(--surface-2); }
+  .top button:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .top .nmt { font-size: 12.5px; }
+  .top .tnum { color: var(--text-3); font-size: 12px; }
 
   .tags { display: inline-flex; gap: 4px; flex: none; }
   .tag {
@@ -412,7 +473,7 @@
 
   /* ---------- detail ---------- */
   #detail {
-    position: sticky; top: var(--head-h); height: calc(100dvh - var(--head-h)); overflow: auto; overscroll-behavior: contain;
+    position: sticky; top: var(--head-h); height: calc(100dvh - var(--head-h)); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
     background: var(--surface-1); border-left: 1px solid var(--border); padding: 20px var(--s5) 64px;
   }
   .banner {
@@ -421,29 +482,36 @@
   }
   .banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--surface-2); outline: 1px solid var(--img-edge); outline-offset: -1px; border-radius: inherit; }
   .banner img.ban-ava { position: static; width: 72px; height: 72px; border-radius: 16px; background: none; }
-  .banner .cap {
-    position: absolute; left: 8px; bottom: 8px; padding: 2px 7px; border-radius: var(--r-sm);
-    background: oklch(0 0 0 / .6); color: oklch(1 0 0 / .92); font: 500 11px/1.5 var(--sans); letter-spacing: 0;
+  .banner.short { aspect-ratio: 3 / 1; font-size: 36px; }
+  .crumb {
+    all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; gap: var(--s2); max-width: calc(100% + 8px);
+    margin: 0 0 var(--s3) -6px; padding: 4px 8px 4px 6px; border-radius: var(--r-md); cursor: pointer;
+    font: 500 12px var(--mono); color: var(--text-2); transition: background-color 120ms ease, color 120ms ease;
   }
-  .src-line { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s3); font-size: 12px; color: var(--text-3); }
-  .src-line b { color: var(--text-2); font: 500 12px var(--mono); }
-  .src-line .star { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .crumb:hover { background: var(--surface-2); color: var(--text); }
+  .crumb:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .crumb-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crumb .star { flex: none; font: 12px var(--sans); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .crumb .cr { flex: none; width: 12px; height: 12px; color: var(--text-3); }
+  .d-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
+  .d-meta .tag { height: 20px; }
+  .d-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s4); }
   .d-top { display: flex; align-items: flex-start; gap: 4px; }
+  .d-top > .switch { margin: 5px 0 0 var(--s2); }
   .d-title { flex: 1; min-width: 0; margin: 0; padding-top: 2px; font: 600 18px/1.3 var(--mono); letter-spacing: -.01em; overflow-wrap: anywhere; }
   .d-title .slash { font-weight: 500; }
-  .d-sub { margin: 4px 0 0; font-size: 12px; color: var(--text-3); overflow-wrap: anywhere; }
   .d-desc { margin: var(--s4) 0 0; color: var(--text-2); max-width: 65ch; }
   .d-desc.clamp { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
   .d-more { margin-top: 6px; }
-  .linkbtn { position: relative; background: none; border: 0; padding: 0; color: var(--text-2); font-size: 12px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
+  .linkbtn { position: relative; white-space: nowrap; background: none; border: 0; padding: 0; color: var(--text-2); font-size: 12px; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
   .linkbtn::before { content: ""; position: absolute; inset: -12px -6px; }
   .linkbtn:hover { color: var(--text); }
   .d-sec { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--border); display: grid; gap: var(--s3); }
+  .d-sec > .btn { justify-self: start; }
   .card { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border-radius: var(--r-lg); background: var(--surface-2); }
   .card.accent { background: var(--tint-accent); }
   .card > div { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-2); }
   .card strong { display: block; color: var(--text); font-weight: 600; font-size: 13px; }
-  .card code { font: 11.5px var(--mono); color: var(--text-3); overflow-wrap: anywhere; }
   .card .uslot { min-width: 0; }
   .note { font-size: 12px; color: var(--text-3); margin: 4px 0 0; }
   .note.warn { color: var(--warn); }
@@ -455,6 +523,7 @@
   .danger-zone .note { flex-basis: 100%; }
   .danger-zone .btn.danger { margin-left: auto; }
   .d-close { display: none; }
+  #scrim { display: none; }
 
   .inv h3 { margin: 0 0 var(--s3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
@@ -522,17 +591,18 @@
   }
   .mode[data-raw]::before { transform: translateX(100%); }
   .mode button { position: relative; height: 24px; padding: 0 12px; border: 0; background: none; color: var(--text-3); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: color 150ms ease; }
-  .mode button[aria-pressed="true"] { color: var(--text); }
+  .mode button:hover, .mode button[aria-pressed="true"] { color: var(--text); }
 
   .v-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0; }
   .v-body.no-toc { grid-template-columns: minmax(0, 1fr); }
-  .v-toc { overflow: auto; padding: var(--s4) var(--s3) var(--s5); border-right: 1px solid var(--border); font-size: 12.5px; }
+  .v-toc { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: var(--s4) var(--s3) var(--s5); border-right: 1px solid var(--border); font-size: 12.5px; }
   .v-toc h3 { margin: 0 0 var(--s2); padding: 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .v-toc a { display: block; padding: 4px 8px; border-radius: var(--r-sm); color: var(--text-2); text-decoration: none; line-height: 1.35; }
   .v-toc a.l3 { padding-left: 20px; color: var(--text-3); }
   .v-toc a:hover { background: var(--surface-2); color: var(--text); }
   .v-toc[hidden] { display: none; }
   .v-scroll { overflow: auto; overscroll-behavior: contain; min-height: 0; }
+  .v-scroll:focus-visible { outline: none; }
   .v-note { margin: 0; padding: 8px var(--s5); font-size: 12px; color: var(--warn); background: var(--tint-warn); }
   .v-load { padding: var(--s6); color: var(--text-3); }
 
@@ -574,9 +644,19 @@
   }
 
   /* ---------- narrow ---------- */
+  @property --fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+  @property --fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+  @keyframes edges { from { --fade-l: 0px; --fade-r: 24px; } to { --fade-l: 24px; --fade-r: 0px; } }
   @media (max-width: 1100px) {
     main { grid-template-columns: minmax(0, 1fr); }
     .bar2 { overflow-x: auto; scrollbar-width: none; }
+    /* Fade an edge only while more tabs sit past it. */
+    @supports (animation-timeline: scroll()) {
+      .bar2 {
+        mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+        animation: edges linear both; animation-timeline: scroll(self inline);
+      }
+    }
     .meta { display: none; }
     #detail {
       position: fixed; top: 0; right: 0; bottom: 0; height: auto; width: min(420px, 100vw); z-index: var(--z-drawer);
@@ -588,17 +668,39 @@
   }
   @media (max-width: 720px) {
     .bar1, .bar2 { padding: 0 var(--s3); }
-    .brand span, .cluster > [data-k="t"] { display: none; }
-    .bar2 { overflow-x: auto; scrollbar-width: none; }
-    .meta { display: none; }
+    #scrim {
+      display: block; position: fixed; inset: 0; z-index: calc(var(--z-drawer) - 1); background: oklch(0 0 0 / .45);
+      opacity: 0; visibility: hidden; transition: opacity 200ms var(--ease-in-cubic), visibility 0s linear 200ms;
+    }
+    #detail[data-open] + #scrim { opacity: 1; visibility: visible; transition: opacity 280ms var(--ease-out), visibility 0s; }
+    .brand span, .cluster > [data-k="t"], #displayBtn .lbl, .search kbd { display: none !important; }
+    .search { min-width: 0; }
+    #displayBtn { width: 28px; padding: 0; }
+    #displayBtn .dot { position: absolute; top: 4px; right: 4px; }
+    .sec-head .tools { gap: var(--s3); }
     #list { padding: 0 var(--s2) 96px; }
     .uslot { min-width: 0; }
     .gsub { display: none; }
+    .heat-scale span { display: none; }
     .search input, .linkform input { font-size: 16px; }
+    .v-head { flex-wrap: wrap; row-gap: var(--s2); }
+    .v-title { flex-basis: calc(100% - 40px); }
+    .v-acts { width: 100%; }
+    .v-acts .mode { margin-right: auto; }
+    .v-body { grid-template-columns: minmax(0, 1fr); }
+    .v-toc { display: none; }
+    .md { padding: var(--s4) var(--s4) 64px; }
+    .raw span { padding: 0 var(--s4) 0 48px; }
+    .raw span::before { width: 32px; }
     #detail {
       top: auto; left: 0; width: 100%; height: 85dvh; border-radius: 14px 14px 0 0;
       transform: translateY(100%); padding-bottom: calc(64px + env(safe-area-inset-bottom));
     }
+  }
+
+  @media (max-width: 480px) {
+    .bar1 { height: auto; flex-wrap: wrap; row-gap: var(--s2); padding-block: var(--s2); }
+    .search { order: 1; flex-basis: 100%; max-width: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -606,6 +708,7 @@
     .switch, .switch::after { transition-delay: 0ms !important; }
     .spin { display: none; }
     @starting-style { .menu, .linkform, #toast, #help, #help .sheet, .row.enter { opacity: 1; transform: none; } }
+    @supports (animation-timeline: scroll()) { @media (max-width: 1100px) { .bar2 { animation: edges linear both !important; animation-timeline: scroll(self inline) !important; } } }
   }
 </style>
 </head>
@@ -621,14 +724,21 @@
     </div>
     <div class="cluster" id="cluster"></div>
     <div class="pop-wrap" id="displayWrap">
-      <button class="btn ghost" id="displayBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="display">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Display<i class="dot" id="displayDot" hidden></i>
+      <button class="btn ghost" id="displayBtn" aria-label="Display" aria-haspopup="dialog" aria-expanded="false" aria-controls="display">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="lbl">Display</span><i class="dot" id="displayDot" hidden></i>
       </button>
       <div class="pop" id="display" role="dialog" aria-label="Display options" hidden>
         <div class="pop-row"><span>Layout</span>
           <div class="seg" id="layout" role="group" aria-label="Layout">
             <button data-l="list" aria-pressed="true"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>List</button>
             <button data-l="cards" aria-pressed="false"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Cards</button>
+          </div>
+        </div>
+        <div class="pop-row"><span>Sort</span>
+          <div class="seg" id="sortBy" role="group" aria-label="Sort skills">
+            <button data-o="name" aria-pressed="true">Name</button>
+            <button data-o="uses" aria-pressed="false">Most used</button>
+            <button data-o="recent" aria-pressed="false">Recent</button>
           </div>
         </div>
         <div class="pop-row"><span>Group by</span>
@@ -651,16 +761,19 @@
       <button data-v="off" aria-pressed="false">Off <span class="n" data-n="off"></span></button>
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
+      <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
     </div>
     <div class="meta" id="meta"></div>
   </div>
   <div class="band" id="band" hidden>Read-only build. Run <code>./atlas</code> to change skills.</div>
+  <div class="band" id="stale" role="alert" hidden></div>
   <div id="bar" aria-hidden="true"><i></i></div>
 </header>
 
 <main>
   <div id="list"></div>
   <aside id="detail" aria-label="Skill details"></aside>
+  <div id="scrim" aria-hidden="true"></div>
 </main>
 <div id="toast" role="status" hidden></div>
 <div id="announce" class="vh" aria-live="polite"></div>
@@ -696,12 +809,13 @@ const ui = {
   groupBy: localStorage.getItem('atlas.groupBy') || 'source',
   compact: localStorage.getItem('atlas.compact') === '1',
   layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
+  sort: localStorage.getItem('atlas.sort') || 'name',
   menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
 const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
-const groupLabel = s => (s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? s.plugin : s.scope === 'project' ? s.project : sourceOf(s));
-const groupId = s => (s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : sourceOf(s));
+const groupLabel = s => (s.kind === 'group' ? s.label : s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? s.plugin : s.scope === 'project' ? s.project : sourceOf(s));
+const groupId = s => (s.kind === 'group' ? s.hueKey : s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : sourceOf(s));
 const isLocalGroup = source => source === NO_SOURCE || source.endsWith('-*');
 const live = s => s.scope === 'personal' && s.config_roots.includes(ui.root);
 
@@ -714,13 +828,13 @@ const ICON = {
   refresh: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   close: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   alert: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.8v3.6M8 10.9v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  chevR: '<svg class="cr" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3 7.5 6 4.5 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  folder: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  sun: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  moon: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.5 5.5 0 0 1 6.4 2.5a5.5 5.5 0 1 0 7.1 7.1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  auto: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 14h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
 };
 
-ICON.folder = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-ICON.expand = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-ICON.sun = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-ICON.moon = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.5 5.5 0 0 1 6.4 2.5a5.5 5.5 0 1 0 7.1 7.1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-ICON.auto = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 14h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
 
 // ---------------------------------------------------------------- source identity: hue, avatar, banner
 // Fixed, evenly spread hues; lightness and chroma come from the theme tokens.
@@ -734,7 +848,7 @@ const REPOS = {};
 const repoPending = new Set();
 const ghRepo = v => (String(v || '').match(/github\.com[/:]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/) || [])[1] || (/^[\w.-]+\/[\w.-]+$/.test(v || '') ? v : null);
 function repoOf(s) {
-  if (s.kind === 'avail') return s.repo;
+  if (s.kind === 'avail' || s.kind === 'group') return s.repo;
   if (s.origin?.source) return s.origin.source;
   const ms = s.marketplace_source || {};
   return s.scope === 'plugin' ? ghRepo(ms.url) || ghRepo(ms.repo) : null;
@@ -765,29 +879,13 @@ function avatarUrl(repo) {
   const a = REPOS[repo]?.avatar;
   return a ? a + (a.includes('?') ? '&' : '?') + 's=64' : `https://github.com/${repo.split('/')[0]}.png?size=64`;
 }
+const ghLink = url => `<a class="btn ghost" data-k="repo" href="${esc(url)}" target="_blank" rel="noreferrer">GitHub ↗</a>`;
 const monogram = label => (String(label).replace(/^[^A-Za-z0-9]+/, '')[0] || '?');
 function avatar(label, repo, lg = false) {
   const img = repo ? `<img src="${esc(avatarUrl(repo))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
   const face = label === NO_SOURCE ? ICON.folder : esc(monogram(label));
   return `<span class="ava${lg ? ' lg' : ''}" data-k="ava" data-leaf aria-hidden="true">${face}${img}</span>`;
 }
-function bannerHtml(s, label) {
-  const b = skillBanner(s);
-  const cap = b?.own ? '<span class="cap">From this skill</span>' : '';
-  const img = b ? `<img src="${esc(b.url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
-  // GitHub's card service fails for some repos; the owner's avatar stays underneath.
-  const repo = repoOf(s);
-  const face = repo ? `<img class="ban-ava" src="${esc(avatarUrl(repo).replace(/s(ize)?=64/, 's$1=160'))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
-    : label === NO_SOURCE ? '' : esc(monogram(label));
-  return `<div class="banner" data-k="ban" data-leaf aria-hidden="true">${face}${img}${cap}</div>`;
-}
-function sourceLine(repo) {
-  const m = REPOS[repo];
-  if (!m) return '';
-  const stars = m.stars ? `<span class="star">★ ${m.stars >= 1000 ? (m.stars / 1000).toFixed(m.stars >= 10000 ? 0 : 1) + 'k' : m.stars}</span>` : '';
-  return `<p class="src-line" data-k="srcl" data-leaf>${m.description ? esc(m.description) : `<b>${esc(repo)}</b>`}${stars}</p>`;
-}
-// Ask the server for repos this render showed that it has not described yet.
 async function loadRepos(repos) {
   const want = [...new Set(repos)].filter(r => r && !(r in REPOS) && !repoPending.has(r));
   if (!WRITABLE || !want.length) return;
@@ -843,12 +941,14 @@ const lockName = s => (s.scope === 'personal' && s.origin?.skillFolderHash ? s.d
 const updStatus = s => upd.status[lockName(s)];
 const isOutdated = s => updStatus(s) === 'outdated';
 const jobRunning = () => Boolean(upd.job && !upd.job.done);
+// checked_at may carry a +0200 offset, which Date.parse refuses without the colon.
+const checkedMs = () => (upd.checkedAt ? Date.parse(upd.checkedAt.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : NaN);
 
 // Skills a source repo offers that are not installed. Keys: `a:<repo>:<path>`.
 const availKey = (repo, a) => `a:${repo}:${a.path}`;
 const newIn = repo => (upd.available[repo] || []).filter(a => a.new);
 const newTotal = () => Object.keys(upd.available).reduce((n, r) => n + newIn(r).length, 0);
-const selKey = s => (s ? (s.kind === 'avail' ? s.key : 'r:' + s.path) : null);
+const selKey = s => (s ? (s.kind === 'avail' || s.kind === 'group' ? s.key : 'r:' + s.path) : null);
 function availShown(repo) {
   if (!WRITABLE || !['all', 'new'].includes(ui.view) || (ui.view === 'all' && ui.groupBy !== 'source')) return [];
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -891,6 +991,7 @@ function visible(s) {
   if (!inView(s)) return false;
   if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
+  else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
   return terms.every(t => s._hay.includes(t));
@@ -907,8 +1008,8 @@ function highlight(text) {
 // ---------------------------------------------------------------- keyed patching
 // Nodes with the same data-k survive a render, so transitions, focus, and scroll carry over.
 function morph(from, to) {
-  // `open` belongs to <details> and `style` to runtime motion, so neither is removed here.
-  for (const a of [...from.attributes]) if (!to.hasAttribute(a.name) && a.name !== 'open' && a.name !== 'style') from.removeAttribute(a.name);
+  // `style` carries runtime motion, so it is never removed here.
+  for (const a of [...from.attributes]) if (!to.hasAttribute(a.name) && a.name !== 'style') from.removeAttribute(a.name);
   for (const a of to.attributes) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
   if (to.hasAttribute('data-leaf')) { if (from.innerHTML !== to.innerHTML) from.innerHTML = to.innerHTML; return; }
   patchChildren(from, to);
@@ -991,18 +1092,20 @@ function rowState(s, st) {
   return 'on';
 }
 
-const jobVerbs = () => (upd.job?.kind === 'install' ? ['Installing', 'Installed'] : ['Updating', 'Updated']);
+const VERBS = { install: ['Installing', 'Installed'], update: ['Updating', 'Updated'] };
+const jobVerbs = () => VERBS[upd.job?.kind === 'install' ? 'install' : 'update'];
+
+function jobBadge(js, [ing, ed], leaving = false) {
+  const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
+  const label = js === 'queued' ? 'Queued' : js === 'done' ? ed : REDUCED.matches ? ing + '…' : ing;
+  return `<span class="ustate ${cls}${leaving ? ' is-leaving' : ''}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${label}</span></span>`;
+}
 
 function updateSlot(s, primary = false) {
   const name = lockName(s);
   if (!name || !WRITABLE) return '';
   const js = jobState(name);
-  if (js && js !== 'failed') {
-    const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
-    const [ing, ed] = jobVerbs();
-    const label = js === 'queued' ? 'Queued' : js === 'done' ? ed : REDUCED.matches ? ing + '…' : ing;
-    return `<span class="ustate ${cls}${upd.job.leaving ? ' is-leaving' : ''}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${label}</span></span>`;
-  }
+  if (js && js !== 'failed') return jobBadge(js, jobVerbs(), upd.job.leaving);
   if (js === 'failed') return `<button class="btn danger" data-k="retry" data-update="${esc(name)}" title="${esc(upd.job.items[name].error)}">Retry</button>`;
   if (!isOutdated(s)) return '';
   if (upd.confirm === name) return `<button class="btn warn confirm" data-k="upd" data-update="${esc(name)}" data-confirmed="1">Replace my edits</button>`;
@@ -1022,16 +1125,22 @@ function row(s) {
   const ctl = s.scope === 'personal'
     ? switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)
     : '<span></span>';
-  const hints = s.scope === 'personal' && WRITABLE ? `<span class="kh" aria-hidden="true"><kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}</span>` : '<span></span>';
+  const hints = `<span class="kh" aria-hidden="true">${s.scope === 'personal' && WRITABLE ? `<kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}` : ''}</span>`;
   const cls = ui.restored.has(s.path) ? 'row enter restored' : 'row';
   return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'} aria-current="${ui.selected === s}">
     <button class="open" data-id="${s.id}" data-leaf>${thumbHtml(s, s.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
-    ${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
+    ${useCell(s)}${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
   </div>`;
 }
 
 const collapsed = new Set(JSON.parse(localStorage.getItem('atlas.collapsed') || '[]'));
+const saveCollapsed = () => localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
 const isOpen = id => Boolean(ui.q) || !collapsed.has(id);
+
+// The group name opens its detail; the chevron beside it folds the group.
+function groupTitle(id, label, repo, nameHtml, open) {
+  return `${fold(id, '', `Show or hide ${label}`, open)}<button class="gopen" data-k="go" data-group="${esc(id)}" aria-label="Details for ${esc(label)}">${avatar(label, repo)}<span class="gname" data-leaf>${nameHtml}</span></button>`;
+}
 
 function fold(id, inner, label, open = isOpen(id)) {
   return `<button class="fold" data-k="fold" data-fold="${esc(id)}" aria-expanded="${open}" aria-label="${esc(label)}">${ICON.chev}${inner}</button>`;
@@ -1051,7 +1160,7 @@ function section(id, title, count, body, groupIds = [], extraTools = '') {
 
 function group(id, headInner, body, open = isOpen(id), h = hue(id)) {
   return `<div class="group${open ? '' : ' collapsed'}" data-k="${esc(id)}" style="--h: ${h}">
-    <div class="group-head" data-k="h">${headInner}</div>${open ? body : ''}
+    <div class="group-head" data-k="h" aria-current="${selKey(ui.selected) === 'g:' + id}">${headInner}</div>${open ? body : ''}
   </div>`;
 }
 
@@ -1073,7 +1182,6 @@ function groupMenu(source, all) {
     all.length ? `<button role="menuitem" class="danger${confirm ? ' confirm' : ''}" data-delete-source="${esc(source)}">${confirm ? `Move ${all.length} to Trash` : `Delete ${plural(all.length, 'skill')}…`}</button>` : '',
   ].filter(Boolean);
   if (!items.length) return '';
-  // The destructive item sits last, after a divider.
   if (all.length && items.length > 1) items.splice(items.length - 1, 0, '<hr>');
   return `<span class="menu-wrap" data-k="mw">
     <button class="btn ghost icon" data-k="mb" data-menu="${esc(source)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${esc(source)}">${ICON.dots}</button>
@@ -1112,9 +1220,7 @@ function availRow(repo, a) {
   const js = upd.job?.kind === 'install' ? jobState(a.name) : null;
   let slot = '';
   if (js && js !== 'failed') {
-    const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
-    const label = js === 'queued' ? 'Queued' : js === 'done' ? 'Installed' : REDUCED.matches ? 'Installing…' : 'Installing';
-    slot = `<span class="ustate ${cls}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${label}</span></span>`;
+    slot = jobBadge(js, VERBS.install);
   } else if (a.taken) {
     slot = a.taken === 'moved'
       ? '<span class="ustate" data-k="tk" title="This repo moved the folder of a skill you have. Update or relink it.">installed under an old path</span>'
@@ -1122,11 +1228,11 @@ function availRow(repo, a) {
   } else if (WRITABLE) {
     slot = `<button class="btn ${js === 'failed' ? 'danger' : 'accent'}" data-k="ins" data-install-one="${esc(repo)}" data-path="${esc(a.path)}"${js === 'failed' ? ` title="${esc(upd.job.items[a.name].error)}"` : ''}>${js === 'failed' ? 'Retry' : 'Install'}</button>`;
   }
-  const hints = !a.taken && WRITABLE ? '<span class="kh" aria-hidden="true"><kbd>i</kbd></span>' : '<span></span>';
+  const hints = `<span class="kh" aria-hidden="true">${!a.taken && WRITABLE ? '<kbd>i</kbd>' : ''}</span>`;
   const tag = a.new ? '<span class="tags"><span class="tag update">new</span></span>' : '';
   return `<div class="row avail" data-k="${esc(key)}" data-st="${js === 'done' ? 'done' : RUNNING.has(js) ? 'busy' : a.new ? 'outdated' : 'avail'}" aria-current="${selKey(ui.selected) === key}">
     <button class="open" data-avail="${esc(repo)}" data-path="${esc(a.path)}" data-leaf>${thumbHtml({ kind: 'avail', repo, path: a.path }, a.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(a.name)}</span>${tag}</span><span class="desc">${desc}</span></button>
-    ${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
+    <span class="use" data-k="use"></span>${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
   </div>`;
 }
 
@@ -1184,9 +1290,9 @@ function sourceGroups(personal) {
       ? `<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length && ui.view !== 'new' ? ` · ${list.length} shown` : ''}`
       : 'watching';
     const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
-    const head = `${fold(id, `${avatar(source, local ? null : source)}<span class="gname" data-leaf>${highlight(source)}</span>`, source, ui.view === 'new' || isOpen(id))}
+    const head = `${groupTitle(id, source, local ? null : source, highlight(source), ui.view === 'new' || isOpen(id))}
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
-      <span class="gsub" data-leaf>${meta}</span>
+      <span class="gsub" data-leaf>${meta}</span>${groupSpark(all)}
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
       ${all.length ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
@@ -1203,13 +1309,14 @@ function emptyHtml() {
       <span class="acts"><button class="btn" data-clear>Clear search</button>${hidden && !ui.showProject ? '<button class="btn ghost" data-show-project>Show project skills</button>' : ''}</span></div>`;
   }
   if (ui.view === 'updates' || ui.view === 'new') {
-    const at = upd.checkedAt ? Date.parse(upd.checkedAt.replace(/([+-]\d\d)(\d\d)$/, '$1:$2')) : NaN;
+    const at = checkedMs();
     const ago = Number.isNaN(at) ? null : Math.max(0, Math.round((Date.now() - at) / 60000));
     const when = ago === null ? 'No check has run yet.' : ago ? `Checked ${ago}m ago.` : 'Checked just now.';
     return `<div class="empty" data-k="empty"><h2>${ui.view === 'new' ? 'No new skills' : 'Everything is up to date'}</h2>
       <p>${when}${ui.view === 'new' ? ' Your sources have not added skills since you last looked.' : ''}</p>
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
+  if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
   return '<div class="empty" data-k="empty"><h2>No skills here</h2><p>Turn on Project skills or Old plugin versions to see more.</p></div>';
 }
@@ -1217,8 +1324,10 @@ function emptyHtml() {
 // ---------------------------------------------------------------- render
 function render() {
   const byName = (a, b) => a.name.localeCompare(b.name);
+  const sorter = ui.sort === 'uses' ? (a, b) => uses(b) - uses(a) || byName(a, b)
+    : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b) : byName;
   const inRoot = s => s.scope === 'project' || s.config_roots.includes(ui.root);
-  const shown = SKILLS.filter(visible).sort(byName);
+  const shown = SKILLS.filter(visible).sort(sorter);
   const out = [];
 
   const personal = shown.filter(s => s.scope === 'personal');
@@ -1248,8 +1357,8 @@ function render() {
       const ctl = lv.status === 'stale' ? '' :
         switchHtml(st.on, `Plugin ${lv.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
       const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
-      const head = `${fold('plg:' + ref, `${avatar(lv.plugin, repoOf(lv))}<span class="gname" data-leaf>${highlight(lv.plugin)}</span>`, lv.plugin)}
-        <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span><span class="gctl" data-k="c">${ctl}</span>`;
+      const head = `${groupTitle('plg:' + ref, lv.plugin, repoOf(lv), highlight(lv.plugin), isOpen('plg:' + ref))}
+        <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span>${groupSpark(list)}<span class="gctl" data-k="c">${ctl}</span>`;
       return group('plg:' + ref, head, list.map(row).join(''));
     });
     out.push(section('sec:plugins', 'Plugins', refs.length, groups.join(''), refs.map(([r]) => 'plg:' + r)));
@@ -1259,7 +1368,7 @@ function render() {
   if (project.length) {
     const byProject = groupMap(project, s => s.project).sort(([a], [b]) => a.localeCompare(b));
     const groups = byProject.map(([name, list]) => group('prj:' + name,
-      `${fold('prj:' + name, `${avatar(name, null)}<span class="gname" data-leaf>${esc(name)}</span>`, name)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
+      `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name))}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
       list.map(row).join('')));
     out.push(section('sec:project', 'Project skills', project.length, groups.join(''), byProject.map(([n]) => 'prj:' + n)));
   }
@@ -1275,7 +1384,9 @@ function renderChrome() {
   const on = lv.filter(s => state(s).on).length;
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
-  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh };
+  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  el('viewUnused').classList.toggle('wait', !USE.ready);
+  el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
   el('viewUpdates').hidden = !WRITABLE;
   el('viewNew').hidden = !WRITABLE || (!fresh && ui.view !== 'new');
@@ -1326,29 +1437,46 @@ function resetBar() {
 
 function field(label, value, mono) {
   if (value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)) return '';
-  return `<dt>${esc(label)}</dt><dd${mono ? ' class="mono"' : ''}>${esc(Array.isArray(value) ? value.join(', ') : value)}</dd>`;
+  const text = esc(Array.isArray(value) ? value.join(', ') : value);
+  return `<dt>${esc(label)}</dt><dd${mono ? ' class="mono"' : ''}>${mono ? text.replace(/\//g, '/<wbr>') : text}</dd>`;
 }
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
+
+const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
 
 function inventoryHtml() {
   const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
   const personal = lv.filter(s => s.scope === 'personal');
-  const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
-  return `<div class="inv" data-k="inv" data-leaf>
-    <h3>Inventory</h3>
-    <div class="stats">
+  return `<div class="inv" data-k="inv">
+    <h3 data-leaf>Inventory</h3>
+    <div class="stats" data-k="st" data-leaf>
       ${stat(lv.filter(s => state(s).on).length, 'on', 'on')}${stat(lv.filter(s => !state(s).on).length, 'off')}
       ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates', WRITABLE ? 'accent' : '')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
-    <div class="d-sec"><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
+    ${inventoryUsageHtml(lv)}
+    <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
 }
+
+const groupKeyOf = s => (s.kind === 'avail' ? 'src:' + s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : 'src:' + sourceOf(s));
+
+function crumbHtml(s) {
+  const label = groupLabel(s), repo = repoOf(s);
+  const stars = REPOS[repo]?.stars ? `<span class="star">★ ${short(REPOS[repo].stars)}</span>` : '';
+  return `<button class="crumb" data-k="crumb" data-group="${esc(groupKeyOf(s))}" data-leaf title="Show this collection">${avatar(label, repo)}<span class="crumb-t">${esc(label)}</span>${stars}${ICON.chevR}</button>`;
+}
+function ownBannerHtml(s) {
+  const b = skillBanner(s);
+  return b?.own ? `<div class="banner" data-k="ban" data-leaf aria-hidden="true"><img src="${esc(b.url)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></div>` : '';
+}
+const closeBtn = '<button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">' + ICON.close + '</button>';
+const metaHtml = parts => `<p class="d-meta" data-k="meta" data-leaf>${parts.filter(Boolean).join('<span aria-hidden="true">·</span>')}</p>`;
 
 function availDetailHtml(s) {
   const a = (upd.available[s.repo] || []).find(x => x.path === s.path) || s.a;
@@ -1357,8 +1485,7 @@ function availDetailHtml(s) {
   const js = upd.job?.kind === 'install' ? jobState(a.name) : null;
   let action;
   if (js && js !== 'failed') {
-    const cls = js === 'queued' ? 'is-queued' : js === 'done' ? 'is-done' : 'is-busy';
-    action = `<span class="ustate ${cls}" data-k="st"><span class="uicon"><i class="spin"></i>${ICON.tick}</span><span>${js === 'queued' ? 'Queued' : js === 'done' ? 'Installed' : 'Installing'}</span></span>`;
+    action = jobBadge(js, VERBS.install);
   } else if (!a.taken && WRITABLE) {
     action = `<button class="btn primary" data-k="ins" data-install-one="${esc(s.repo)}" data-path="${esc(s.path)}">${js === 'failed' ? 'Retry' : 'Install'}</button>`;
   } else action = '';
@@ -1366,33 +1493,27 @@ function availDetailHtml(s) {
     : a.taken ? `A skill named ${esc(a.name)} is already installed, so this one cannot go in next to it.`
     : `Installs into ~/.agents/skills/${esc(a.name)} and tracks ${esc(s.repo)} for updates.`;
   const gh = `https://github.com/${s.repo}/tree/HEAD/${s.path.replace(/\/?SKILL\.md$/, '')}`;
-  return `${bannerHtml(s, s.repo)}${sourceLine(s.repo)}
-    <div class="d-top" data-k="top">
-      <h2 class="d-title" data-leaf><span class="slash">/</span>${esc(a.name)}</h2>
-      <button class="btn ghost icon" data-k="vw" data-view aria-label="Read the whole SKILL.md" title="Read the whole SKILL.md (v)">${ICON.expand}</button>
-      <button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">${ICON.close}</button>
-    </div>
-    <p class="d-sub" data-k="sub" data-leaf>${esc(s.repo)} · ${a.new ? 'new, ' : ''}not installed</p>
+  return `${ownBannerHtml(s)}${crumbHtml(s)}
+    <div class="d-top" data-k="top"><h2 class="d-title" data-leaf><span class="slash">/</span>${esc(a.name)}</h2>${closeBtn}</div>
+    ${metaHtml([a.new ? '<span class="tag update">new</span>' : '', 'Not installed'])}
     <p class="d-desc" data-k="desc" data-leaf>${info ? esc(info.description || 'No description') : upd.descs[s.repo]?.error ? 'Description unavailable.' : '<span class="skel"></span>'}</p>
+    <div class="d-acts" data-k="acts"><button class="btn" data-k="vw" data-view>Read SKILL.md <kbd>v</kbd></button>
+      ${ghLink(gh)}</div>
     <div class="d-sec" data-k="cards"><div class="card ${a.taken ? '' : 'accent'}" data-k="c-ins"><div data-leaf><strong>${a.taken ? 'Cannot install' : 'Available'}</strong>${why}</div>
       <span class="uslot" data-k="u">${action}</span></div></div>
-    <div class="d-sec" data-k="facts"><dl data-leaf>
-      ${field('Source', s.repo, true)}
-      ${field('Path', s.path, true)}
-    </dl></div>
-    <div class="d-sec" data-k="pv"><button class="btn" data-k="vwb" data-view>Read SKILL.md <kbd>v</kbd></button></div>
-    <div class="d-sec danger-zone" data-k="dz"><a class="btn ghost" data-k="repo" href="${esc(gh)}" target="_blank" rel="noreferrer">Open on GitHub ↗</a></div>`;
+    <div class="d-sec" data-k="facts"><dl data-leaf>${field('Source', s.repo, true)}${field('Path', s.path, true)}</dl></div>`;
 }
 
 function detailHtml(s) {
   if (s.kind === 'avail') return availDetailHtml(s);
+  if (s.kind === 'group') return groupDetailHtml(s);
   const st = state(s);
   const o = s.origin || {};
   const ms = s.marketplace_source || {};
   const cards = [];
+  let ctl = '';
   if (s.scope === 'personal') {
-    cards.push(`<div class="card" data-k="c-sw">${switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)}
-      <div data-k="t" data-leaf><strong>${st.on ? 'On' : 'Off'}</strong><code>skillOverrides.${esc(s.name)}${st.mode === 'on' ? '' : ` = "${esc(st.mode)}"`}</code></div></div>`);
+    ctl = switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`);
     const name = lockName(s);
     if (!name && WRITABLE) {
       cards.push(`<div class="card" data-k="c-link"><div><strong>Not linked to a repo</strong>Link it to get update checks.
@@ -1402,52 +1523,156 @@ function detailHtml(s) {
         ${s.local_edits ? '<p class="note warn">You changed this skill after install. Updating replaces your changes.</p>' : ''}</div>
         <span class="uslot" data-k="u">${updateSlot(s, true)}</span></div>`);
     } else if (s.local_edits) {
-      cards.push('<p class="note warn" data-k="c-ed">You changed this skill after install.</p>');
+      cards.push('<p class="note warn" data-k="c-ed">You changed this skill after install. An update would replace your changes.</p>');
     }
   } else if (s.scope === 'plugin' && s.status !== 'stale') {
-    const n = SKILLS.filter(x => x.plugin_ref === s.plugin_ref && x.status !== 'stale').length;
-    cards.push(`<div class="card" data-k="c-sw">${switchHtml(st.on, `Plugin ${s.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(st.key)}"`)}
-      <div data-k="t" data-leaf><strong>Plugin ${st.on ? 'on' : 'off'}</strong>Turns all ${plural(n, 'skill')} in ${esc(s.plugin)} on or off together.</div></div>`);
+    ctl = switchHtml(st.on, `Plugin ${s.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(st.key)}"`);
   } else if (s.status === 'stale') {
     cards.push('<div class="card" data-k="c-st"><div><strong>Old version</strong>Claude Code no longer loads this copy.</div></div>');
   } else {
     cards.push(`<div class="card" data-k="c-pr"><div><strong>Project skill</strong>Loads only when you work inside ${esc(s.project)}.</div></div>`);
   }
   const src = ms.url || ms.repo || o.sourceUrl || o.source;
-  const srcShort = o.source || String(src || '').replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '');
   const long = (s.description || '').length > 420;
   const confirm = ui.confirm === 'skill:' + s.dir_name;
-  const sub = s.scope === 'plugin' ? s.plugin_ref : s.scope === 'project' ? `${s.project} · project` : sourceOf(s);
-  const label = groupLabel(s);
-  return `${s.scope === 'project' ? '' : bannerHtml(s, label)}${repoOf(s) ? sourceLine(repoOf(s)) : ''}
-    <div class="d-top" data-k="top">
-      <h2 class="d-title" data-leaf><span class="slash">/</span>${esc(s.invoke)}</h2>
-      <button class="btn ghost icon" data-k="vw" data-view aria-label="Read the whole SKILL.md" title="Read the whole SKILL.md (v)">${ICON.expand}</button>
-      <button class="btn ghost icon" data-k="cp" data-copy="/${esc(s.invoke)}" aria-label="Copy /${esc(s.invoke)}" title="Copy">${ICON.copy}</button>
-      <button class="btn ghost icon d-close" data-k="x" data-close aria-label="Close details">${ICON.close}</button>
-    </div>
-    <p class="d-sub" data-k="sub" data-leaf>${esc(sub)}${s._dupes.length ? ` · same as ${esc(s._dupes.join(', '))}` : ''}</p>
+  const pluginCount = s.scope === 'plugin' ? SKILLS.filter(x => x.plugin_ref === s.plugin_ref && x.status !== 'stale').length : 0;
+  const meta = [
+    s.manual_only ? '<span class="tag manual">you only</span>' : 'You or Claude',
+    s.local_edits ? '<span class="tag edited">edited</span>' : '',
+    isOutdated(s) ? '<span class="tag update">update</span>' : '',
+    s.scope === 'plugin' && s.status !== 'stale' ? `The switch turns all ${plural(pluginCount, 'skill')} in ${esc(s.plugin)} on or off` : '',
+    s._dupes.length ? `Same as ${esc(s._dupes.join(', '))}` : '',
+  ];
+  const gh = src && /^https?:/.test(src) ? String(src).replace(/\.git$/, '') : '';
+  const setting = s.scope === 'personal' ? `skillOverrides.${s.name}${st.mode === 'on' ? '' : ` = "${st.mode}"`}` : s.scope === 'plugin' ? `enabledPlugins["${s.plugin_ref}"]` : '';
+  return `${ownBannerHtml(s)}${crumbHtml(s)}
+    <div class="d-top" data-k="top"><h2 class="d-title" data-leaf><span class="slash">/</span>${esc(s.invoke)}</h2>${ctl}${closeBtn}</div>
+    ${metaHtml(meta)}
     <p class="d-desc${long && !ui.descOpen ? ' clamp' : ''}" data-k="desc" data-leaf>${esc(s.description || 'No description')}</p>
     ${long ? `<button class="linkbtn d-more" data-k="more" data-more aria-expanded="${ui.descOpen}">${ui.descOpen ? 'Show less' : 'Show more'}</button>` : ''}
-    <div class="d-sec" data-k="cards">${cards.join('')}</div>
+    <div class="d-acts" data-k="acts">
+      <button class="btn" data-k="vw" data-view>Read SKILL.md <kbd>v</kbd></button>
+      <button class="btn ghost icon" data-k="cp" data-copy="/${esc(s.invoke)}" aria-label="Copy /${esc(s.invoke)}" title="Copy /${esc(s.invoke)}">${ICON.copy}</button>
+      ${gh ? ghLink(gh) : ''}
+      ${WRITABLE ? `<button class="btn ghost" data-k="rv" data-reveal="${esc(s.path)}">Reveal</button>` : ''}
+    </div>
+    ${cards.length ? `<div class="d-sec" data-k="cards">${cards.join('')}</div>` : ''}
+    ${usageHtml(s)}
     <div class="d-sec" data-k="facts"><dl data-leaf>
-      ${field('Who calls it', s.manual_only ? 'Only you, by name' : 'You or Claude')}
-      ${field('Source', srcShort, true)}
       ${field('Version', s.plugin_version || s.version, true)}
       ${field('Updated', (s.last_updated || o.updatedAt || s.modified || '').slice(0, 10))}
       ${field('Tools', s.allowed_tools, true)}
       ${field('Arguments', s.argument_hint, true)}
       ${field('Size', `${s.words.toLocaleString()} words · ${plural(s.file_count, 'file')}`)}
+      ${field('Setting', setting, true)}
       ${field('Path', tilde(s.path), true)}
     </dl></div>
-    <div class="d-sec" data-k="pv"><button class="btn" data-k="vwb" data-view>Read SKILL.md <kbd>v</kbd></button></div>
-    <div class="d-sec danger-zone" data-k="dz">
-      ${src && /^https?:/.test(src) ? `<a class="btn ghost" data-k="repo" href="${esc(String(src).replace(/\.git$/, ''))}" target="_blank" rel="noreferrer">Open repo ↗</a>` : ''}
-      ${WRITABLE ? `<button class="btn ghost" data-k="rv" data-reveal="${esc(s.path)}">Reveal in Finder</button>` : ''}
-      ${WRITABLE && s.scope === 'personal' ? `<button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete="${esc(s.dir_name)}">${confirm ? 'Move to Trash' : 'Delete…'}</button>
-      <p class="note" data-k="dn">Delete moves the folder to the Trash and removes its lock entry. You can undo it.</p>` : ''}
-    </div>`;
+    ${WRITABLE && s.scope === 'personal' ? `<div class="d-sec danger-zone" data-k="dz">
+      <button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete="${esc(s.dir_name)}">${confirm ? 'Move to Trash' : 'Delete…'}</button>
+      <p class="note" data-k="dn">Moves the folder to the Trash and removes its lock entry. You can undo it.</p></div>` : ''}`;
 }
+
+// ---------------------------------------------------------------- collection detail
+function groupFor(id) {
+  const [type, key] = [id.slice(0, 3), id.slice(4)];
+  if (type === 'plg') {
+    const lv = SKILLS.find(x => x.plugin_ref === key && x.status !== 'stale') || SKILLS.find(x => x.plugin_ref === key);
+    return { kind: 'group', type, id, key: 'g:' + id, ref: key, label: lv?.plugin || key, repo: lv ? repoOf(lv) : null, hueKey: id };
+  }
+  if (type === 'prj') return { kind: 'group', type, id, key: 'g:' + id, project: key, label: key, repo: null, hueKey: id };
+  return { kind: 'group', type: 'src', id, key: 'g:' + id, source: key, label: key, repo: isLocalGroup(key) ? null : key, hueKey: key };
+}
+function membersOf(g) {
+  if (g.type === 'plg') return SKILLS.filter(x => x.plugin_ref === g.ref && x.status !== 'stale' && x.config_roots.includes(ui.root));
+  if (g.type === 'prj') return SKILLS.filter(x => x.scope === 'project' && x.project === g.project);
+  return SKILLS.filter(s => live(s) && sourceOf(s) === g.source);
+}
+function sumDays(list) {
+  const days = {};
+  for (const s of list) for (const [d, k] of Object.entries(USE.by.get(s)?.days || {})) days[d] = (days[d] || 0) + k;
+  return days;
+}
+const useSec = body => `<div class="d-sec uses" data-k="use"><h3 data-leaf>Usage</h3>${body}</div>`;
+const useStats = (count, last, activeDays, play) => `<div class="use-stats${play ? ' play' : ''}" data-k="us" data-leaf>
+    <div><b data-count="${count}">${count.toLocaleString()}</b><span>uses</span></div>
+    <div><b>${ago(last)}</b><span>last used</span></div>
+    <div><b>${activeDays}</b><span>active days</span></div>
+  </div>`;
+const topHtml = list => `<div class="top" data-k="top" data-leaf>${list.filter(uses).sort((a, b) => uses(b) - uses(a)).slice(0, 5)
+  .map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${uses(s).toLocaleString()}</span></button>`).join('')}</div>`;
+
+function groupUsageHtml(list, key) {
+  if (!WRITABLE) return '';
+  if (!USE.ready) return useSec(waitHtml());
+  const total = list.reduce((n, s) => n + uses(s), 0);
+  if (!total) return useSec('<p class="use-note" data-k="un" data-leaf>No recorded uses for these skills yet.</p>');
+  const days = sumDays(list);
+  return useSec(`${useStats(total, Math.max(...list.map(lastUsed)), Object.keys(days).length, playing(key))}
+    ${heatmap(days, key)}
+    ${topHtml(list)}`);
+}
+
+function groupDetailHtml(g) {
+  const list = membersOf(g);
+  const m = g.repo ? REPOS[g.repo] : null;
+  const on = list.filter(s => state(s).on).length;
+  let ctl = '', meta = [], desc = '', acts = [], facts = '', danger = '';
+  if (g.type === 'src') {
+    const local = isLocalGroup(g.source);
+    const checked = on === list.length ? 'true' : on === 0 ? 'false' : 'mixed';
+    const avail = (upd.available[g.source] || []).filter(a => !a.taken);
+    const fresh = avail.filter(a => a.new);
+    const watching = upd.watched.includes(g.source);
+    if (list.length) ctl = switchHtml(checked, `All ${list.length} skills from ${g.source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(g.source)}"`);
+    meta = [`${on} of ${list.length} on`, avail.length ? `${avail.length} available` : '', m?.stars ? `★ ${short(m.stars)}` : '', watching ? 'Watching' : ''];
+    desc = m?.description || (g.source === NO_SOURCE ? 'Skills with no upstream repo. Link one to get update checks.'
+      : local ? `Skills that share the ${esc(g.source.replace(/\*$/, ''))} name prefix. They have no linked repo yet.` : '');
+    acts = [
+      groupUpdateButton(list, `data-update-source="${esc(g.source)}"`, { cls: 'btn primary' }),
+      WRITABLE && fresh.length ? `<button class="btn accent" data-k="ia" data-install="${esc(g.source)}" data-which="new">Install <span class="tnum">${fresh.length}</span> new</button>` : '',
+      g.repo ? ghLink(`https://github.com/${g.repo}`) : '',
+      WRITABLE && local ? `<button class="btn ghost" data-k="ln" data-show-link="${esc(g.source)}">Link to GitHub…</button>` : '',
+      WRITABLE && watching ? `<button class="btn ghost" data-k="uw" data-unwatch="${esc(g.source)}">Stop watching</button>` : '',
+    ];
+    facts = `${field('Kind', local ? (g.source === NO_SOURCE ? 'Local skills' : 'Name prefix') : 'GitHub repo')}${field('Repo', g.repo, true)}
+      ${field('Checked', g.repo && upd.checkedAt ? ago(checkedMs()) : '')}
+      ${field('Folder', list[0] ? tilde(list[0].dir.replace(/\/[^/]+$/, '')) : '', true)}`;
+    const confirm = ui.confirm === 'group:' + g.source;
+    if (WRITABLE && list.length) danger = `<div class="d-sec danger-zone" data-k="dz">
+      <button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete-source="${esc(g.source)}">${confirm ? `Move ${list.length} to Trash` : `Delete ${plural(list.length, 'skill')}…`}</button>
+      <p class="note" data-k="dn">Moves every folder in this collection to the Trash. You can undo it.</p></div>`;
+  } else if (g.type === 'plg') {
+    const lv = list[0];
+    const st = lv ? state(lv) : { on: false };
+    if (lv) ctl = switchHtml(st.on, `Plugin ${g.label}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(g.ref)}"`);
+    const version = lv?.plugin_version && lv.plugin_version !== 'unknown' ? 'v' + lv.plugin_version : '';
+    meta = ['Plugin', lv?.marketplace, version, plural(list.length, 'skill')];
+    desc = m?.description ? `From ${esc(lv?.marketplace)}: ${esc(m.description)}` : 'A plugin turns on or off as one unit.';
+    acts = [g.repo ? ghLink(`https://github.com/${g.repo}`) : ''];
+    facts = `${field('Marketplace', lv?.marketplace, true)}${field('Version', version.slice(1), true)}${field('Installed', (lv?.installed_at || '').slice(0, 10))}
+      ${field('Updated', (lv?.last_updated || '').slice(0, 10))}${field('Setting', `enabledPlugins["${g.ref}"]`, true)}`;
+  } else {
+    meta = ['Project', plural(list.length, 'skill')];
+    desc = `These skills load only when you work inside ${esc(g.project)}.`;
+    facts = field('Folder', list[0] ? tilde(list[0].project_path) : '', true);
+  }
+  return `${g.type === 'prj' ? '' : `<div class="banner${g.repo ? '' : ' short'}" data-k="ban" data-leaf aria-hidden="true">${g.repo
+      ? `<img class="ban-ava" src="${esc(avatarUrl(g.repo).replace(/s(ize)?=64/, 's$1=160'))}" alt="" loading="lazy" decoding="async" onerror="this.remove()"><img src="${esc(repoBanner(g.repo))}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+      : g.source === NO_SOURCE ? '' : esc(monogram(g.label))}</div>`}
+    <div class="d-top" data-k="top"><h2 class="d-title" data-leaf>${esc(g.label)}</h2>${ctl}${closeBtn}</div>
+    ${metaHtml(meta.map(x => (x ? esc(x) : '')))}
+    ${desc ? `<p class="d-desc" data-k="desc" data-leaf>${desc}</p>` : ''}
+    ${acts.some(Boolean) ? `<div class="d-acts" data-k="acts">${acts.join('')}</div>` : ''}
+    <div class="d-sec" data-k="gst"><div class="stats" data-leaf>
+      ${stat(on, 'on', 'on')}${stat(list.length - on, 'off')}${stat(list.filter(isOutdated).length, 'updates', 'accent')}
+      ${stat(list.filter(s => s.local_edits).length, 'edited', 'warn')}${stat(list.filter(s => s.manual_only).length, 'you only')}${stat(USE.ready ? list.filter(isUnused).length : '–', 'unused')}
+    </div></div>
+    ${groupUsageHtml(list, g.key)}
+    ${facts.trim() ? `<div class="d-sec" data-k="facts"><dl data-leaf>${facts}</dl></div>` : ''}
+    ${danger}`;
+}
+
+function selectGroup(id) { select(groupFor(id)); }
 
 let detailFor;
 function renderDetail() {
@@ -1455,7 +1680,8 @@ function renderDetail() {
   const s = ui.selected;
   const key = selKey(s);
   const html = s ? detailHtml(s) : inventoryHtml();
-  if (key !== detailFor) {
+  const fresh = key !== detailFor;
+  if (fresh) {
     d.innerHTML = html; d.scrollTop = 0; detailFor = key;
   } else {
     patch(d, html);
@@ -1463,6 +1689,7 @@ function renderDetail() {
   if (s) d.setAttribute('data-open', ''); else d.removeAttribute('data-open');
   d.style.setProperty('--h', s ? hue(groupId(s)) : 250);
   if (s) loadRepos([repoOf(s)]);
+  if (fresh) for (const n of d.querySelectorAll('.play [data-count]')) countUp(n);
   for (const repo of needDescs) loadDescs(repo);
 }
 
@@ -1676,7 +1903,7 @@ async function openViewer(s) {
   Object.assign(viewer, { s, text: '', note: '', loading: true });
   renderViewer();
   if (!dlg.open) dlg.showModal();
-  dlg.querySelector('.v-scroll')?.focus({ preventScroll: true });
+  dlg.querySelector('.v-scroll').focus({ preventScroll: true });
   try {
     if (s.kind === 'avail') {
       const res = await fetch(RAW(s.repo, s.path));
@@ -1736,11 +1963,18 @@ function renderViewer() {
   dlg.setAttribute('aria-labelledby', 'vTitle');
 }
 
+async function copyFrom(btn, text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (err) { return toast(`Could not copy: ${esc(err.message)}`); }
+  btn.innerHTML = ICON.check; btn.style.color = 'var(--on)';
+  setTimeout(() => { btn.innerHTML = ICON.copy; btn.style.color = ''; }, 1500);
+}
+
 function setRaw(on) {
   viewer.raw = on;
   localStorage.setItem('atlas.raw', on ? '1' : '0');
   renderViewer();
-  el('viewer').querySelector('.v-scroll')?.focus({ preventScroll: true });
+  el('viewer').querySelector('.v-scroll').focus({ preventScroll: true });
 }
 
 el('viewer').addEventListener('close', () => { viewer.s = null; viewer.back?.focus?.({ preventScroll: true }); });
@@ -1757,11 +1991,7 @@ el('viewer').addEventListener('click', async e => {
     return;
   }
   const cp = t.closest('[data-copy-raw]');
-  if (cp) {
-    await navigator.clipboard.writeText(viewer.text).catch(() => {});
-    cp.innerHTML = ICON.check; cp.style.color = 'var(--on)';
-    setTimeout(() => { cp.innerHTML = ICON.copy; cp.style.color = ''; }, 1500);
-  }
+  if (cp) copyFrom(cp, viewer.text);
 });
 
 // ---------------------------------------------------------------- theme
@@ -1782,6 +2012,191 @@ el('theme').addEventListener('click', e => {
   themePick = b.dataset.t; localStorage.setItem('atlas.theme', themePick); applyTheme();
 });
 SYSTEM_LIGHT.addEventListener('change', () => { if (themePick === 'system') applyTheme(); });
+
+// ---------------------------------------------------------------- usage
+const USE = { raw: null, ready: false, status: null, progress: [0, 0], by: new Map(), played: new Map() };
+// True while a key's first reveal runs, so a re-render in that window does not cut it short.
+function playing(key) {
+  if (REDUCED.matches) return false;
+  if (!USE.played.has(key)) USE.played.set(key, performance.now() + 700);
+  return performance.now() < USE.played.get(key);
+}
+const DAY = 864e5;
+const WEEKS = 26;
+const UNUSED_DAYS = 90;
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const useKeys = s => [s.invoke, s.name, s.dir_name, s.plugin && `${s.plugin}:${s.name}`].filter(Boolean);
+
+// Usage is keyed by the name a skill was called by; map each name to one installed skill.
+function indexUsage(d) {
+  USE.raw = d;
+  const recs = SKILLS.filter(s => s.status !== 'stale');
+  const exact = new Map();
+  for (const s of recs) for (const k of useKeys(s)) if (!exact.has(k)) exact.set(k, s);
+  const by = new Map();
+  for (const n of new Set([...Object.keys(d.counters || {}), ...Object.keys(d.skills || {})])) {
+    let s = exact.get(n);
+    // A skill that was renamed with a prefix: design-foundations became emil-design-foundations.
+    if (!s) { const m = recs.filter(r => r.name.endsWith('-' + n)); if (m.length === 1) s = m[0]; }
+    if (!s) continue;
+    if (!by.has(s)) by.set(s, { counted: 0, seen: 0, days: {}, projects: {}, last: 0 });
+    const u = by.get(s), c = d.counters?.[n], t = d.skills?.[n];
+    if (c) { u.counted += c.count; u.last = Math.max(u.last, Date.parse(c.last) || 0); }
+    if (t) {
+      for (const [day, k] of Object.entries(t.days)) { u.days[day] = (u.days[day] || 0) + k; u.seen += k; }
+      for (const [pr, k] of Object.entries(t.projects)) u.projects[pr] = (u.projects[pr] || 0) + k;
+      u.last = Math.max(u.last, Date.parse(t.last) || 0);
+    }
+  }
+  // Claude Code's counter keeps the full history; old transcripts get cleaned up. Trust the larger.
+  for (const u of by.values()) u.count = Math.max(u.counted, u.seen);
+  USE.by = by;
+}
+const uses = s => USE.by.get(s)?.count || 0;
+const lastUsed = s => USE.by.get(s)?.last || 0;
+const isUnused = s => USE.ready && s.scope !== 'project' && s.status !== 'stale' && Date.now() - lastUsed(s) > UNUSED_DAYS * DAY;
+const short = n => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
+function ago(ms) {
+  const days = Math.floor((midnight() - new Date(ms).setHours(0, 0, 0, 0)) / DAY);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
+
+// Weekly totals ending today, oldest first.
+function weekly(days, n) {
+  const out = Array(n).fill(0);
+  const today = midnight();
+  for (const [day, k] of Object.entries(days)) {
+    const back = Math.round((today - new Date(day + 'T00:00')) / DAY);
+    const w = n - 1 - Math.floor(back / 7);
+    if (w >= 0 && w < n) out[w] += k;
+  }
+  return out;
+}
+function spark(values, cls = 'spark') {
+  const max = Math.max(...values, 1);
+  return `<span class="${cls}" aria-hidden="true">${values.map(v => `<i style="--v:${(v / max).toFixed(2)}"></i>`).join('')}</span>`;
+}
+
+function useCell(s) {
+  if (!USE.ready || s.status === 'stale') return '<span class="use" data-k="use"></span>';
+  const u = USE.by.get(s);
+  if (!u?.count) return '<span class="use" data-k="use"></span>';
+  return `<span class="use" data-k="use" data-leaf title="${plural(u.count, 'use')} · last ${ago(u.last)}">${spark(weekly(u.days, 12))}<span>${short(u.count)}</span></span>`;
+}
+function groupSpark(list) {
+  if (!USE.ready) return '';
+  const w = weekly(sumDays(list), 12);
+  return w.some(Boolean) ? `<span class="gspark" data-k="gs" data-leaf title="Uses per week, last 12 weeks">${spark(w)}</span>` : '';
+}
+
+const fmtDay = day => new Date(day + 'T00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+// A 26-week calendar. Each key plays its reveal once; later renders paint it still.
+function heatmap(days, key) {
+  const today = midnight();
+  const start = new Date(today);
+  start.setDate(start.getDate() - start.getDay() - (WEEKS - 1) * 7);
+  const cells = [];
+  let max = 0, total = 0, active = 0;
+  for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const day = isoDay(d), n = days[day] || 0;
+    cells.push([day, n, d.getMonth(), d.getDate()]);
+    max = Math.max(max, n); total += n; if (n) active++;
+  }
+  const lvl = n => (n ? Math.max(1, Math.min(4, Math.ceil(4 * Math.log1p(n) / Math.log1p(max)))) : 0);
+  const play = playing(key);
+  const months = [];
+  const grid = cells.map(([day, n, m, date], i) => {
+    const w = Math.floor(i / 7), dow = i % 7;
+    if (date <= 7 && dow === 0 && w > 0) months.push(`<span style="grid-column:${w + 1}">${new Date(day + 'T00:00').toLocaleDateString(undefined, { month: 'short' })}</span>`);
+    const title = `${fmtDay(day)} · ${n ? plural(n, 'use') : 'no uses'}`;
+    return `<i data-l="${lvl(n)}" data-t="${esc(title)}" style="grid-area:${dow + 1}/${w + 1};--d:${(w + dow) * 9}ms"${day === isoDay(today) ? ' data-today' : ''}></i>`;
+  }).join('');
+  const summary = `${plural(total, 'use')} on ${plural(active, 'day')} in saved sessions`;
+  return `<div class="heat${play ? ' play' : ''}" data-k="heat:${esc(key)}" data-leaf>
+    <div class="heat-months" aria-hidden="true">${months.join('')}</div>
+    <div class="heat-grid" role="img" aria-label="${esc(summary)}">${grid}</div>
+    <div class="heat-foot"><span class="heat-read" data-default="${esc(summary)}">${esc(summary)}</span>
+      <span class="heat-scale" aria-hidden="true"><span>Less</span><i data-l="0"></i><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i><span>More</span></span></div>
+  </div>`;
+}
+
+function waitHtml() {
+  if (USE.status === 'error') return '<p class="use-note" data-k="uw">This server cannot read usage. Restart ./atlas to load the new version.</p>';
+  if (USE.error) return `<p class="use-note" data-k="uw">Could not read usage: ${esc(USE.error)}</p>`;
+  const [done, all] = USE.progress;
+  return `<div class="use-wait" data-k="uw"><span>Reading your Claude Code sessions… <span class="tnum">${done.toLocaleString()} of ${all.toLocaleString()}</span></span>
+    <span class="track"><i style="transform:scaleX(${all ? (done / all).toFixed(3) : 0})"></i></span></div>`;
+}
+
+function usageHtml(s) {
+  if (!WRITABLE || s.kind === 'avail' || s.scope === 'project' || s.status === 'stale') return '';
+  const u = USE.by.get(s);
+  const key = selKey(s);
+  let body;
+  if (!USE.ready && !u) body = waitHtml();
+  else if (!u?.count) {
+    body = `<p class="use-note" data-k="un" data-leaf>No recorded uses yet.${s.scope === 'personal' && state(s).on ? ' Every skill that is on costs a little context in each session, so turn off the ones you never use.' : ''}</p>`;
+  } else {
+    const play = playing(key);
+    const top = Object.entries(u.projects).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const most = top[0]?.[1] || 1;
+    body = `${useStats(u.count, u.last, Object.keys(u.days).length, play)}
+      ${USE.ready ? heatmap(u.days, key) : waitHtml()}
+      ${USE.ready && u.counted > u.seen ? `<p class="use-note" data-k="uc" data-leaf>Claude Code counted ${plural(u.counted, 'use')} in all. Old sessions get deleted, so the calendar shows fewer.</p>` : ''}
+      ${top.length ? `<div class="proj${play ? ' play' : ''}" data-k="pj" data-leaf>${top.map(([name, n], i) => `<span>${esc(name)}</span><span class="tnum">${n}</span><span class="bar"><i style="--v:${(n / most).toFixed(3)};--i:${i}"></i></span>`).join('')}</div>` : ''}`;
+  }
+  return useSec(body);
+}
+
+function inventoryUsageHtml(lv) {
+  if (!WRITABLE) return '';
+  if (!USE.ready) return `<div class="d-sec uses" data-k="iu"><h3 class="sub" data-leaf>Usage</h3>${waitHtml()}</div>`;
+  const unused = lv.filter(isUnused).length;
+  return `<div class="d-sec uses" data-k="iu" style="--h: 240">
+    <h3 class="sub" data-leaf>Usage</h3>
+    ${heatmap(sumDays(lv), 'all')}
+    ${topHtml(lv)}
+    ${unused ? `<p class="use-note" data-k="uu" data-leaf>${plural(unused, 'skill')} not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-unused>Show them</button></p>` : ''}
+  </div>`;
+}
+
+// Counts up from zero with the reveal, so the number lands with the heatmap.
+function countUp(node) {
+  const end = +node.dataset.count;
+  node.style.minWidth = node.getBoundingClientRect().width + 'px';
+  const t0 = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - t0) / 500);
+    node.textContent = Math.round(end * (1 - (1 - k) ** 3)).toLocaleString();
+    if (k < 1 && node.isConnected) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function loadUsage() {
+  try {
+    const d = await api('/api/usage');
+    USE.status = d.status; USE.progress = d.progress; USE.error = d.error || null;
+    indexUsage(d);
+    USE.ready = d.status === 'ready';
+  } catch { USE.status = 'error'; }
+  rerender();
+  if (USE.status === 'indexing') setTimeout(loadUsage, 1200);
+}
+
+document.addEventListener('pointerover', e => {
+  const c = e.target.closest?.('.heat-grid i');
+  if (c) c.closest('.heat').querySelector('.heat-read').textContent = c.dataset.t;
+});
+document.addEventListener('pointerout', e => {
+  const g = e.target.closest?.('.heat-grid');
+  if (g && !g.contains(e.relatedTarget)) { const r = g.closest('.heat').querySelector('.heat-read'); r.textContent = r.dataset.default; }
+});
 
 // ---------------------------------------------------------------- toast
 let toastTimer, toastGone, toastUndo = null;
@@ -1814,12 +2229,24 @@ function runUndo() {
 }
 
 // ---------------------------------------------------------------- server calls
+// Says when this page and the server no longer match: the code changed, or the server restarted.
+function staleBand(kind) {
+  const b = el('stale');
+  b.innerHTML = kind === 'restarted'
+    ? 'The server restarted, so this page is out of date. <button class="linkbtn" data-reload>Reload the page</button>'
+    : 'Skill Atlas changed on disk. Stop <code>./atlas</code> (Ctrl-C) and start it again.';
+  b.hidden = false;
+}
+
 async function api(path, body) {
   const res = await fetch(path, body === undefined
     ? { headers: { 'X-Atlas-Token': DATA.api_token } }
     : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Atlas-Token': DATA.api_token }, body: JSON.stringify(body) });
+  const build = res.headers.get('X-Atlas-Build');
+  if (build && DATA.server?.build && build !== DATA.server.build) staleBand('restarted');
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
+  if (data.server?.stale) staleBand('changed');
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data, status: res.status });
   return data;
 }
 
@@ -1883,6 +2310,8 @@ async function reloadData() {
   const prev = ui.selected;
   DATA = { ...(await api('/api/data')), api_token: token };
   SKILLS = DATA.skills; index();
+  if (USE.raw) indexUsage(USE.raw);
+  if (prev?.kind === 'group') { ui.selected = membersOf(prev).length || (prev.type === 'src' && upd.available[prev.source]) ? prev : null; return; }
   // An available skill that just got installed stays selected as the installed skill.
   ui.selected = prev?.kind === 'avail'
     ? SKILLS.find(s => live(s) && s.dir_name === prev.a.name && s.origin?.source === prev.repo) || prev
@@ -1904,7 +2333,6 @@ async function loadDescs(repo) {
 
 const announce = msg => { el('announce').textContent = msg; };
 
-// Skills you edited are left out of batch updates; they need their own confirmed click.
 function runUpdate(skills, note = '') {
   const names = skills.map(lockName);
   return runJob('update', () => api('/api/update', { names }), names, note);
@@ -1915,7 +2343,7 @@ async function runJob(kind, start, names, note = '', repo = '') {
   if (!names.length) return;
   upd.confirm = null;
   if (upd.job?.done) upd.job = null;
-  const [ing, ed] = kind === 'install' ? ['Installing', 'Installed'] : ['Updating', 'Updated'];
+  const [ing, ed] = VERBS[kind];
   try {
     upd.job = { ...(await start()), kind };
   } catch (err) {
@@ -1927,7 +2355,11 @@ async function runJob(kind, start, names, note = '', repo = '') {
   while (!upd.job.done) {
     await sleep(300);
     const prev = JSON.stringify(upd.job.items);
-    upd.job = { ...(await api('/api/jobs/' + upd.job.id).catch(() => upd.job)), kind };
+    upd.job = { ...(await api('/api/jobs/' + upd.job.id).catch(err => {
+      if (err.status !== 404) return upd.job;
+      for (const i of Object.values(upd.job.items)) if (RUNNING.has(i.state)) Object.assign(i, { state: 'failed', error: err.message });
+      return { ...upd.job, done: true, seconds: 0 };
+    })), kind };
     if (prev !== JSON.stringify(upd.job.items) || upd.job.done) rerender();
   }
 
@@ -1980,7 +2412,7 @@ async function dismissNew(repo) {
   fresh.forEach(a => { a.new = false; });
   // Keep the list where the user is looking, even though it no longer has news.
   collapsed.add('+av:' + repo); collapsed.delete('av:' + repo);
-  localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+  saveCollapsed();
   rerender();
   toast(`Dismissed ${plural(fresh.length, 'new skill')} from <b>${esc(repo)}</b>. They stay under Available.`);
 }
@@ -2018,6 +2450,7 @@ async function unwatch(repo) {
   });
 }
 
+// Skills you edited are left out of batch updates; they need their own confirmed click.
 function updateBatch(list) {
   if (jobRunning()) return toast('An update is already running.');
   const out = list.filter(isOutdated);
@@ -2130,6 +2563,10 @@ function select(s) {
   rerender();
 }
 
+function showView(v) {
+  ui.view = v; setSeg('view', 'v', v); render(); scrollTo({ top: 0 });
+}
+
 function selectAvail(repo, path) {
   const a = (upd.available[repo] || []).find(x => x.path === path);
   if (a) select({ kind: 'avail', repo, path, a, key: availKey(repo, a) });
@@ -2158,7 +2595,7 @@ document.addEventListener('click', async e => {
   const us = t.closest('[data-update-source]');
   if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
   if (t.closest('[data-recheck]')) return checkUpdates(true);
-  if (t.closest('[data-view-new]')) { ui.view = 'new'; setSeg('view', 'v', 'new'); render(); scrollTo({ top: 0 }); return; }
+  if (t.closest('[data-view-new]')) return showView('new');
   const io = t.closest('[data-install-one]');
   if (io) {
     const a = (upd.available[io.dataset.installOne] || []).find(x => x.path === io.dataset.path);
@@ -2199,7 +2636,7 @@ document.addEventListener('click', async e => {
       const flag = newIn(repo).length || !installed ? 'av:' + repo : '+av:' + repo;
       collapsed.has(flag) ? collapsed.delete(flag) : collapsed.add(flag);
     } else if (!ui.q && !(ui.view === 'new' && id.startsWith('src:'))) collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
-    localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+    saveCollapsed();
     render(); return;
   }
   const fa = t.closest('[data-fold-all]');
@@ -2207,7 +2644,7 @@ document.addEventListener('click', async e => {
     const ids = fa.dataset.foldAll.split('\n');
     const close = !ids.every(g => collapsed.has(g));
     ids.forEach(g => (close ? collapsed.add(g) : collapsed.delete(g)));
-    localStorage.setItem('atlas.collapsed', JSON.stringify([...collapsed]));
+    saveCollapsed();
     render(); return;
   }
   const sl = t.closest('[data-show-link]');
@@ -2236,17 +2673,18 @@ document.addEventListener('click', async e => {
   const open = t.closest('.open');
   if (open && open.dataset.avail) return selectAvail(open.dataset.avail, open.dataset.path);
   if (open) return select(SKILLS[+open.dataset.id]);
-  if (t.closest('[data-close]')) { const k = selKey(ui.selected); select(null); focusRow(k); return; }
+  if (t.closest('[data-close]') || t.id === 'scrim') { const k = selKey(ui.selected); select(null); focusRow(k); return; }
+  if (t.closest('[data-reload]')) return location.reload();
   if (t.closest('[data-view]')) return openViewer(ui.selected);
+  const go = t.closest('[data-group]');
+  if (go) return selectGroup(go.dataset.group);
+  const pick = t.closest('[data-pick]');
+  if (pick) return select(SKILLS[+pick.dataset.pick]);
+  if (t.closest('[data-view-unused]')) return showView('unused');
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');
-  if (copy) {
-    await navigator.clipboard.writeText(copy.dataset.copy).catch(() => {});
-    copy.innerHTML = ICON.check; copy.style.color = 'var(--on)';
-    setTimeout(() => { copy.innerHTML = ICON.copy; copy.style.color = ''; }, 1500);
-    return;
-  }
+  if (copy) return copyFrom(copy, copy.dataset.copy);
   if (t.closest('[data-clear]')) return reset();
   if (t.closest('[data-show-project]')) { el('showProject').checked = true; ui.showProject = true; markDisplay(); return render(); }
   if (t.closest('[data-help-close]') || t.id === 'help') return closeHelp();
@@ -2303,6 +2741,12 @@ el('layout').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   setLayout(b.dataset.l); render();
 });
+
+function setSort(o) {
+  ui.sort = o; localStorage.setItem('atlas.sort', o); setSeg('sortBy', 'o', o); render();
+}
+setSeg('sortBy', 'o', ui.sort);
+el('sortBy').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSort(b.dataset.o); });
 
 function setDisplay(open, focusButton = false) {
   el('display').hidden = !open;
@@ -2396,6 +2840,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === 's') { const order = ['name', 'uses', 'recent']; setSort(order[(order.indexOf(ui.sort) + 1) % 3]); toast(`Sorted by ${{ name: 'name', uses: 'most used', recent: 'recently used' }[ui.sort]}.`); return; }
   if (e.key === 'g') { setLayout(ui.layout === 'cards' ? 'list' : 'cards'); render(); return; }
   if (e.key === 'v') {
     const o = t.matches?.('.open') ? t : null;
@@ -2424,13 +2869,14 @@ document.addEventListener('keydown', e => {
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));
 el('band').hidden = WRITABLE;
+if (WRITABLE && DATA.server?.stale) staleBand('changed');
 document.body.classList.toggle('ro', !WRITABLE);
 setCompact(ui.compact);
 setLayout(ui.layout);
 applyTheme();
 render();
 renderDetail();
-if (WRITABLE) checkUpdates();
+if (WRITABLE) { checkUpdates(); loadUsage(); }
 </script>
 </body>
 </html>
