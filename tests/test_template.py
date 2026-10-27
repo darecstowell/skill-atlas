@@ -1,13 +1,13 @@
 import re
 import shutil
 import subprocess
-from pathlib import Path
 
 import pytest
 
-from build import render_page
+from skill_atlas import WEB
+from skill_atlas.build import render_page
 
-TEMPLATE = Path(__file__).resolve().parent.parent / "template" / "index.html"
+TEMPLATE = WEB / "index.html"
 
 
 def test_render_inlines_data():
