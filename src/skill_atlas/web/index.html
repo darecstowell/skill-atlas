@@ -429,8 +429,8 @@
   .gsub + .gspark { margin-left: 0; }
   body.compact .use .spark { display: none; }
 
-  /* One heading style for every panel section; .d-sec's gap sets the space below it. */
-  .inv h3, .d-sec > h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  /* Uppercase heading for the inventory hero and collection sections; .d-sec's gap sets the space below it. */
+  .inv > h3, .d-sec > h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .inv > h3 { margin-bottom: var(--s3); }
   .use-stats { display: flex; gap: var(--s5); }
   .use-stats div { display: grid; gap: 1px; }
@@ -653,9 +653,6 @@
   .linkbtn:hover { color: var(--text); }
   .d-sec { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--border); display: grid; gap: var(--s3); }
   .d-sec > .btn { justify-self: start; }
-  /* Row lists pad their own rows, so the heading sits closer. */
-  .d-sec.loaded, .d-sec.ovl { gap: 2px; }
-  .loaded > h3, .ovl > h3 { margin-bottom: 6px; }
   .card { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); border-radius: var(--r-lg); background: var(--surface-2); }
   .card.accent { background: var(--tint-accent); }
   .card > div { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-2); }
@@ -681,13 +678,47 @@
   .stat b { display: block; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
   .stat span { font-size: 12px; color: var(--text-3); }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px var(--s3); align-items: center; font-size: 12.5px; color: var(--text-2); }
+  .keys-hint { display: flex; align-items: center; gap: 6px; margin: var(--s5) 0 0; }
+
+  /* ---------- panel sections: a header button folds each body ---------- */
+  .pane { border-top: 1px solid var(--border); }
+  :not(.pane) + .pane { margin-top: var(--s4); }
+  .pane-h { margin: 0; font: inherit; }
+  .pane-h button {
+    all: unset; box-sizing: border-box; display: flex; align-items: center; gap: var(--s2); width: calc(100% + 16px); min-height: 40px; margin: 0 -8px; padding: 0 8px;
+    border-radius: var(--r-md); cursor: pointer; touch-action: manipulation; font: 500 13px var(--sans); color: var(--text); transition: background-color 120ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) { .pane-h button:hover { background: var(--surface-2); } }
+  .pane-h button:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .pane-h svg { flex: none; width: 16px; height: 16px; color: var(--text-3); }
+  .pane-h .chev { width: 12px; height: 12px; }
+  .pane-h [aria-expanded="false"] .chev { transform: rotate(-90deg); }
+  .pane-t { flex: 1 0 auto; }
+  .pane-sum { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 400; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .pane-sum i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+  .pane-sum[data-tone="warn"] { color: var(--warn); }
+  .pane-sum[data-tone="danger"] { color: var(--danger); }
+  .pane[data-open] .pane-sum { display: none; }
+  /* Rows animate 0fr to 1fr; visibility drops the folded body from the tab order once it closes. */
+  .pane-b { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 160ms var(--ease-out), visibility 0s linear 160ms; }
+  .pane[data-open] > .pane-b { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 220ms var(--ease-out), visibility 0s; }
+  .pane-in { min-height: 0; overflow: hidden; margin: 0 -8px; padding: 0 8px; }
+  .pane-c { display: grid; gap: var(--s3); padding: 2px 0 var(--s4); }
+  .pane-c .rows { display: grid; gap: 2px; }
+  .pane-sub { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .rows + .rows .pane-sub { margin-top: var(--s2); }
+  .attn { display: grid; }
+  .attn .hl:not([open]) { gap: 0; }
+  .attn-row { display: flex; align-items: center; gap: var(--s2); min-height: 32px; margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .attn-row i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .attn-row i[data-lvl="error"] { background: var(--danger); }
+  .attn-row i[data-lvl="ok"] { background: var(--on); }
   .keys > span:nth-child(odd) { display: inline-flex; gap: 4px; justify-content: flex-end; }
 
   /* ---------- context cost ---------- */
   .cost-sum { margin: 0; display: grid; gap: 1px; font-size: 12px; color: var(--text-3); }
   .cost-top .tnum, .cost-per .tnum { white-space: nowrap; }
   .cost-per .hn { color: var(--text-2); }
-  .cost-flag { color: var(--warn); }
 
   /* ---------- health: SKILL.md and store problems ---------- */
   .card.probs { display: block; background: var(--tint-warn); }
@@ -706,10 +737,8 @@
   .hl[open] summary .cr { transform: rotate(90deg); }
   @media (hover: hover) and (pointer: fine) { .hl summary:hover { background: var(--surface-2); color: var(--text); } }
   .hl summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
-  .hl p { display: flex; align-items: center; gap: var(--s2); margin: 0; font-size: 12.5px; color: var(--text-3); }
   .hl i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
   .hl i[data-lvl="error"] { background: var(--danger); }
-  .hl i[data-lvl="ok"] { background: var(--on); }
   .hl .probs { padding: var(--s3); border-radius: var(--r-lg); background: var(--surface-2); font-size: 12.5px; color: var(--text-2); }
   .hl .probs ul { margin: 0; }
 
@@ -856,9 +885,6 @@
   .ss-lead { margin: 0; font-size: 12.5px; color: var(--text-2); text-wrap: pretty; }
   .ss-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
   .ss-acts .btn { min-width: 76px; }
-  .ss-missing { display: grid; justify-items: start; gap: var(--s2); padding: var(--s3); border-radius: var(--r-lg); background: var(--tint-warn); }
-  .ss-missing p { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 12.5px; color: var(--warn); }
-  .ss-missing svg { width: 14px; height: 14px; flex: none; }
   #detail[data-drop] .inv { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: var(--r-lg); }
   .ss-plan { display: grid; gap: var(--s3); max-height: min(56dvh, 460px); overflow: auto; overscroll-behavior: contain; }
   .ss-plan fieldset { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -1252,6 +1278,7 @@ const switchable = () => Boolean(harness()?.switch);
 // Installs land in the store, so only offer them where the harness reads it.
 const readsStore = () => ui.root === 'all' || Boolean(harness()?.store);
 
+const lineIcon = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON = {
   user: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3 13.5c.6-2.5 2.6-4 5-4s4.4 1.5 5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   spark: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2c.4 2.9 2 4.6 5 5.1v.4c-3 .5-4.6 2.2-5 5.1h-.1c-.4-2.9-2-4.6-5-5.1v-.4c3-.5 4.6-2.2 5-5.1Z" fill="currentColor"/></svg>',
@@ -1270,6 +1297,16 @@ const ICON = {
   pen: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.2 12.8 5.5 6 12.3l-3 .7.7-3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   trash: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   auto: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 14h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  // Panel section icons: one 1.5 stroke path each.
+  flag: lineIcon('M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5'),
+  chart: lineIcon('M2.5 13.5h11M4.5 11V8M8 11V4.5M11.5 11V6.5'),
+  layers: lineIcon('M8 2.5 13.5 5.5 8 8.5 2.5 5.5ZM2.5 8.5l5.5 3 5.5-3M2.5 11l5.5 3 5.5-3'),
+  overlap: lineIcon('M9.75 8a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 1 1 7.5 0ZM13.75 8a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 1 1 7.5 0Z'),
+  shield: lineIcon('M8 2 13 3.8v3.7c0 3-2.1 5.3-5 6.5-2.9-1.2-5-3.5-5-6.5V3.8Z'),
+  box: lineIcon('M2.75 3h10.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-.75.75H2.75A.75.75 0 0 1 2 5.25v-1.5A.75.75 0 0 1 2.75 3ZM3 6v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M6.5 8.75h3'),
+  plug: lineIcon('M6 2.5v3M10 2.5v3M4.5 5.5h7v2a3.5 3.5 0 0 1-7 0ZM8 11v2.5'),
+  list: lineIcon('M6 4.5h7.5M6 8h7.5M6 11.5h7.5M2.75 4.5h.01M2.75 8h.01M2.75 11.5h.01'),
+  clock: lineIcon('M13.75 8a5.75 5.75 0 1 1-11.5 0 5.75 5.75 0 1 1 11.5 0ZM8 5v3.25l2 1.25'),
 };
 
 
@@ -1983,6 +2020,69 @@ const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}
 
 const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
 
+// ---------------------------------------------------------------- panel sections
+// Each section folds. A user toggle is kept per mode in localStorage; until then the default applies.
+const PANE_DEFAULT = { inv: ['attn', 'use'], skill: ['lb', 'use'] };
+const paneMemo = new Map();
+function paneOpen(key) {
+  if (!paneMemo.has(key)) {
+    let v = null;
+    try { v = localStorage.getItem('atlas.sec.' + key); } catch {}
+    const [mode, id] = key.split('.');
+    paneMemo.set(key, v ? v === '1' : PANE_DEFAULT[mode].includes(id));
+  }
+  return paneMemo.get(key);
+}
+function togglePane(key) {
+  const open = !paneOpen(key);
+  paneMemo.set(key, open);
+  try { localStorage.setItem('atlas.sec.' + key, open ? '1' : '0'); } catch {}
+  renderDetail();
+}
+// A folded section shows its summary, or the cue ({ tone, text }) when it needs the user.
+function pane(key, icon, title, summary, body, cue = null) {
+  const open = paneOpen(key), id = 'pane-' + key.replace('.', '-');
+  const sum = cue ? `<span class="pane-sum" data-tone="${cue.tone}"><i></i>${esc(cue.text)}</span>`
+    : summary ? `<span class="pane-sum">${esc(summary)}</span>` : '';
+  return `<section class="pane" data-k="p:${key}"${open ? ' data-open' : ''}>
+    <h3 class="pane-h" data-k="h"><button data-k="t" data-leaf data-pane="${key}" aria-expanded="${open}" aria-controls="${id}">
+      ${ICON[icon]}<span class="pane-t">${title}</span>${sum}${ICON.chev}</button></h3>
+    <div class="pane-b" id="${id}" data-k="b"><div class="pane-in"><div class="pane-c" data-k="c">${body}</div></div></div>
+  </section>`;
+}
+const attnRow = (k, lvl, text, act = '') => `<p class="attn-row" data-k="${k}" data-leaf><i data-lvl="${lvl}"></i><span>${text}${act ? ' ' + act : ''}</span></p>`;
+
+// Things in the inventory that need the user, most severe first.
+function attentionItems(lv) {
+  const items = [];
+  const store = DATA.health.problems;
+  if (store.length) items.push({ tone: worst(store) === 'error' ? 'danger' : 'warn', text: plural(store.length, 'store problem'), html: storeHealthHtml() });
+  const high = SKILLS.filter(inView).filter(isRisky).length;
+  if (high) items.push({ tone: 'danger', text: `${plural(high, 'skill')} to review`,
+    html: attnRow('a-sec', 'error', `${plural(high, 'skill')} with high-risk security findings.`, '<button class="linkbtn" data-view-review>Show them</button>') });
+  const bad = lv.filter(s => s.problems.length);
+  const err = bad.some(s => worst(s.problems) === 'error');
+  if (bad.length) items.push({ tone: err ? 'danger' : 'warn', text: `${plural(bad.length, 'skill')} with problems`,
+    html: attnRow('a-prob', err ? 'error' : 'warn', `${plural(bad.length, 'skill')} with SKILL.md problems.`, '<button class="linkbtn" data-view-issues>Show them</button>') });
+  const n = SS.missing.length;
+  if (WRITABLE && n) items.push({ tone: 'warn', text: `${n} missing`, html: missingHtml(n) });
+  const diverged = overlapCounts(lv).diverged;
+  if (diverged) items.push({ tone: 'warn', text: plural(diverged, 'diverged name'),
+    html: attnRow('a-div', 'warn', `${plural(diverged, 'skill name')} with copies that differ.`, '<button class="linkbtn" data-overlap-view="diverged">Show them</button>') });
+  const costly = costlyUnused().size;
+  if (costly) items.push({ tone: 'warn', text: plural(costly, 'costly skill'),
+    html: attnRow('a-cost', 'warn', `${plural(costly, 'costly skill')} not used in ${UNUSED_DAYS} days.`, '<button class="linkbtn" data-view-costly>Show them</button>') });
+  return items.sort((a, b) => (b.tone === 'danger') - (a.tone === 'danger'));
+}
+const attnCue = items => items.length > 0 && { tone: items[0].tone, text: items.length === 1 ? items[0].text : `${items.length} things to check` };
+
+function attentionPane(lv) {
+  const items = attentionItems(lv);
+  const body = items.length ? `<div class="attn" data-k="al">${items.map(i => i.html).join('')}</div>`
+    : attnRow('a-ok', 'ok', 'Nothing needs your attention. The skill folders and lock files have no problems.');
+  return pane('inv.attn', 'flag', 'Needs attention', 'Nothing to do', body, attnCue(items));
+}
+
 function inventoryHtml() {
   const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && loads(s));
   const personal = lv.filter(s => s.scope === 'personal');
@@ -1993,13 +2093,13 @@ function inventoryHtml() {
       ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates', WRITABLE ? 'accent' : '')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
-    ${storeHealthHtml()}
-    ${overlapInvHtml(lv)}
+    ${attentionPane(lv)}
     ${inventoryUsageHtml(lv)}
     ${costHtml()}
-    ${skillSetHtml()}
+    ${overlapInvHtml(lv)}
     ${inventorySecHtml(SKILLS.filter(inView))}
-    <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
+    ${skillSetHtml()}
+    <p class="keys-hint" data-k="kb"><button class="linkbtn" data-help-open>All keyboard shortcuts</button> <kbd>?</kbd></p>
   </div>`;
 }
 
@@ -2023,11 +2123,10 @@ let healthOpen = false;
 document.addEventListener('toggle', e => { if (e.target.matches?.('details.hl')) healthOpen = e.target.open; }, true);
 function storeHealthHtml() {
   const list = DATA.health.problems;
-  if (!list.length) return '<div class="d-sec hl" data-k="hl" data-leaf><p><i data-lvl="ok"></i>No problems in the skill folders or lock files.</p></div>';
   const ghosts = list.filter(p => p.code === 'ghost-lock').length;
   const broken = list.length - ghosts;
   const parts = [ghosts ? `${ghosts} lock ${ghosts === 1 ? 'entry' : 'entries'} with no folder` : '', broken ? `${plural(broken, 'folder')} that no harness can load` : ''];
-  return `<details class="d-sec hl" data-k="hl"${healthOpen ? ' open' : ''}><summary data-leaf><i data-lvl="${worst(list)}"></i>${parts.filter(Boolean).join(' · ')}${ICON.chevR}</summary>
+  return `<details class="hl" data-k="hl"${healthOpen ? ' open' : ''}><summary data-leaf><i data-lvl="${worst(list)}"></i>${parts.filter(Boolean).join(' · ')}${ICON.chevR}</summary>
     <div class="probs" data-leaf>${probItems(list)}</div></details>`;
 }
 
@@ -2121,6 +2220,7 @@ function detailHtml(s) {
     s._dupes.length ? `Same as ${esc(s._dupes.join(', '))}` : '',
   ];
   const gh = src && /^https?:/.test(src) ? String(src).replace(/\.git$/, '') : '';
+  const ver = s.plugin_version || s.version;
   const sw = harness()?.switch;
   const setting = sw === 'claude' ? (s.scope === 'personal' ? `skillOverrides.${s.name}${st.mode === 'on' ? '' : ` = "${st.mode}"`}` : s.scope === 'plugin' ? `enabledPlugins["${s.plugin_ref}"]` : '')
     : sw && s.scope === 'personal' ? tilde(harness().config) : '';
@@ -2142,8 +2242,8 @@ function detailHtml(s) {
     ${overlapHtml(s)}
     ${usageHtml(s)}
     ${securityHtml(s)}
-    <div class="d-sec" data-k="facts"><dl data-leaf>
-      ${field('Version', s.plugin_version || s.version, true)}
+    ${pane('skill.facts', 'list', 'Details', [ver && 'v' + ver, `${approx(s.tokens_listed)} tokens`].filter(Boolean).join(' · '), `<dl data-k="dl" data-leaf>
+      ${field('Version', ver, true)}
       ${field('Updated', (s.last_updated || o.updatedAt || s.modified || '').slice(0, 10))}
       ${field('Tools', s.allowed_tools, true)}
       ${field('Arguments', s.argument_hint, true)}
@@ -2151,7 +2251,7 @@ function detailHtml(s) {
       ${costFieldHtml(s)}
       ${field('Setting', setting, true)}
       ${field('Path', tilde(s.path), true)}
-    </dl></div>
+    </dl>`)}
     ${historyHtml(s)}
     ${WRITABLE && s.scope === 'personal' && s.store ? `<div class="d-sec danger-zone" data-k="dz">
       <button class="btn danger" data-k="del" data-delete="${esc(s.dir_name)}">Delete…</button>
@@ -2187,7 +2287,9 @@ function loadedHtml(s) {
       : '<span class="note">no switch</span>';
     return `<div class="lb${id === ui.root ? ' cur' : ''}" data-k="lb:${esc(id)}"><span data-leaf>${esc(h.label)}</span>${ctl}</div>`;
   });
-  return `<div class="d-sec loaded" data-k="lb"><h3 data-leaf>Loaded by</h3>${rows.join('') || '<p class="note">No harness loads this folder.</p>'}</div>`;
+  const on = s.harnesses.filter(id => harness(id) && state(s, id).on).length;
+  const summary = rows.length ? `On in ${on} of ${rows.length}` : 'No harness';
+  return pane('skill.lb', 'plug', 'Loaded by', summary, `<div class="rows" data-k="r">${rows.join('') || '<p class="note">No harness loads this folder.</p>'}</div>`);
 }
 const useSec = body => `<div class="d-sec uses" data-k="use"><h3 data-leaf>Usage</h3>${body}</div>`;
 const useStats = (count, last, activeDays, play) => `<div class="use-stats${play ? ' play' : ''}" data-k="us" data-leaf>
@@ -2753,8 +2855,8 @@ function usageHtml(s) {
   if (!WRITABLE || s.kind === 'avail' || s.scope === 'project' || s.status === 'stale') return '';
   const u = USE.by.get(s);
   const key = selKey(s);
-  let body;
-  if (!USE.ready && !u) body = waitHtml();
+  let body, summary = u?.count ? usesText(u.count) : 'No uses yet';
+  if (!USE.ready && !u) { body = waitHtml(); summary = waitText; }
   else if (!u?.count) {
     body = `<p class="use-note" data-k="un" data-leaf>No recorded uses yet.${s.scope === 'personal' && state(s).on ? ' Every skill that is on costs a little context in each session, so turn off the ones you never use.' : ''}</p>`;
   } else {
@@ -2766,19 +2868,21 @@ function usageHtml(s) {
       ${USE.ready && u.counted > u.seen ? `<p class="use-note" data-k="uc" data-leaf>Claude Code counted ${plural(u.counted, 'use')} in all. Old sessions get deleted, so the calendar shows fewer.</p>` : ''}
       ${top.length ? `<div class="proj${play ? ' play' : ''}" data-k="pj" data-leaf>${top.map(([name, n], i) => `<span>${esc(name)}</span><span class="tnum">${n}</span><span class="bar"><i style="--v:${(n / most).toFixed(3)};--i:${i}"></i></span>`).join('')}</div>` : ''}`;
   }
-  return useSec(body);
+  return pane('skill.use', 'chart', 'Usage', summary, body, useCue());
 }
+
+const usesText = n => (n === 1 ? '1 use' : `${n.toLocaleString()} uses`);
+const useCue = () => (USE.status === 'error' || USE.error) && { tone: 'warn', text: 'Could not read usage' };
+const waitText = 'Reading sessions…';
 
 function inventoryUsageHtml(lv) {
   if (!WRITABLE) return '';
-  if (!USE.ready) return `<div class="d-sec uses" data-k="iu"><h3 class="sub" data-leaf>Usage</h3>${waitHtml()}</div>`;
+  if (!USE.ready) return pane('inv.use', 'chart', 'Usage', waitText, waitHtml(), useCue());
   const unused = lv.filter(isUnused).length;
-  return `<div class="d-sec uses" data-k="iu">
-    <h3 class="sub" data-leaf>Usage</h3>
-    ${heatmap(sumDays(lv), 'all')}
+  const total = lv.reduce((n, s) => n + uses(s), 0);
+  return pane('inv.use', 'chart', 'Usage', total ? usesText(total) : 'No uses yet', `${heatmap(sumDays(lv), 'all')}
     ${topHtml(lv)}
-    ${unused ? `<p class="use-note" data-k="uu" data-leaf>${plural(unused, 'skill')} not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-unused>Show them</button></p>` : ''}
-  </div>`;
+    ${unused ? `<p class="use-note" data-k="uu" data-leaf>${plural(unused, 'skill')} not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-unused>Show them</button></p>` : ''}`);
 }
 
 // ---------------------------------------------------------------- context cost
@@ -2803,7 +2907,7 @@ function costlyUnused() {
 function costHtml() {
   const on = listedIn(ui.root);
   const where = ui.root === 'all' ? '' : ` in ${esc(harnessName())}`;
-  let body;
+  let body, summary = on.length ? `${approx(costTotal(on))} tokens` : 'No tokens';
   if (ui.root === 'all') {
     const per = HARNESS_IDS.map(id => [id, listedIn(id)]).filter(([, l]) => l.length)
       .sort((a, b) => costTotal(b[1]) - costTotal(a[1]) || a[0].localeCompare(b[0]));
@@ -2811,18 +2915,14 @@ function costHtml() {
       ? `<p class="use-note" data-k="cl" data-leaf>Tokens each harness adds to every session</p>
         <div class="top cost-per" data-k="cp" data-leaf>${per.map(([id, l]) => `<button data-cost-harness="${esc(id)}" title="Show ${esc(harness(id).label)}"><span class="hn">${esc(harness(id).label)}</span><span class="tnum">${approx(costTotal(l))} · ${l.length} on</span></button>`).join('')}</div>`
       : '';
+    if (per.length) summary = `Up to ${approx(costTotal(per[0][1]))} tokens`;
   } else if (on.length) {
     body = `<p class="cost-sum" data-k="cs" data-leaf><b class="tnum">${approx(costTotal(on))} tokens</b><span>in every session, from ${plural(on.length, 'skill')} that ${on.length === 1 ? 'is' : 'are'} on</span></p>`;
   } else body = '';
   if (!on.length) body = `<p class="use-note" data-k="ce" data-leaf>No skills are on${where}, so skills add no tokens to a session.</p>`;
-  const flagged = costlyUnused().size;
-  return `<div class="d-sec" data-k="ic">
-    <h3 class="sub" data-leaf>Context cost</h3>
-    ${body}
+  return pane('inv.cost', 'layers', 'Context cost', summary, `${body}
     ${on.length ? `<div class="top cost-top" data-k="ct" data-leaf>${on.slice(0, 5).map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${approx(s.tokens_listed)}</span></button>`).join('')}</div>` : ''}
-    ${flagged ? `<p class="use-note" data-k="cu" data-leaf><span class="cost-flag">${plural(flagged, 'costly skill')}</span> not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-costly>Show them</button></p>` : ''}
-    <p class="use-note" data-k="cn" data-leaf>Estimate: about 4 characters per token. A skill's body loads only when it runs.</p>
-  </div>`;
+    <p class="use-note" data-k="cn" data-leaf>Estimate: about 4 characters per token. A skill's body loads only when it runs.</p>`);
 }
 
 function costFieldHtml(s) {
@@ -2873,6 +2973,8 @@ const SEC_RULES = {
 };
 const SEC_NOTE = 'A heuristic scan of the files. It can miss real risks and flag safe code.';
 const isRisky = s => s.security.level === 'high';
+const invSecCue = high => high > 0 && { tone: 'danger', text: `${plural(high, 'skill')} to review` };
+const secCue = s => s.security.counts.high > 0 && { tone: 'danger', text: plural(s.security.counts.high, 'high finding') };
 
 function secTag(s) {
   const x = s.security;
@@ -2911,9 +3013,10 @@ function secGroupHtml(s, rule, level, list) {
 function securityHtml(s) {
   if (s.kind) return '';
   const sum = s.security;
-  const wrap = body => `<div class="d-sec sec" data-k="sec"><h3 data-leaf>Security</h3>${body}<p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p></div>`;
+  const c = sum.counts;
+  const summary = sum.level === 'none' ? 'No risks found' : [c.medium && plural(c.medium, 'medium finding'), c.info && `${c.info} info`].filter(Boolean).join(' · ');
+  const wrap = body => pane('skill.sec', 'shield', 'Security', summary, `${body}<p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p>`, secCue(s));
   if (!WRITABLE) {
-    const c = sum.counts;
     const line = sum.level === 'none' ? 'No risky patterns found.'
       : [c.high && `${c.high} high`, c.medium && `${c.medium} medium`, c.info && `${c.info} info`].filter(Boolean).join(' · ') + '. Run ./atlas to see each finding.';
     return wrap(`<p class="use-note" data-k="ss" data-leaf>${line}</p>`);
@@ -2941,9 +3044,9 @@ function inventorySecHtml(list) {
   const medium = list.filter(s => s.security.level === 'medium').length;
   const code = list.filter(s => s.security.code).length;
   const parts = [high && `<b>${high}</b> to review`, medium && `<b>${medium}</b> with medium findings`, `<b>${code}</b> run code`].filter(Boolean);
-  return `<div class="d-sec sec" data-k="isec"><h3 data-leaf>Security</h3>
-    <p class="use-note" data-k="is" data-leaf>${parts.join(' · ')}.${high ? ' <button class="linkbtn" data-view-review>Show them</button>' : ''}</p>
-    <p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p></div>`;
+  const summary = [high || medium ? '' : 'No high risks', medium && `${medium} medium`, code && `${code} run code`].filter(Boolean).join(' · ');
+  return pane('inv.sec', 'shield', 'Security', summary, `<p class="use-note" data-k="is" data-leaf>${parts.join(' · ')}.${high ? ' <button class="linkbtn" data-view-review>Show them</button>' : ''}</p>
+    <p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p>`, invSecCue(high));
 }
 
 // ---------------------------------------------------------------- bulk actions
@@ -3330,17 +3433,19 @@ async function loadHistory(name) {
   renderDetail();
 }
 
+const histCue = h => Boolean(h?.error) && { tone: 'warn', text: 'Could not read history' };
 function historyHtml(s) {
   const name = lockName(s);
   if (!WRITABLE || !name) return '';
   const h = hist[name];
-  let body;
+  let body, summary = 'Reading…';
   if (!h || h.loading) body = '<p class="note">Reading saved versions…</p>';
   else if (h.error) body = `<p class="note warn">Could not read the history: ${esc(h.error)} <button class="linkbtn" data-hist-retry="${esc(name)}">Try again</button></p>`;
-  else if (!h.list.length) body = '<p class="note">No saved versions yet. Before each update, the atlas saves a copy of this skill here.</p>';
+  else if (!h.list.length) { body = '<p class="note">No saved versions yet. Before each update, the atlas saves a copy of this skill here.</p>'; summary = 'No snapshots'; }
   else body = `<ul class="hs-list">${h.list.map(x => `<li><span><b>${esc(snapTime(x.at))}</b>${x.reason === 'restore' ? 'Before a restore' : 'Before an update'}${x.hash ? ` · <code>${esc(x.hash)}</code>` : ''}</span>
     <button class="btn ghost" data-restore="${esc(name)}" data-id="${esc(x.id)}">Restore…</button></li>`).join('')}</ul>`;
-  return `<div class="d-sec hs" data-k="hist"><h3 data-leaf>History</h3><div data-leaf>${body}</div></div>`;
+  if (h?.list?.length) summary = plural(h.list.length, 'snapshot');
+  return pane('skill.hist', 'clock', 'History', summary, `<div class="hs" data-k="hs" data-leaf>${body}</div>`, histCue(h));
 }
 
 function histDialog(html, wide = false) {
@@ -3522,27 +3627,21 @@ async function linkSkills(form) {
 // ---------------------------------------------------------------- skill set: export, import, restore
 const SS = { missing: [], busy: '', copied: false };
 
+// aria-disabled, not disabled: a disabled button drops keyboard focus.
+const ssOff = () => (SS.busy ? ' aria-disabled="true"' : '');
+const missingHtml = n => attnRow('a-miss', 'warn', `${n === 1 ? '1 skill in the lock file has' : `${n} skills in the lock file have`} no folder.`,
+  `<button class="linkbtn" data-ss="restore"${ssOff()}>${SS.busy === 'restore' ? 'Reading…' : `Restore ${n === 1 ? 'it' : 'them'}`}</button>`);
+
 function skillSetHtml() {
   if (!WRITABLE) return '';
-  const n = SS.missing.length;
-  const busy = SS.busy;
-  // aria-disabled, not disabled: a disabled button drops keyboard focus.
-  const off = busy ? ' aria-disabled="true"' : '';
-  const missing = n ? `<div class="ss-missing" role="status" data-k="m">
-      <p data-k="t" data-leaf>${ICON.alert}${n === 1 ? '1 skill in the lock file has' : `${n} skills in the lock file have`} no folder.</p>
-      <button class="btn" data-k="r" data-leaf data-ss="restore"${off}>${busy === 'restore' ? 'Reading…' : `Restore ${plural(n, 'missing skill')}`}</button>
-    </div>` : '';
-  return `<div class="d-sec" data-k="ss">
-    <h3 data-k="h" data-leaf>Skill set</h3>
-    ${missing}
-    <p class="ss-lead" data-k="l" data-leaf>Save your skills, sources, and switches to a file. Import the file on a different computer to get the same set.</p>
+  const busy = SS.busy, off = ssOff();
+  return pane('inv.set', 'box', 'Skill set', 'Export or import', `<p class="ss-lead" data-k="l" data-leaf>Save your skills, sources, and switches to a file. Import the file on a different computer to get the same set.</p>
     <div class="ss-acts" data-k="a">
       <button class="btn" data-k="e" data-leaf data-ss="export"${off}>${busy === 'export' ? 'Exporting…' : 'Export'}</button>
       <button class="btn ghost" data-k="c" data-leaf data-ss="copy"${off}>${SS.copied ? `${ICON.check}Copied` : busy === 'copy' ? 'Copying…' : 'Copy'}</button>
       <button class="btn" data-k="i" data-leaf data-ss="import"${off}>${busy === 'import' ? 'Reading…' : 'Import…'}</button>
     </div>
-    <p class="note" data-k="n" data-leaf>You can also drop a manifest file on this panel.</p>
-  </div>`;
+    <p class="note" data-k="n" data-leaf>You can also drop a manifest file on this panel.</p>`);
 }
 
 async function loadMissing() {
@@ -3855,9 +3954,13 @@ document.addEventListener('click', async e => {
   const ch = t.closest('[data-cost-harness]');
   if (ch) { el('harness').value = ch.dataset.costHarness; el('harness').dispatchEvent(new Event('change')); return; }
   if (t.closest('[data-view-review]')) return showView('review');
+  if (t.closest('[data-view-issues]')) return showView('issues');
   if (t.closest('[data-sec-retry]') && ui.selected) { SEC.by.delete(ui.selected.path); return renderDetail(); }
   const hr = t.closest('[data-hist-retry]');
   if (hr) { delete hist[hr.dataset.histRetry]; return renderDetail(); }
+  const pn = t.closest('[data-pane]');
+  if (pn) return togglePane(pn.dataset.pane);
+  if (t.closest('[data-help-open]')) return openHelp();
   const secGroup = t.closest('[data-sec-group]');
   if (secGroup) return toggleSecGroup(secGroup);
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
@@ -4324,12 +4427,14 @@ function overlapCounts(list) {
   }
   return { similar: pairs.size, diverged: names.size };
 }
+const ovlCue = diverged => diverged > 0 && { tone: 'warn', text: plural(diverged, 'diverged name') };
 function overlapInvHtml(list) {
   const n = overlapCounts(list);
   const go = (count, view, label, tone) => `<button class="stat go" data-overlap-view="${view}"${count ? '' : ' aria-disabled="true"'}${tone && count ? ` data-tone="${tone}"` : ''}
     title="${count ? `Show only these skills` : `No ${label}`}"><b>${count}</b><span>${label}</span></button>`;
-  return `<div class="d-sec" data-k="ovl"><h3 data-leaf>Overlap</h3><div class="stats ovl-stats" data-leaf>
-    ${go(n.similar, 'similar', n.similar === 1 ? 'similar pair' : 'similar pairs')}${go(n.diverged, 'diverged', n.diverged === 1 ? 'diverged name' : 'diverged names', 'warn')}</div></div>`;
+  const summary = n.similar || n.diverged ? `${n.similar} similar · ${n.diverged} diverged` : 'No overlap';
+  return pane('inv.ovl', 'overlap', 'Overlap', summary, `<div class="stats ovl-stats" data-k="os" data-leaf>
+    ${go(n.similar, 'similar', n.similar === 1 ? 'similar pair' : 'similar pairs')}${go(n.diverged, 'diverged', n.diverged === 1 ? 'diverged name' : 'diverged names', 'warn')}</div>`, ovlCue(n.diverged));
 }
 function overlapEmpty() {
   if (ui.view === 'similar') return '<div class="empty" data-k="empty"><h2>No similar skills</h2><p>No two skills in this harness have descriptions that overlap a lot.</p><span class="acts"><button class="btn" data-overlap-view="all">Show all skills</button></span></div>';
@@ -4342,18 +4447,19 @@ function overlapChrome() {
   }
 }
 function newerText(c) { return c.newer === 'other' ? 'That copy is newer' : c.newer === 'this' ? 'This copy is newer' : 'Same date'; }
+const copiesCue = cp => cp.length > 0 && { tone: 'warn', text: cp.length === 1 ? '1 diverged copy' : `${cp.length} diverged copies` };
 function overlapHtml(s) {
   const sim = simOf(s), cp = s.copies;
   const out = [];
   if (sim.length) {
-    out.push(`<div class="d-sec ovl" data-k="sim"><h3 data-leaf>Similar skills</h3>
+    out.push(`<div class="rows" data-k="sim"><h4 class="pane-sub" data-leaf>Similar skills</h4>
       <p class="note" data-leaf>The descriptions overlap, so the agent may load the wrong one.</p>
       ${sim.map(x => `<button class="sim" data-k="sim:${esc(x.path)}" data-pick="${x.s.id}" data-leaf title="${esc(tilde(x.path))}">
         <span class="nm">/${esc(x.s.invoke)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.round(x.score * 100)}%"></i></span>
         <span class="pct" aria-label="${Math.round(x.score * 100)} percent overlap">${Math.round(x.score * 100)}%</span></button>`).join('')}</div>`);
   }
   if (cp.length) {
-    out.push(`<div class="d-sec ovl" data-k="cpy"><h3 data-leaf>Copies</h3>
+    out.push(`<div class="rows" data-k="cpy"><h4 class="pane-sub" data-leaf>Copies</h4>
       <p class="note" data-leaf>Other folders have a skill with this name and a different SKILL.md.</p>
       ${cp.map(c => `<div class="cpy" data-k="cpy:${esc(c.path)}" data-leaf>
         <span class="where">${esc(tilde(c.dir)).replace(/\//g, '/<wbr>')}</span>
@@ -4361,7 +4467,9 @@ function overlapHtml(s) {
         ${WRITABLE ? `<button class="btn" data-compare="${esc(c.path)}">Compare</button>` : ''}</div>`).join('')}
       ${WRITABLE ? '' : '<p class="note" data-leaf>Run ./atlas to compare the files.</p>'}</div>`);
   }
-  return out.join('');
+  if (!out.length) return '';
+  const summary = [sim.length && plural(sim.length, 'similar skill'), cp.length && `${cp.length} diverged`].filter(Boolean).join(' · ');
+  return pane('skill.ovl', 'overlap', 'Overlap', summary, out.join(''), copiesCue(cp));
 }
 let compareRun = 0;
 async function openCompare(s, otherPath) {
