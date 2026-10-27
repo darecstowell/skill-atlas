@@ -244,3 +244,13 @@ def test_bind_skips_a_reserved_port(monkeypatch):
     server = serve.bind(5000)
     server.server_close()
     assert tried == [5000, 5001]
+
+
+def test_texture_served(server):
+    with urllib.request.urlopen(f"{server}/bg/paper.webp") as r:
+        assert r.headers["Content-Type"] == "image/webp"
+        assert r.read(4) == b"RIFF"
+    for bad in ("/bg/..%2Fserve.py", "/bg/missing.webp", "/bg/serve.py"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(server + bad)
+        assert e.value.code == 404

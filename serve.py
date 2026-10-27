@@ -27,6 +27,7 @@ from build import render_page
 from scan import config_path, read_json_strict, scan, settings_state, write_user_config
 
 REPO = Path(__file__).resolve().parent
+TEXTURES = REPO / "template" / "bg"
 TOKEN = secrets.token_urlsafe(24)
 ROOTS: dict[str, Path] = {}
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][\w.-]*$")
@@ -195,6 +196,11 @@ class Handler(BaseHTTPRequestHandler):
                 msg = f"Skill Atlas could not build the page: {e!r}\n"
                 return self._send(500, msg.encode(), "text/plain; charset=utf-8")
             return self._send(200, page.encode(), "text/html; charset=utf-8")
+        if path.startswith("/bg/"):
+            name = path[4:]
+            if SAFE_NAME.match(name) and name.endswith(".webp") and (TEXTURES / name).is_file():
+                return self._send(200, (TEXTURES / name).read_bytes(), "image/webp")
+            return self._json(404, {"error": "not found"})
         if not path.startswith("/api/"):
             return self._json(404, {"error": "not found"})
         self._answer(lambda: self._get(path, query))
