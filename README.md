@@ -9,13 +9,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B97A3" alt="MIT license"></a>
 </p>
 
-Skill Atlas shows every agent skill on your machine on one local page, for every harness that
-loads them: Claude Code, Codex, Cursor, Gemini CLI, Copilot CLI, OpenCode, and more. You can turn
-skills on and off per harness, update them from GitHub, install new skills from the repos you
-follow, and move old skills to the Trash.
+Skill Atlas is one local page for every agent skill on your machine. It reads the skills of
+Claude Code, Codex, Cursor, Gemini CLI, Copilot CLI, OpenCode, and more. Turn skills on and off for
+each harness, update them from GitHub, and find the ones that cost context but never run.
 
 <p align="center">
-  <img src="docs/images/screenshot.png" alt="Skill Atlas, grouped by source, with updates and available skills" width="900">
+  <img src="docs/images/demo.gif" alt="Search for a skill, read its panel, see the changes in an update, switch harness, and change the palette" width="900">
 </p>
 
 ## Quick start
@@ -62,24 +61,17 @@ Use `--port` to set a different port, and `--no-open` to keep the browser closed
 
 ## What it does
 
-| | |
-| --- | --- |
-| **See everything** | Personal, plugin, and project skills in one list, grouped by the repo they came from. Search covers names, descriptions, sources, and paths. |
-| **Switch skills on and off** | One switch per skill, per source, or per plugin. Changes go to `settings.json`, with a backup made first. |
-| **Update from GitHub** | Marks skills whose upstream folder changed. Update one skill, one source, or all. About 40 skills update in 3 seconds. |
-| **See changes and roll back** | **See changes** on an update shows each added, changed, and removed file, with line diffs. Before each update, the atlas saves the old folder (the last 5 per skill, in `~/.cache/skill-atlas/history`). **History** in the skill panel restores one. |
-| **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
-| **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
-| **See where it comes from** | Each source shows its owner's GitHub avatar. A source's panel shows the repo's banner, and a skill's panel shows a picture from its own folder when it has one. |
-| **Make it yours** | Switch between dense rows and a card grid. Pick light, dark, or the system theme, one of five palettes, and a quiet background texture. |
-| **Act on many at once** | Tick skills one by one, shift-click a range, or tick a whole source. Then turn them on or off, update, link, copy them as a prompt, or delete them. |
-| **See context cost** | Shows about how many tokens each harness spends in every session to list the skills that are on, and the top five. It marks costly skills that you did not use in 90 days. Sort by **Cost** to put the largest first. |
-| **Find problems** | The **Issues** view lists skills with bad frontmatter, a wrong name, a long description, or links to files that are not there. The inventory panel shows lock entries with no folder and folders with no SKILL.md. The atlas does not fix them. |
-| **Profiles** | Save which skills are on and off as a named profile, from the **Profiles** menu or from a selection. Apply shows what changes in each harness first, and you can undo it. Profiles go in `~/.config/skill-atlas/profiles.json`. |
-| **Move your set** | **Export** in the Inventory panel saves your skills, sources, watched repos, and off switches to a JSON file. **Import** shows what it will install and change, then does it. **Restore** installs again the skills in the lock file that have no folder. |
-| **Check before you trust** | A read-only scan tags skills that run code, and marks **review** on high-risk patterns: piped installs, secret reads, hidden instructions. The skill panel lists each finding with its file and line. It is a heuristic, not a guarantee. |
-| **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
-| **Find overlap** | A **similar** tag marks skills with descriptions so close that the agent can pick the wrong one. A **diverged** tag marks copies of a skill whose SKILL.md is different in another folder. **Compare** shows the line diff. |
+<table>
+<tr><td width="50%" valign="top"><b>Needs attention</b><br>The side panel collects what needs you: high-risk findings, broken SKILL.md files, copies that differ, and costly skills you do not use.<br><br><img src="docs/images/attention.png" alt="Needs attention list with four items" width="400"></td><td width="50%" valign="top"><b>Switch per harness</b><br>Each harness has its own switch, and the atlas writes it to that harness’s config file after it makes a backup.<br><br><img src="docs/images/loaded-by.png" alt="Loaded by list with a switch for each harness" width="400"></td></tr>
+<tr><td width="50%" valign="top"><b>Update from GitHub</b><br>The atlas marks skills whose upstream folder changed, and updates one skill, one source, or all of them.<br><br><img src="docs/images/update-card.png" alt="Update available card with See changes and Update" width="400"></td><td width="50%" valign="top"><b>Find overlap</b><br>The atlas marks skills with descriptions so similar that the agent can load the wrong one, and copies of a skill that differ.<br><br><img src="docs/images/similar.png" alt="Similar skills and a copy that differs, with Compare" width="400"></td></tr>
+<tr><td colspan="2"><b>See changes, then roll back</b><br>Before an update, see each changed file as a line diff, and after it, <b>History</b> can put back any of the last 5 versions.<br><br><img src="docs/images/diff.png" alt="Line diff of the files that an update changes" width="860"></td></tr>
+<tr><td width="50%" valign="top"><b>See context cost</b><br>The atlas estimates how many tokens each harness spends in every session to list the skills that are on.<br><br><img src="docs/images/cost.png" alt="Context cost: about 5.4k tokens, with the top five skills" width="400"></td><td width="50%" valign="top"><b>See what you use</b><br>A heatmap from your session logs shows which skills you use and which you never use.<br><br><img src="docs/images/usage.png" alt="Usage heatmap and the most used skills" width="400"></td></tr>
+<tr><td width="50%" valign="top"><b>Check before you trust</b><br>A read-only heuristic scan marks skills that run code, pipe a download into a shell, read secrets, or hide instructions.<br><br><img src="docs/images/security.png" alt="Security findings for a skill that pipes a download into sh" width="400"></td><td width="50%" valign="top"><b>Find problems</b><br>The <b>Issues</b> view shows SKILL.md files with bad frontmatter, a wrong name, a long description, or links to files that are not there.<br><br><img src="docs/images/problems.png" alt="A problem card: a link to a file that does not exist" width="400"></td></tr>
+<tr><td colspan="2"><b>Act on many at once</b><br>Select skills, a range, or a whole source, then turn them on or off, update, copy, or delete them in one step.<br><br><img src="docs/images/bulk.png" alt="Three skills selected, with the bulk action bar" width="860"></td></tr>
+<tr><td width="50%" valign="top"><b>Profiles</b><br>Save the current switches as a named profile, and apply it later after a preview of each change.<br><br><img src="docs/images/profiles-menu.png" alt="Profiles menu with one saved profile" width="400"></td><td width="50%" valign="top"><b>Move your set</b><br>Export your skills, sources, and switches to a file, and import it on another computer to get the same set.<br><br><img src="docs/images/skill-set.png" alt="Skill set section with Export, Copy, and Import" width="400"></td></tr>
+<tr><td width="50%" valign="top"><b>Make it yours</b><br>Pick rows or cards, a theme, one of five palettes, a quiet background texture, and the page size.<br><br><img src="docs/images/display.png" alt="Display options" width="400"></td><td width="50%" valign="top"><b>Small things</b><br>Find new skills in the repos you follow, see the avatar of each source, and delete to the Trash with Undo.</td></tr>
+<tr><td colspan="2"><b>Read a skill</b><br>Press <kbd>v</kbd> to read the whole SKILL.md in a large reader, with an outline of its sections.<br><br><img src="docs/images/reader.png" alt="The reader with an outline and the formatted SKILL.md" width="860"></td></tr>
+</table>
 
 ## How it works
 
@@ -215,10 +207,22 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 | `src/skill_atlas/harnesses.py` | Where each harness looks for skills, and how its switch reads and writes |
 | `src/skill_atlas/usage.py` | Counts skill use from session logs of Claude Code, Codex, Gemini CLI, Copilot CLI, and OpenCode |
 | `src/skill_atlas/remove.py` | Moves skills to the Trash, and puts them back |
+| `src/skill_atlas/tokens.py` | Estimates the context cost of each skill |
+| `src/skill_atlas/health.py` | Finds problems in SKILL.md files and in the store |
+| `src/skill_atlas/overlap.py` | Finds similar skills and copies that differ |
+| `src/skill_atlas/security.py` | Read-only scan for risky patterns in skill folders |
+| `src/skill_atlas/history.py` | Diffs before an update, snapshots, and rollback |
+| `src/skill_atlas/profiles.py` | Saves and applies named sets of switches |
+| `src/skill_atlas/manifest.py` | Export, import, and restore of a skill set |
 | `src/skill_atlas/build.py` | Puts the records into `web/index.html` |
 | `src/skill_atlas/web/index.html` | The page: one file of HTML, CSS, and JavaScript |
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
+
+## Credits
+
+The interface follows the design engineering skills of [Emil Kowalski](https://emilkowal.ski). We
+used them for most of the layout, motion, color, and polish decisions on this page.
 
 ## License
 
