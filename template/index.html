@@ -271,6 +271,42 @@
   body.compact .nm { flex: none; max-width: 48%; }
   body.compact .desc { color: var(--text-3); flex: 1; min-width: 0; }
 
+  /* ---------- marking for bulk actions: a checkbox in the gutter left of each row ---------- */
+  .mark {
+    position: absolute; left: -22px; top: 50%; translate: 0 -50%; z-index: 1; width: 16px; height: 16px; padding: 0; border: 0;
+    border-radius: 4px; background: var(--surface-1); box-shadow: inset 0 0 0 1.5px var(--border-strong); cursor: pointer;
+    display: grid; place-items: center; color: var(--on-accent); opacity: 0; transition: opacity 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  }
+  .mark::before { content: ""; position: absolute; inset: -6px; }
+  .mark svg { width: 12px; height: 12px; opacity: 0; transition: opacity 120ms ease; }
+  .mark[aria-checked="true"], .mark[aria-checked="mixed"] { background: var(--accent); box-shadow: none; }
+  .mark[aria-checked="true"] svg.ck, .mark[aria-checked="mixed"] svg.mx { opacity: 1; }
+  .mark svg.mx { position: absolute; }
+  @media (hover: hover) and (pointer: fine) { .row:hover > .mark, .group-head:hover > .mark { opacity: 1; } }
+  .mark:focus-visible, .mark[aria-checked="true"], .mark[aria-checked="mixed"], body.marking .mark { opacity: 1; }
+  @media (hover: none) { .mark { opacity: 1; } #list { padding-left: 32px !important; } }
+  body.ro .mark { display: none; }
+  .row[data-marked] { background: color-mix(in oklab, var(--accent) 9%, transparent); }
+  @media (hover: hover) and (pointer: fine) { .row[data-marked]:hover { background: color-mix(in oklab, var(--accent) 13%, transparent); } }
+  .group-head > .mark { left: -22px; }
+  /* Sticky heads reach into the gutter, so marks scrolling under them stay hidden. */
+  .sec-head::before, .group-head::before { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: inherit; }
+
+  .bulk { display: none; }
+  body.marking .bar2.filters { display: none; }
+  body.marking .bar2.bulk { display: flex; }
+  .bulk .count { display: inline-flex; align-items: center; gap: var(--s2); font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bulk .count span { font-weight: 400; color: var(--text-3); }
+  .bulk .acts { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .bulk .acts .tnum { color: inherit; opacity: .7; }
+  .bulk .end { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+  .bulk form { display: flex; align-items: center; gap: 6px; }
+  .bulk form input {
+    width: 220px; height: 26px; padding: 0 8px; border-radius: var(--r-md); border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font: 12.5px var(--mono);
+  }
+  .bulk .err { color: var(--danger); font-size: 12px; white-space: nowrap; }
+
   /* ---------- cards: the same .row nodes, laid out in a grid ---------- */
   .thumb { display: none; }
   body.cards .group, body.cards .avail-block, body.cards .sec-body:has(> .row) {
@@ -288,6 +324,7 @@
   @media (hover: hover) and (pointer: fine) { body.cards .row:hover { background: var(--surface-1); box-shadow: var(--elevation-raised-hover); } }
   body.cards .row[aria-current="true"] { background: var(--surface-1); }
   body.cards .row > .kh, body.cards .row:has(.open:focus-visible) > .kh { display: none; }
+  body.cards .row > .mark { left: auto; right: 8px; top: 8px; translate: none; }
   body.cards .row .use { grid-column: 1; grid-row: 2; justify-content: flex-start; padding-left: 16px; min-width: 0; }
   body.cards .row .open { grid-column: 1 / -1; grid-row: 1; align-self: start; display: grid; gap: 4px; padding: 0; }
   body.cards .row .uslot { grid-column: 2; grid-row: 2; min-width: 0; }
@@ -754,7 +791,7 @@
       </div>
     </div>
   </div>
-  <div class="bar2">
+  <div class="bar2 filters">
     <div class="seg" id="view" role="group" aria-label="Show">
       <button data-v="all" aria-pressed="true">All <span class="n" data-n="all"></span></button>
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
@@ -765,6 +802,7 @@
     </div>
     <div class="meta" id="meta"></div>
   </div>
+  <div class="bar2 bulk" id="bulk" role="toolbar" aria-label="Bulk actions"></div>
   <div class="band" id="band" hidden>Read-only build. Run <code>./atlas</code> to change skills.</div>
   <div class="band" id="stale" role="alert" hidden></div>
   <div id="bar" aria-hidden="true"><i></i></div>
@@ -810,6 +848,7 @@ const ui = {
   compact: localStorage.getItem('atlas.compact') === '1',
   layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
   sort: localStorage.getItem('atlas.sort') || 'name',
+  marked: new Set(), lastMark: null, bulkConfirm: null, bulkLink: false, bulkErr: null,
   menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
@@ -1127,10 +1166,40 @@ function row(s) {
     : '<span></span>';
   const hints = `<span class="kh" aria-hidden="true">${s.scope === 'personal' && WRITABLE ? `<kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}` : ''}</span>`;
   const cls = ui.restored.has(s.path) ? 'row enter restored' : 'row';
-  return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'} aria-current="${ui.selected === s}">
-    <button class="open" data-id="${s.id}" data-leaf>${thumbHtml(s, s.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
+  return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'}${isMarked(s) ? ' data-marked' : ''} aria-current="${ui.selected === s}">
+    ${WRITABLE ? markHtml(s) : ''}<button class="open" data-id="${s.id}" data-leaf>${thumbHtml(s, s.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
     ${useCell(s)}${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
   </div>`;
+}
+
+// ---------------------------------------------------------------- marking for bulk actions
+const MARK_ICONS = '<svg class="ck" viewBox="0 0 12 12" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3L9.5 3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  + '<svg class="mx" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const markKey = s => 'r:' + s.path;
+const isMarked = s => ui.marked.has(markKey(s));
+const markedSkills = () => SKILLS.filter(isMarked);
+function markHtml(s) {
+  return `<button class="mark" data-k="mk" data-mark="${esc(markKey(s))}" role="checkbox" aria-checked="${isMarked(s)}" aria-label="Select /${esc(s.invoke)}">${MARK_ICONS}</button>`;
+}
+function markGroupHtml(id, list) {
+  if (!list.length) return '';
+  const n = list.filter(isMarked).length;
+  const checked = n === 0 ? 'false' : n === list.length ? 'true' : 'mixed';
+  return `<button class="mark" data-k="mg" data-mark-group="${esc(list.map(markKey).join('\n'))}" role="checkbox" aria-checked="${checked}" aria-label="Select all ${list.length} in ${esc(id.slice(4))}">${MARK_ICONS}</button>`;
+}
+function setMarks(keys, on) {
+  for (const k of keys) on ? ui.marked.add(k) : ui.marked.delete(k);
+  ui.bulkConfirm = null;
+  if (!ui.marked.size) { ui.bulkLink = false; ui.bulkErr = null; }
+  render();
+}
+// Shift-click marks every visible row between the last mark and this one.
+function markRange(key) {
+  const keys = [...el('list').querySelectorAll('.row > .mark')].map(m => m.dataset.mark);
+  const a = keys.indexOf(ui.lastMark), b = keys.indexOf(key);
+  if (a < 0 || b < 0) return false;
+  setMarks(keys.slice(Math.min(a, b), Math.max(a, b) + 1), true);
+  return true;
 }
 
 const collapsed = new Set(JSON.parse(localStorage.getItem('atlas.collapsed') || '[]'));
@@ -1138,8 +1207,8 @@ const saveCollapsed = () => localStorage.setItem('atlas.collapsed', JSON.stringi
 const isOpen = id => Boolean(ui.q) || !collapsed.has(id);
 
 // The group name opens its detail; the chevron beside it folds the group.
-function groupTitle(id, label, repo, nameHtml, open) {
-  return `${fold(id, '', `Show or hide ${label}`, open)}<button class="gopen" data-k="go" data-group="${esc(id)}" aria-label="Details for ${esc(label)}">${avatar(label, repo)}<span class="gname" data-leaf>${nameHtml}</span></button>`;
+function groupTitle(id, label, repo, nameHtml, open, list = []) {
+  return `${WRITABLE ? markGroupHtml(id, list) : ''}${fold(id, '', `Show or hide ${label}`, open)}<button class="gopen" data-k="go" data-group="${esc(id)}" aria-label="Details for ${esc(label)}">${avatar(label, repo)}<span class="gname" data-leaf>${nameHtml}</span></button>`;
 }
 
 function fold(id, inner, label, open = isOpen(id)) {
@@ -1290,7 +1359,7 @@ function sourceGroups(personal) {
       ? `<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length && ui.view !== 'new' ? ` · ${list.length} shown` : ''}`
       : 'watching';
     const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
-    const head = `${groupTitle(id, source, local ? null : source, highlight(source), ui.view === 'new' || isOpen(id))}
+    const head = `${groupTitle(id, source, local ? null : source, highlight(source), ui.view === 'new' || isOpen(id), list)}
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
       <span class="gsub" data-leaf>${meta}</span>${groupSpark(all)}
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
@@ -1357,7 +1426,7 @@ function render() {
       const ctl = lv.status === 'stale' ? '' :
         switchHtml(st.on, `Plugin ${lv.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
       const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
-      const head = `${groupTitle('plg:' + ref, lv.plugin, repoOf(lv), highlight(lv.plugin), isOpen('plg:' + ref))}
+      const head = `${groupTitle('plg:' + ref, lv.plugin, repoOf(lv), highlight(lv.plugin), isOpen('plg:' + ref), list)}
         <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span>${groupSpark(list)}<span class="gctl" data-k="c">${ctl}</span>`;
       return group('plg:' + ref, head, list.map(row).join(''));
     });
@@ -1368,7 +1437,7 @@ function render() {
   if (project.length) {
     const byProject = groupMap(project, s => s.project).sort(([a], [b]) => a.localeCompare(b));
     const groups = byProject.map(([name, list]) => group('prj:' + name,
-      `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name))}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
+      `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name), list)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
       list.map(row).join('')));
     out.push(section('sec:project', 'Project skills', project.length, groups.join(''), byProject.map(([n]) => 'prj:' + n)));
   }
@@ -1420,6 +1489,7 @@ function renderChrome() {
     }
   }
   patch(el('cluster'), cluster);
+  renderBulk();
   renderBar();
 }
 
@@ -1443,7 +1513,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -2198,6 +2268,99 @@ document.addEventListener('pointerout', e => {
   if (g && !g.contains(e.relatedTarget)) { const r = g.closest('.heat').querySelector('.heat-read'); r.textContent = r.dataset.default; }
 });
 
+// ---------------------------------------------------------------- bulk actions
+// What each action would touch among the marked skills, so every button shows a real count.
+function bulkPlan() {
+  const list = markedSkills();
+  const own = list.filter(s => s.scope === 'personal' && live(s));
+  const plugins = [...new Set(list.filter(s => s.scope === 'plugin' && s.status !== 'stale').map(s => s.plugin_ref))];
+  const pluginOn = ref => DATA.settings[ui.root]?.enabledPlugins?.[ref] === true;
+  return {
+    list,
+    on: { skills: own.filter(s => !state(s).on), plugins: plugins.filter(r => !pluginOn(r)) },
+    off: { skills: own.filter(s => state(s).on), plugins: plugins.filter(pluginOn) },
+    update: own.filter(isOutdated),
+    link: own.filter(s => !lockName(s)),
+    del: own,
+  };
+}
+
+function renderBulk() {
+  document.body.classList.toggle('marking', ui.marked.size > 0);
+  if (!ui.marked.size) return patch(el('bulk'), '');
+  const b = bulkPlan();
+  const hidden = b.list.filter(s => !visible(s)).length;
+  const n = x => x.skills.length + x.plugins.length;
+  const btn = (k, label, count, attrs, cls = 'btn ghost') => `<button class="${cls}" data-k="${k}" ${attrs}${count ? '' : ' disabled'}>${label}${count ? ` <span class="tnum">${count}</span>` : ''}</button>`;
+  const confirm = ui.bulkConfirm === 'del';
+  const acts = ui.bulkLink
+    ? `<form data-k="blf" data-bulk-link><input name="repo" placeholder="owner/repo" aria-label="GitHub repo to link ${plural(b.link.length, 'skill')} to" autocomplete="off" spellcheck="false" required>
+        <button class="btn">Link ${b.link.length}</button><button type="button" class="btn ghost" data-bulk-link-cancel>Cancel</button>
+        ${ui.bulkErr ? `<span class="err" role="alert">${esc(ui.bulkErr)}</span>` : ''}</form>`
+    : [
+      btn('on', 'Turn on', n(b.on), 'data-bulk="on"'),
+      btn('off', 'Turn off', n(b.off), 'data-bulk="off"'),
+      btn('up', 'Update', b.update.length, 'data-bulk="update"', 'btn accent'),
+      btn('ln', 'Link to GitHub…', b.link.length, 'data-bulk="link"'),
+      `<button class="btn ghost" data-k="cp" data-bulk="copy">${ICON.copy}Copy as prompt</button>`,
+      btn('del', confirm ? `Move ${b.del.length} to Trash` : 'Delete…', confirm ? 0 : b.del.length, 'data-bulk="delete"', `btn danger${confirm ? ' confirm' : ''}`),
+    ].join('');
+  patch(el('bulk'), `<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
+    <span class="acts" data-k="a">${acts}</span>
+    <span class="end" data-k="e"><button class="btn ghost" data-k="cl" data-bulk="clear">Clear <kbd>esc</kbd></button></span>`);
+}
+
+async function bulkToggle(on) {
+  const plan = bulkPlan()[on ? 'on' : 'off'];
+  const names = plan.skills.map(s => s.name), refs = plan.plugins;
+  cascade(rowSwitches(names), on);
+  if (names.length) await post('skill', names, on);
+  if (refs.length) await post('plugin', refs, on);
+  const what = [names.length ? plural(names.length, 'skill') : '', refs.length ? plural(refs.length, 'plugin') : ''].filter(Boolean).join(' and ');
+  toast(`Turned <b>${what}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`, async () => {
+    cascade(rowSwitches(names), !on);
+    if (names.length) await post('skill', names, !on);
+    if (refs.length) await post('plugin', refs, !on);
+  });
+}
+
+async function bulkLink(form) {
+  const names = bulkPlan().link.map(s => s.dir_name);
+  try {
+    const r = await api('/api/link', { names, repo: form.repo.value });
+    if (!r.linked.length) { ui.bulkErr = `No folder in ${r.repo} has the same name as these skills.`; return renderBulk(); }
+    ui.bulkLink = false; ui.bulkErr = null;
+    await reloadData(); await checkUpdates(true);
+    toast(`Linked <b>${r.linked.length}</b> to ${esc(r.repo)}.${r.missing.length ? ` No folder for: ${esc(r.missing.join(', '))}.` : ''}`);
+  } catch (err) {
+    ui.bulkErr = err.message; renderBulk();
+  }
+}
+
+async function bulk(action) {
+  const b = bulkPlan();
+  if (action === 'clear') return setMarks([...ui.marked], false);
+  if (action === 'on' || action === 'off') return bulkToggle(action === 'on').catch(err => { rerender(); toast(`Could not save: ${esc(err.message)}`); });
+  if (action === 'update') return updateBatch(b.update);
+  if (action === 'link') { ui.bulkLink = true; ui.bulkErr = null; renderBulk(); el('bulk').querySelector('input')?.focus(); return; }
+  if (action === 'copy') {
+    const text = b.list.map(s => '/' + s.invoke).join(' ');
+    return navigator.clipboard.writeText(text).then(() => toast(`Copied ${plural(b.list.length, 'skill')}: <code>${esc(text.length > 80 ? text.slice(0, 80) + '…' : text)}</code>`), () => toast('Could not copy.'));
+  }
+  if (action === 'delete') {
+    if (ui.bulkConfirm !== 'del') {
+      ui.bulkConfirm = 'del'; renderBulk();
+      setTimeout(() => { if (ui.bulkConfirm === 'del') { ui.bulkConfirm = null; renderBulk(); } }, 4000);
+      return;
+    }
+    ui.bulkConfirm = null;
+    for (const s of b.del) ui.marked.delete(markKey(s));
+    return deleteSkills(b.del);
+  }
+}
+
+el('bulk').addEventListener('submit', e => { e.preventDefault(); bulkLink(e.target); });
+
 // ---------------------------------------------------------------- toast
 let toastTimer, toastGone, toastUndo = null;
 function toast(html, undo) {
@@ -2576,6 +2739,18 @@ document.addEventListener('click', async e => {
   const t = e.target;
   if (ui.menu && !t.closest('.menu-wrap')) closeMenu(false);
 
+  const mk = t.closest('[data-mark]');
+  if (mk) {
+    const key = mk.dataset.mark;
+    if (!(e.shiftKey && markRange(key))) setMarks([key], !ui.marked.has(key));
+    ui.lastMark = key;
+    return;
+  }
+  const mg = t.closest('[data-mark-group]');
+  if (mg) return setMarks(mg.dataset.markGroup.split('\n'), mg.getAttribute('aria-checked') !== 'true');
+  const bk = t.closest('[data-bulk]');
+  if (bk) return bulk(bk.dataset.bulk);
+  if (t.closest('[data-bulk-link-cancel]')) { ui.bulkLink = false; ui.bulkErr = null; return renderBulk(); }
   const sw = t.closest('.switch');
   if (sw) {
     if (!WRITABLE) return toast('This page is read-only. Run <b>./atlas</b> to change skills.');
@@ -2821,6 +2996,9 @@ document.addEventListener('keydown', e => {
 
   if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (mod && e.key.toLowerCase() === 'z' && !typing && !e.shiftKey) { if (runUndo()) e.preventDefault(); return; }
+  if (mod && e.key.toLowerCase() === 'a' && !typing && WRITABLE) {
+    e.preventDefault(); setMarks([...el('list').querySelectorAll('.row > .mark')].map(m => m.dataset.mark), true); return;
+  }
   if (mod || e.altKey) return;
 
   if (e.key === 'Escape') {
@@ -2830,8 +3008,11 @@ document.addEventListener('keydown', e => {
       return;
     }
     if (typing && t.closest('.linkform')) { ui.linkOpen = null; ui.watchOpen = false; ui.linkErr = null; render(); return; }
+    if (typing && t.closest('#bulk')) { ui.bulkLink = false; ui.bulkErr = null; renderBulk(); return; }
     if (ui.menu) return closeMenu();
     if (ui.confirm || upd.confirm) { ui.confirm = null; upd.confirm = null; rerender(); return; }
+    if (ui.bulkConfirm) { ui.bulkConfirm = null; renderBulk(); return; }
+    if (ui.marked.size) return setMarks([...ui.marked], false);
     if (ui.selected) { const k = selKey(ui.selected); select(null); focusRow(k); }
     return;
   }
@@ -2840,6 +3021,11 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === 'm' && WRITABLE) {
+    const k = t.closest?.('.row')?.querySelector(':scope > .mark')?.dataset.mark;
+    if (k) { setMarks([k], !ui.marked.has(k)); ui.lastMark = k; }
+    return;
+  }
   if (e.key === 's') { const order = ['name', 'uses', 'recent']; setSort(order[(order.indexOf(ui.sort) + 1) % 3]); toast(`Sorted by ${{ name: 'name', uses: 'most used', recent: 'recently used' }[ui.sort]}.`); return; }
   if (e.key === 'g') { setLayout(ui.layout === 'cards' ? 'list' : 'cards'); render(); return; }
   if (e.key === 'v') {
