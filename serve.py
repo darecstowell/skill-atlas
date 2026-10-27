@@ -26,6 +26,7 @@ import manifest
 import overlap
 import profiles
 import remove
+import security
 import updates
 import usage
 from build import render_page
@@ -281,6 +282,12 @@ class Handler(BaseHTTPRequestHandler):
             q = parse_qs(query)
             a, b = (scanned_path(q.get(k, [""])[0]) for k in ("a", "b"))
             return self._json(200, overlap.diff(a, b))
+        if path == "/api/security":
+            want = parse_qs(query).get("path", [""])[0]
+            rec = next((s for s in scan(REPO)["skills"] if s["path"] == want), None)
+            if rec is None:
+                raise ValueError("unknown skill path")
+            return self._json(200, security.report(Path(want).parent, rec["allowed_tools"]))
         if path.startswith("/api/jobs/"):
             job = updates.JOBS.get(path[10:])
             if job is None:

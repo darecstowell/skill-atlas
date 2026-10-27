@@ -1095,6 +1095,36 @@
     @starting-style { .menu, .linkform, #toast, #help, #help .sheet, .row.enter { opacity: 1; transform: none; } }
     @supports (animation-timeline: scroll()) { @media (max-width: 1100px) { .bar2 { animation: edges linear both !important; animation-timeline: scroll(self inline) !important; } } }
   }
+  /* Security scan */
+  :root { --tint-danger: color-mix(in oklab, var(--danger) 12%, var(--surface-1)); }
+  .tag.risk { color: var(--danger); background: var(--tint-danger); border-color: transparent; }
+  .sec h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .sec-g { display: grid; gap: 6px; }
+  .sec-h {
+    all: unset; box-sizing: border-box; display: flex; align-items: center; gap: var(--s2); min-height: 32px; padding: 0 8px; margin: 0 -8px;
+    border-radius: var(--r-md); font-size: 13px; color: var(--text); cursor: pointer;
+  }
+  .sec-h:hover { background: var(--surface-2); }
+  .sec-h:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .sec-h b { flex: 1; min-width: 0; font-weight: 600; }
+  .sec-h .tnum { color: var(--text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .sec-h .chev { width: 12px; height: 12px; color: var(--text-3); transition: transform 160ms var(--ease-out); }
+  .sec-h[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+  .sec-lv { flex: none; width: 58px; justify-content: center; }
+  .sec-lv.high { color: var(--danger); background: var(--tint-danger); border-color: transparent; }
+  .sec-lv.medium { color: var(--warn); background: var(--tint-warn); border-color: transparent; }
+  .sec-body { display: grid; gap: var(--s2); padding-left: 66px; }
+  .sec-body[hidden] { display: none; }
+  .sec-body > p { margin: 0; font-size: 12px; color: var(--text-2); max-width: 65ch; }
+  .sec-list { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+  .sec-list li { display: grid; gap: 2px; min-width: 0; }
+  .sec-loc { font: 11.5px var(--mono); color: var(--text-3); overflow-wrap: anywhere; }
+  .sec-list code {
+    display: block; padding: 4px 6px; border-radius: var(--r-sm); background: var(--surface-2);
+    font: 11.5px/1.5 var(--mono); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .sec-more { margin: 0; font-size: 12px; color: var(--text-3); }
+  @media (max-width: 520px) { .sec-body { padding-left: 0; } }
 </style>
 </head>
 <body>
@@ -1174,6 +1204,7 @@
       <button data-v="costly" aria-pressed="false" id="viewCostly" hidden title="On, costly, and not used in 90 days">Costly <span class="n" data-n="costly"></span></button>
       <button data-v="similar" aria-pressed="false" id="view-similar" hidden>Similar</button>
       <button data-v="diverged" aria-pressed="false" id="view-diverged" hidden>Diverged</button>
+      <button data-v="review" aria-pressed="false" id="viewReview" hidden title="Skills with high-risk patterns">Review <span class="n" data-n="review"></span></button>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -1433,6 +1464,7 @@ function visible(s) {
   else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view === 'costly') { if (!costlyUnused().has(s)) return false; }
   else if (ui.view === 'similar' || ui.view === 'diverged') { if (!overlapView(s)) return false; }
+  else if (ui.view === 'review') { if (!isRisky(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
   return terms.every(t => s._hay.includes(t));
@@ -1516,11 +1548,13 @@ function switchHtml(on, label, attrs) {
 function tagsHtml(s, st) {
   const tags = [
     issueTag(s),
+    isRisky(s) ? secTag(s) : '',
     s.local_edits ? '<span class="tag edited" title="Changed after install. Updating replaces your changes.">edited</span>' : '',
     updStatus(s) === 'unknown' ? '<span class="tag gone" title="Not found in the source repo. It may have moved or been removed.">not upstream</span>' : '',
     isOutdated(s) && !WRITABLE ? '<span class="tag update">update</span>' : '',
     s.manual_only ? '<span class="tag manual" title="disable-model-invocation: the agent never calls it on its own">you only</span>' : '',
     s.claude_only ? '<span class="tag manual" title="user-invocable: false. It is not in the / menu">agent only</span>' : '',
+    isRisky(s) ? '' : secTag(s),
     st.mode && !['on', 'off', 'not set', 'project only'].includes(st.mode) ? `<span class="tag">${esc(st.mode)}</span>` : '',
     s.status === 'stale' ? `<span class="tag">v${esc(s.plugin_version)}</span>` : '',
     s._dupes?.length ? `<span class="tag" title="Same description as ${esc(s._dupes.join(', '))}">same as ${esc(s._dupes[0])}</span>` : '',
@@ -1815,6 +1849,7 @@ function emptyHtml() {
   }
   if (ui.view === 'issues') return '<div class="empty" data-k="empty"><h2>No problems found</h2><p>Each SKILL.md in this view has valid frontmatter, and each file it names is there.</p></div>';
   if (ui.view === 'similar' || ui.view === 'diverged') return overlapEmpty();
+  if (ui.view === 'review') return `<div class="empty" data-k="empty"><h2>Nothing to review</h2><p>No skill in this view has high-risk patterns. ${SEC_NOTE}</p></div>`;
   if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
   if (ui.view === 'costly') return '<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
@@ -1885,7 +1920,7 @@ function renderChrome() {
   const on = lv.filter(s => state(s).on).length;
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
-  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length, review: SKILLS.filter(s => inView(s) && isRisky(s)).length };
   counts.costly = costlyUnused().size; el('viewCostly').hidden = ui.view !== 'costly';
   counts.issues = lv.filter(s => s.problems?.length).length;
   el('viewIssues').hidden = !counts.issues && ui.view !== 'issues';
@@ -1895,6 +1930,7 @@ function renderChrome() {
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
   el('viewUpdates').hidden = !WRITABLE;
   overlapChrome();
+  el('viewReview').hidden = !counts.review && ui.view !== 'review';
   el('viewNew').hidden = !WRITABLE || (!fresh && ui.view !== 'new');
   const badge = [outdated.length ? `${outdated.length}↑` : '', fresh ? `${fresh} new` : ''].filter(Boolean).join(' · ');
   document.title = WRITABLE && badge ? `(${badge}) Skill Atlas` : 'Skill Atlas';
@@ -1982,6 +2018,7 @@ function inventoryHtml() {
     ${inventoryUsageHtml(lv)}
     ${costHtml()}
     ${skillSetHtml()}
+    ${inventorySecHtml(SKILLS.filter(inView))}
     <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
 }
@@ -2125,6 +2162,7 @@ function detailHtml(s) {
     ${s.scope === 'personal' ? loadedHtml(s) : ''}
     ${overlapHtml(s)}
     ${usageHtml(s)}
+    ${securityHtml(s)}
     <div class="d-sec" data-k="facts"><dl data-leaf>
       ${field('Version', s.plugin_version || s.version, true)}
       ${field('Updated', (s.last_updated || o.updatedAt || s.modified || '').slice(0, 10))}
@@ -2846,6 +2884,91 @@ document.addEventListener('pointerout', e => {
   if (g && !g.contains(e.relatedTarget)) { const r = g.closest('.heat').querySelector('.heat-read'); r.textContent = r.dataset.default; }
 });
 
+// ---------------------------------------------------------------- security scan
+// flip: groups the user opened or closed against the default (info starts closed).
+const SEC = { by: new Map(), flip: new Set() };
+const SEC_RULES = {
+  'remote-exec': 'Runs downloaded code', 'decode-exec': 'Decodes and runs data', secrets: 'Reads secrets',
+  'env-leak': 'Sends the environment out', tools: 'Broad tool access', injection: 'Prompt injection',
+  'hidden-comment': 'Hidden instructions', invisible: 'Invisible characters', blob: 'Encoded blob',
+  escapes: 'Escaped text', code: 'Scripts', network: 'Network hosts',
+};
+const SEC_NOTE = 'A heuristic scan of the files. It can miss real risks and flag safe code.';
+const secOf = s => s.security || { level: 'none', counts: { high: 0, medium: 0, info: 0 }, code: 0 };
+const isRisky = s => secOf(s).level === 'high';
+
+function secTag(s) {
+  const x = secOf(s);
+  if (x.level === 'high') return `<span class="tag risk" title="${plural(x.counts.high, 'high-risk pattern')}. Read Security in the detail panel.">review</span>`;
+  if (x.code) return `<span class="tag" title="Ships ${plural(x.code, 'script')} the agent can run">runs code</span>`;
+  return '';
+}
+
+async function loadSec(s) {
+  SEC.by.set(s.path, 'loading');
+  try {
+    SEC.by.set(s.path, await api('/api/security?path=' + encodeURIComponent(s.path)));
+  } catch (e) {
+    SEC.by.set(s.path, { error: e.message });
+  }
+  if (ui.selected?.path === s.path) renderDetail();
+}
+
+function secGroupHtml(s, rule, level, list) {
+  const key = `${s.path}:${rule}:${level}`;
+  const open = (level !== 'info') !== SEC.flip.has(key);
+  const items = list.map(f => `<li><span class="sec-loc">${esc(f.file)}:${f.line}</span>${f.excerpt ? `<code>${esc(f.excerpt)}</code>` : ''}</li>`).join('');
+  const msg = rule === 'network' ? 'Hosts named in the scripts. The skill can call them when it runs.' : list[0].message;
+  return `<div class="sec-g" data-k="g:${esc(rule)}:${level}">
+    <button class="sec-h" data-k="h" data-leaf data-sec-group="${esc(key)}" aria-expanded="${open}">
+      <span class="tag sec-lv ${level}">${level}</span><b>${esc(SEC_RULES[rule] || rule)}</b><span class="tnum">${list.length}</span>${ICON.chev}</button>
+    <div class="sec-body" data-k="b" data-leaf${open ? '' : ' hidden'}><p>${esc(msg)}</p><ul class="sec-list">${items}</ul></div>
+  </div>`;
+}
+
+function securityHtml(s) {
+  if (s.kind) return '';
+  const sum = secOf(s);
+  const wrap = body => `<div class="d-sec sec" data-k="sec"><h3 data-leaf>Security</h3>${body}<p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p></div>`;
+  if (!WRITABLE) {
+    const c = sum.counts;
+    const line = sum.level === 'none' ? 'No risky patterns found.'
+      : [c.high && `${c.high} high`, c.medium && `${c.medium} medium`, c.info && `${c.info} info`].filter(Boolean).join(' · ') + '. Run ./atlas to see each finding.';
+    return wrap(`<p class="use-note" data-k="ss" data-leaf>${line}</p>`);
+  }
+  const rep = SEC.by.get(s.path);
+  if (!rep) loadSec(s);
+  if (!rep || rep === 'loading') return wrap('<p class="use-note" data-k="ss" data-leaf>Scanning the files…</p>');
+  if (rep.error) return wrap(`<p class="use-note" data-k="ss" data-leaf>Could not scan this skill: ${esc(rep.error)}</p>`);
+  if (!rep.findings.length) return wrap(`<p class="use-note" data-k="ss" data-leaf>No risky patterns in ${plural(rep.files, 'file')}.</p>`);
+  const groups = new Map();
+  for (const f of rep.findings) {
+    const k = f.rule + '\0' + f.level;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(f);
+  }
+  const html = [...groups].map(([k, list]) => { const [rule, level] = k.split('\0'); return secGroupHtml(s, rule, level, list); }).join('');
+  const more = rep.truncated ? `<p class="sec-more" data-k="sm" data-leaf>${plural(rep.truncated, 'more finding')} not shown.</p>` : '';
+  const skipped = rep.skipped ? `<p class="sec-more" data-k="sk" data-leaf>${plural(rep.skipped, 'file')} over 1 MB not scanned.</p>` : '';
+  return wrap(html + more + skipped);
+}
+
+function toggleSecGroup(b) {
+  const key = b.dataset.secGroup;
+  if (!SEC.flip.delete(key)) SEC.flip.add(key);
+  renderDetail();
+}
+
+function inventorySecHtml(list) {
+  const high = list.filter(isRisky).length;
+  const medium = list.filter(s => secOf(s).level === 'medium').length;
+  const code = list.filter(s => secOf(s).code).length;
+  const parts = [high && `<b>${high}</b> to review`, medium && `<b>${medium}</b> with medium findings`, `<b>${code}</b> run code`].filter(Boolean);
+  return `<div class="d-sec sec" data-k="isec"><h3 data-leaf>Security</h3>
+    <p class="use-note" data-k="is" data-leaf>${parts.join(' · ')}.${high ? ' <button class="linkbtn" data-view-review>Show them</button>' : ''}</p>
+    <p class="note" data-k="sn" data-leaf>${SEC_NOTE}</p></div>`;
+}
+
 // ---------------------------------------------------------------- bulk actions
 // What each action would touch among the marked skills, so every button shows a real count.
 function bulkPlan() {
@@ -3048,6 +3171,7 @@ async function reloadData() {
   const prev = ui.selected;
   DATA = { ...(await api('/api/data')), api_token: token };
   SKILLS = DATA.skills; index();
+  SEC.by.clear();
   if (USE.raw) indexUsage(USE.raw);
   if (prev?.kind === 'group') { ui.selected = membersOf(prev).length || (prev.type === 'src' && upd.available[prev.source]) ? prev : null; return; }
   // An available skill that just got installed stays selected as the installed skill.
@@ -3753,6 +3877,9 @@ document.addEventListener('click', async e => {
   if (t.closest('[data-view-costly]')) return showView('costly');
   const ch = t.closest('[data-cost-harness]');
   if (ch) { el('harness').value = ch.dataset.costHarness; el('harness').dispatchEvent(new Event('change')); return; }
+  if (t.closest('[data-view-review]')) return showView('review');
+  const secGroup = t.closest('[data-sec-group]');
+  if (secGroup) return toggleSecGroup(secGroup);
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');

@@ -15,6 +15,7 @@ from pathlib import Path
 import harnesses
 import health
 import overlap
+import security
 import tokens
 
 HOME = Path.home()
@@ -305,6 +306,7 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
     }
     rec.update(bundle_stats(skill_dir))
     rec.update(tokens.costs(str(rec["name"]), str(rec["description"]), body))
+    rec["security"] = security.summary(skill_dir, as_list(fm.get("allowed-tools")))
     rec.update(extra)
     rec.setdefault("invoke", rec["name"])
     return rec
