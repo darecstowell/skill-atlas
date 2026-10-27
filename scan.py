@@ -432,12 +432,26 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
 # --------------------------------------------------------------------------
 
 
+def user_config_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
+    return Path(base).expanduser() / "skill-atlas" / "config.json"
+
+
+def config_path(repo: Path) -> Path:
+    """$SKILL_ATLAS_CONFIG, else the user file, else a config.json next to the code."""
+    env = os.environ.get("SKILL_ATLAS_CONFIG")
+    if env:
+        return Path(env).expanduser()
+    user = user_config_path()
+    return user if user.exists() else repo / "config.json"
+
+
 def load_config(repo: Path) -> dict:
-    """config.json with defaults. Wrong types fall back, and CLAUDE_CONFIG_DIR joins the roots."""
-    cfg = read_json(repo / "config.json")
+    """The config with defaults. Wrong types fall back, and CLAUDE_CONFIG_DIR joins the roots."""
+    cfg = read_json(config_path(repo))
     roots = cfg.get("config_roots")
     if not isinstance(roots, dict) or not roots:
-        roots = {"personal": "~/.claude"}
+        roots = {"main": "~/.claude"}
     roots = {str(k): str(v) for k, v in roots.items() if isinstance(v, str) and v}
     env = os.environ.get("CLAUDE_CONFIG_DIR")
     if env and Path(env).expanduser().resolve() not in {
@@ -462,6 +476,34 @@ def load_config(repo: Path) -> dict:
         "project_roots": [str(p) for p in projects if isinstance(p, str) and p],
         "project_scan_depth": depth,
     }
+
+
+# Copies people keep around, not roots Claude Code runs from.
+SPARE = re.compile(r"archive|backup|bak|old|stale|copy", re.I)
+
+
+def detect_roots() -> dict[str, str]:
+    """~/.claude, CLAUDE_CONFIG_DIR, and each ~/.claude-<name> that has a settings.json."""
+    home = Path.home()
+    roots = {"main": "~/.claude"} if (home / ".claude").is_dir() else {}
+    for d in sorted(home.glob(".claude-*")):
+        if d.is_dir() and (d / "settings.json").is_file() and not SPARE.search(d.name):
+            roots[d.name.removeprefix(".claude-")] = "~/" + d.name
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    if env and env not in roots.values():
+        roots.setdefault(Path(env).expanduser().name.lstrip(".") or "config", env)
+    return roots or {"main": "~/.claude"}
+
+
+def write_user_config(force: bool = False) -> Path:
+    """Write a starter config with the roots found here. Never replaces a file unasked."""
+    path = user_config_path()
+    if path.exists() and not force:
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = {"config_roots": detect_roots(), "project_roots": [], "project_scan_depth": 3}
+    path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def scan(repo: Path) -> dict:

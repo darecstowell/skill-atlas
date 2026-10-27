@@ -126,13 +126,13 @@ def skill(root, name, text="---\nname: {name}\ndescription: d\n---\nbody\n"):
         "{not json",
         "[]",
         {"config_roots": ["~/.claude"], "project_roots": "~/nowhere", "project_scan_depth": "x"},
-        {"config_roots": {"personal": "~/.claude", "gone": "~/missing"}, "project_roots": [3]},
+        {"config_roots": {"main": "~/.claude", "gone": "~/missing"}, "project_roots": [3]},
     ],
 )
 def test_scan_odd_config(tmp_path, home, config):
     skill(home / ".claude", "demo")
     data = scan(repo_with(tmp_path, config))
-    assert data["config_roots"] == {"personal": str(home / ".claude")}
+    assert data["config_roots"] == {"main": str(home / ".claude")}
     assert [s["name"] for s in data["skills"]] == ["demo"]
 
 
@@ -162,7 +162,7 @@ def test_scan_odd_files(tmp_path, home):
         "fine": "d",
         "latin": "caf�",
     }
-    assert data["settings"]["personal"]["skillOverrides"] == {}
+    assert data["settings"]["main"]["skillOverrides"] == {}
 
 
 @pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="needs file modes")
@@ -175,3 +175,39 @@ def test_scan_skips_unreadable_skill(tmp_path, home):
     finally:
         md.chmod(0o644)
     assert [s["name"] for s in data["skills"]] == ["fine"]
+
+
+def test_config_lookup_order(tmp_path, monkeypatch):
+    from scan import config_path
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.delenv("SKILL_ATLAS_CONFIG", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    assert config_path(repo) == repo / "config.json"
+    user = tmp_path / "xdg" / "skill-atlas" / "config.json"
+    user.parent.mkdir(parents=True)
+    user.write_text("{}")
+    assert config_path(repo) == user
+    monkeypatch.setenv("SKILL_ATLAS_CONFIG", str(tmp_path / "mine.json"))
+    assert config_path(repo) == tmp_path / "mine.json"
+
+
+def test_init_writes_detected_roots(tmp_path, monkeypatch):
+    from scan import write_user_config
+
+    home = tmp_path / "home"
+    for d in (".claude", ".claude-work", ".claude-none", ".claude-STALE-archive"):
+        (home / d).mkdir(parents=True)
+    for d in (".claude-work", ".claude-STALE-archive"):
+        (home / d / "settings.json").write_text("{}")
+    monkeypatch.setattr(Path, "home", lambda: home)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    path = write_user_config()
+    cfg = json.loads(path.read_text())
+    assert cfg["config_roots"] == {"main": "~/.claude", "work": "~/.claude-work"}
+    assert cfg["project_roots"] == []
+    with pytest.raises(FileExistsError):
+        write_user_config()
+    assert write_user_config(force=True) == path

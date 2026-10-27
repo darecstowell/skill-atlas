@@ -13,6 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import serve
 
 
+@pytest.fixture(autouse=True)
+def no_user_config(tmp_path_factory, monkeypatch):
+    # Tests must never read the real ~/.config/skill-atlas/config.json.
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg")))
+    monkeypatch.delenv("SKILL_ATLAS_CONFIG", raising=False)
+
+
 @pytest.fixture
 def server_root(tmp_path):
     return tmp_path
