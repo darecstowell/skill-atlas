@@ -21,6 +21,7 @@ from urllib.parse import parse_qs
 
 import assets
 import harnesses
+import history
 import remove
 import updates
 import usage
@@ -243,6 +244,13 @@ class Handler(BaseHTTPRequestHandler):
             want = scanned_path(parse_qs(query).get("path", [""])[0])
             text = Path(want).read_text(encoding="utf-8", errors="replace")
             return self._json(200, {"text": text})
+        if path in ("/api/diff", "/api/history"):
+            name = parse_qs(query).get("name", [""])[0]
+            if not SAFE_NAME.match(name):
+                raise ValueError("bad skill name")
+            if path == "/api/diff":
+                return self._json(200, history.diff(name, roots()))
+            return self._json(200, history.listing(name))
         if path.startswith("/api/jobs/"):
             job = updates.JOBS.get(path[10:])
             if job is None:
@@ -279,6 +287,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/dismiss":
                 return self._json(200, updates.dismiss(repo, paths, roots()))
             return self._json(200, updates.job_view(updates.start_install(repo, paths, roots())))
+        if path == "/api/rollback":
+            name = str(req["name"])
+            if not SAFE_NAME.match(name):
+                raise ValueError("bad skill name")
+            return self._json(200, history.rollback(name, str(req["id"]), roots()))
         if path == "/api/undo-delete":
             return self._json(200, remove.undo())
         if path in ("/api/update", "/api/link", "/api/delete"):

@@ -764,6 +764,54 @@
   .btn.danger.solid { background: var(--danger); border-color: transparent; color: var(--on-accent); }
   @media (hover: hover) and (pointer: fine) { .btn.danger.solid:hover { background: color-mix(in oklab, var(--danger) 88%, var(--text)); color: var(--on-accent); } }
 
+  /* ---------- diff and history ---------- */
+  #histDlg {
+    width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: 14px;
+    background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop); overflow: hidden;
+    opacity: 1; transform: none; transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  }
+  #histDlg.wide { width: min(860px, calc(100vw - 32px)); }
+  @starting-style { #histDlg[open] { opacity: 0; transform: scale(.97); } }
+  #histDlg::backdrop { background: oklch(0 0 0 / .45); transition: opacity 180ms var(--ease-out); }
+  @starting-style { #histDlg[open]::backdrop { opacity: 0; } }
+  #histDlg form { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; max-height: calc(100dvh - 32px); padding: 20px var(--s5) var(--s4); }
+  #histDlg h2 { margin: 0; font-size: 15px; font-weight: 600; text-wrap: balance; }
+  #histDlg h2 code { font: 600 14px var(--mono); }
+  #histDlg .note { margin: 0 0 var(--s3); }
+  .hd-sum { display: flex; flex-wrap: wrap; gap: 4px var(--s3); margin: 0 0 var(--s3); font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .hd-add { color: var(--on); } .hd-del { color: var(--danger); }
+  .hd-files { display: grid; gap: var(--s2); align-content: start; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .hd-wait { margin: 0; padding: var(--s4) 0; font-size: 13px; color: var(--text-3); }
+  .hd-file { border-radius: var(--r-lg); background: var(--surface-2); }
+  .hd-file summary {
+    display: flex; align-items: center; gap: var(--s2); min-height: 36px; padding: 0 var(--s3); border-radius: var(--r-lg);
+    list-style: none; cursor: pointer; font-size: 12.5px; color: var(--text-2);
+  }
+  .hd-file summary::-webkit-details-marker { display: none; }
+  .hd-file summary:hover { color: var(--text); }
+  .hd-file summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .hd-file summary .chev { width: 12px; height: 12px; flex: none; color: var(--text-3); rotate: -90deg; transition: rotate 150ms var(--ease-out); }
+  .hd-file[open] summary .chev { rotate: 0deg; }
+  .hd-path { flex: 1; min-width: 0; font: 500 12px var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hd-st { flex: none; }
+  .hd-st[data-st="added"] { color: var(--on); background: var(--tint-on); border-color: transparent; }
+  .hd-st[data-st="removed"] { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, var(--surface-1)); border-color: transparent; }
+  .hd-n { flex: none; font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+  .hd-code { margin: 0 var(--s2) var(--s2); padding: 6px 0; border-radius: var(--r-md); background: var(--surface-1); font: 12px/1.55 var(--mono); overflow-x: auto; }
+  .hd-in { display: inline-block; min-width: 100%; font: inherit; }
+  .hd-l { display: block; padding: 0 var(--s3); white-space: pre; color: var(--text-2); }
+  .hd-l[data-t="add"] { background: color-mix(in oklab, var(--on) 16%, transparent); color: var(--text); }
+  .hd-l[data-t="del"] { background: color-mix(in oklab, var(--danger) 16%, transparent); color: var(--text); }
+  .hd-l[data-t="hunk"] { margin: 4px 0; color: var(--text-3); background: var(--surface-2); }
+  #histDlg .hd-file > .note { margin: 0 var(--s3) var(--s3); }
+  .hs h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .hs-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .hs-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 36px; font-size: 12.5px; color: var(--text-3); }
+  .hs-list b { display: block; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .hs-list code { font: 11.5px var(--mono); }
+  .hs .note { margin: 0; }
+  @media (prefers-reduced-motion: reduce) { #histDlg, #histDlg::backdrop, .hd-file summary .chev { transition: none; } }
+
   #viewer {
     width: min(1120px, calc(100vw - 32px)); height: min(900px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
     border-radius: 14px; background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop); overflow: hidden;
@@ -1006,6 +1054,7 @@
 <div id="announce" class="vh" aria-live="polite"></div>
 <dialog id="viewer" aria-label="Skill file"></dialog>
 <dialog id="confirmDel" aria-labelledby="cdTitle"></dialog>
+<dialog id="histDlg" aria-labelledby="hdTitle"></dialog>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -1887,6 +1936,7 @@ function detailHtml(s) {
     } else if (name && (isOutdated(s) || jobState(name))) {
       cards.push(`<div class="card accent" data-k="c-upd"><div data-leaf><strong>Update available</strong>A newer version is on ${esc(o.source)}.
         ${s.local_edits ? '<p class="note warn">You changed this skill after install. Updating replaces your changes.</p>' : ''}</div>
+        ${WRITABLE && !jobState(name) ? `<button class="btn ghost" data-k="dif" data-diff="${esc(name)}">See changes</button>` : ''}
         <span class="uslot" data-k="u">${updateSlot(s, true)}</span></div>`);
     } else if (s.local_edits) {
       cards.push('<p class="note warn" data-k="c-ed">You changed this skill after install. An update would replace your changes.</p>');
@@ -1937,6 +1987,7 @@ function detailHtml(s) {
       ${field('Setting', setting, true)}
       ${field('Path', tilde(s.path), true)}
     </dl></div>
+    ${historyHtml(s)}
     ${WRITABLE && s.scope === 'personal' && s.store ? `<div class="d-sec danger-zone" data-k="dz">
       <button class="btn danger" data-k="del" data-delete="${esc(s.dir_name)}">Delete…</button>
       <p class="note" data-k="dn">Moves the folder to the Trash and removes its lock entry. You can undo it.</p></div>` : ''}`;
@@ -2070,6 +2121,7 @@ function renderDetail() {
   if (s) d.setAttribute('data-open', ''); else d.removeAttribute('data-open');
   if (s) d.style.setProperty('--h', hue(groupId(s))); else d.style.removeProperty('--h');
   if (s) loadRepos([repoOf(s)]);
+  if (WRITABLE && s && lockName(s) && !hist[lockName(s)]) loadHistory(lockName(s));
   if (fresh) for (const n of d.querySelectorAll('.play [data-count]')) countUp(n);
   for (const repo of needDescs) loadDescs(repo);
 }
@@ -2908,6 +2960,7 @@ async function runJob(kind, start, names, note = '', repo = '') {
     upd.available[repo] = upd.available[repo].filter(a => !done.has(a.name));
   }
   await reloadData();
+  for (const n of names) delete hist[n];
   await checkUpdates();
   const where = kind === 'install' && repo ? ` from ${esc(repo)}` : '';
   const msg = failed.length
@@ -3007,6 +3060,118 @@ function updateOne(name, confirmed) {
     return;
   }
   runUpdate([s]);
+}
+
+// ---------------------------------------------------------------- diff and history
+const hist = {};
+const snapTime = at => (at ? new Date(at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'an unknown time');
+const kb = n => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`);
+
+async function loadHistory(name) {
+  hist[name] = { loading: true };
+  try {
+    hist[name] = { list: (await api('/api/history?name=' + encodeURIComponent(name))).snapshots };
+  } catch (err) {
+    hist[name] = { error: err.message };
+  }
+  renderDetail();
+}
+
+function historyHtml(s) {
+  const name = lockName(s);
+  if (!WRITABLE || !name) return '';
+  const h = hist[name];
+  let body;
+  if (!h || h.loading) body = '<p class="note">Reading saved versions…</p>';
+  else if (h.error) body = `<p class="note warn">Could not read the history: ${esc(h.error)}</p>`;
+  else if (!h.list.length) body = '<p class="note">No saved versions yet. Before each update, the atlas saves a copy of this skill here.</p>';
+  else body = `<ul class="hs-list">${h.list.map(x => `<li><span><b>${esc(snapTime(x.at))}</b>${x.reason === 'restore' ? 'Before a restore' : 'Before an update'}${x.hash ? ` · <code>${esc(x.hash)}</code>` : ''}</span>
+    <button class="btn ghost" data-restore="${esc(name)}" data-id="${esc(x.id)}">Restore…</button></li>`).join('')}</ul>`;
+  return `<div class="d-sec hs" data-k="hist"><h3 data-leaf>History</h3><div data-leaf>${body}</div></div>`;
+}
+
+function histDialog(html, wide = false) {
+  const dlg = el('histDlg');
+  dlg.classList.toggle('wide', wide);
+  dlg.innerHTML = html;
+  dlg.returnValue = '';
+  dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
+  if (!dlg.open) dlg.showModal();
+  return dlg;
+}
+const dialogResult = dlg => new Promise(r => dlg.addEventListener('close', () => r(dlg.returnValue), { once: true }));
+
+function diffFileHtml(f, open) {
+  const counts = f.binary ? '' : `<span class="hd-n"><span class="hd-add">+${f.added}</span> <span class="hd-del">−${f.removed}</span></span>`;
+  let body;
+  if (f.binary) body = `<p class="note">Binary file${f.status === 'changed' ? `, ${kb(f.old_size)} to ${kb(f.new_size)}` : `, ${kb(f.old_size || f.new_size)}`}.</p>`;
+  else if (!f.diff.length) body = '<p class="note">Not shown. The diff is too long.</p>';
+  else {
+    const lines = f.diff.map(l => `<span class="hd-l"${l[0] === '+' ? ' data-t="add"' : l[0] === '-' ? ' data-t="del"' : l.startsWith('@@') ? ' data-t="hunk"' : ''}>${esc(l) || ' '}</span>`).join('');
+    body = `<pre class="hd-code"><code class="hd-in">${lines}</code></pre>${f.truncated ? `<p class="note">Shows the first ${f.diff.length} lines only.</p>` : ''}`;
+  }
+  return `<details class="hd-file"${open ? ' open' : ''}><summary>${ICON.chev}<span class="hd-path">${esc(f.path)}</span>${counts}<span class="tag hd-st" data-st="${f.status}">${f.status}</span></summary>${body}</details>`;
+}
+
+function diffHtml(s, d) {
+  const o = s.origin || {};
+  let body;
+  if (d.loading) body = `<p class="hd-wait" role="status">Downloading ${esc(o.source)}…</p>`;
+  else if (d.error) body = `<p class="note warn" role="alert">Could not get the changes: ${esc(d.error)}</p>`;
+  else if (!d.files.length) body = '<p class="hd-wait">The files are the same. Only the version record is different.</p>';
+  else body = d.files.map((f, i) => diffFileHtml(f, i < 3)).join('');
+  const by = st => (d.files || []).filter(f => f.status === st).length;
+  const sum = d.files?.length ? `<p class="hd-sum">${['added', 'changed', 'removed'].filter(by).map(st => `${by(st)} ${st}`).join(' · ')}
+    <span><span class="hd-add">+${d.added}</span> <span class="hd-del">−${d.removed}</span> lines</span></p>` : '';
+  const edited = d.local_edits ?? s.local_edits;
+  const name = lockName(s);
+  const go = isOutdated(s) && !jobRunning()
+    ? `<button class="btn ${edited ? 'warn confirm' : 'primary'}" value="update">${edited ? 'Replace my edits' : 'Update'}</button>` : '';
+  return `<form method="dialog">
+    <div><h2 id="hdTitle">Changes in <code>/${esc(s.invoke)}</code></h2>
+    <p class="cd-lead">From your copy to the latest version on ${esc(o.source)}.</p></div>
+    <div>${sum}${edited ? '<p class="note warn">You changed this skill after install. The removed lines include your changes.</p>' : ''}</div>
+    <div class="hd-files" data-for="${esc(name)}">${body}</div>
+    <div class="cd-acts"><button class="btn" value="cancel" autofocus>Close</button>${go}</div>
+  </form>`;
+}
+
+async function showDiff(name) {
+  const s = SKILLS.find(x => lockName(x) === name);
+  if (!s) return;
+  const dlg = histDialog(diffHtml(s, { loading: true }), true);
+  dialogResult(dlg).then(v => { if (v === 'update') updateOne(name, true); });
+  let d;
+  try {
+    d = await api('/api/diff?name=' + encodeURIComponent(name));
+  } catch (err) {
+    d = { error: err.message };
+  }
+  if (!dlg.open || dlg.querySelector('.hd-files')?.dataset.for !== name) return;
+  dlg.innerHTML = diffHtml(s, d);
+  dlg.querySelector('[autofocus]')?.focus();
+}
+
+async function askRestore(name, id) {
+  const s = SKILLS.find(x => lockName(x) === name);
+  const x = hist[name]?.list?.find(y => y.id === id);
+  if (!s || !x) return;
+  if (jobRunning()) return toast('An update is still running.');
+  const dlg = histDialog(`<form method="dialog">
+    <h2 id="hdTitle">Restore <code>/${esc(s.invoke)}</code> from ${esc(snapTime(x.at))}?</h2>
+    <p class="cd-lead">The folder and its lock entry go back to that version. Before that, the atlas saves the current folder to History, so you can go back.</p>
+    <div class="cd-acts"><button class="btn" value="cancel" autofocus>Cancel</button><button class="btn primary" value="ok">Restore</button></div>
+  </form>`);
+  if (await dialogResult(dlg) !== 'ok') return;
+  try {
+    await api('/api/rollback', { name, id });
+  } catch (err) {
+    return toast(`Could not restore: ${esc(err.message)}`);
+  }
+  delete hist[name];
+  await reloadData();
+  await checkUpdates();
+  toast(`Restored <b>${esc(name)}</b> from ${esc(snapTime(x.at))}. Restart ${esc(harnessName())} sessions to pick it up.`);
 }
 
 // Row positions before a change, so rows that stay can slide into place afterwards.
@@ -3154,6 +3319,10 @@ document.addEventListener('click', async e => {
     } catch (err) { sw.setAttribute('aria-checked', was); rerender(); toast(`Could not save: ${esc(err.message)}`); }
     return;
   }
+  const df = t.closest('[data-diff]');
+  if (df) return showDiff(df.dataset.diff);
+  const rs = t.closest('[data-restore]');
+  if (rs) return askRestore(rs.dataset.restore, rs.dataset.id);
   const u = t.closest('[data-update]');
   if (u) return updateOne(u.dataset.update, Boolean(u.dataset.confirmed));
   if (t.closest('[data-update-all]')) return updateBatch(SKILLS.filter(live));
@@ -3416,7 +3585,7 @@ document.addEventListener('keydown', e => {
   const typing = t.matches('input[type="search"], input[type="text"], input:not([type]), textarea');
   const mod = e.metaKey || e.ctrlKey;
 
-  if (el('confirmDel').open) return;
+  if (el('confirmDel').open || el('histDlg').open) return;
   if (el('viewer').open) {
     if (!typing && !mod && e.key === 'r') { e.preventDefault(); setRaw(!viewer.raw); }
     return;

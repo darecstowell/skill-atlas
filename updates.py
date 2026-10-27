@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
+import history
 from scan import (
     ATLAS_LOCK,
     as_dict,
@@ -419,6 +420,7 @@ def _update_source(repo: str, ref: str, names: list[str], job: dict, all_tracked
                 _extract(tar, folder_of(e["skillPath"]), staged)
                 if not (staged / "SKILL.md").exists():
                     raise ValueError("no SKILL.md in the download")
+                history.snapshot(skills_dir / n, n, lock, e)
                 _swap(skills_dir / n, staged)
                 with job["lock"]:
                     write_lock_entries(
