@@ -677,6 +677,13 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px var(--s3); align-items: center; font-size: 12.5px; color: var(--text-2); }
   .keys > span:nth-child(odd) { display: inline-flex; gap: 4px; justify-content: flex-end; }
 
+  /* ---------- context cost ---------- */
+  .cost-sum { margin: 0; display: grid; gap: 1px; font-size: 12px; color: var(--text-3); }
+  .cost-sum b { font-size: 18px; font-weight: 600; line-height: 1.2; color: var(--text); }
+  .cost-top .tnum, .cost-per .tnum { white-space: nowrap; }
+  .cost-per .hn { color: var(--text-2); }
+  .cost-flag { color: var(--warn); }
+
   /* ---------- toast ---------- */
   #toast {
     position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
@@ -910,6 +917,7 @@
             <button data-o="name" aria-pressed="true">Name</button>
             <button data-o="uses" aria-pressed="false">Most used</button>
             <button data-o="recent" aria-pressed="false">Recent</button>
+            <button data-o="cost" aria-pressed="false" title="Most tokens in every session first">Cost</button>
           </div>
         </div>
         <div class="pop-row"><span>Size</span>
@@ -951,6 +959,7 @@
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
       <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
+      <button data-v="costly" aria-pressed="false" id="viewCostly" hidden title="On, costly, and not used in 90 days">Costly <span class="n" data-n="costly"></span></button>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -1203,6 +1212,7 @@ function visible(s) {
   if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
   else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
+  else if (ui.view === 'costly') { if (!costlyUnused().has(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
   return terms.every(t => s._hay.includes(t));
@@ -1526,6 +1536,7 @@ function byGroup([a, x], [b, y]) {
   const name = a.localeCompare(b, undefined, { sensitivity: 'base' });
   if (ui.sort === 'uses') return y.reduce((n, s) => n + uses(s), 0) - x.reduce((n, s) => n + uses(s), 0) || name;
   if (ui.sort === 'recent') return Math.max(0, ...y.map(lastUsed)) - Math.max(0, ...x.map(lastUsed)) || name;
+  if (ui.sort === 'cost') return costTotal(y) - costTotal(x) || name;
   return name;
 }
 
@@ -1581,6 +1592,7 @@ function emptyHtml() {
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
   if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
+  if (ui.view === 'costly') return '<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
   return '<div class="empty" data-k="empty"><h2>No skills here</h2><p>Turn on Project skills or Old plugin versions to see more.</p></div>';
 }
@@ -1589,7 +1601,8 @@ function emptyHtml() {
 function render() {
   const byName = (a, b) => a.name.localeCompare(b.name);
   const sorter = ui.sort === 'uses' ? (a, b) => uses(b) - uses(a) || byName(a, b)
-    : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b) : byName;
+    : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b)
+    : ui.sort === 'cost' ? (a, b) => listed(b) - listed(a) || byName(a, b) : byName;
   const inRoot = s => s.scope === 'project' || loads(s);
   const shown = SKILLS.filter(visible).sort(sorter);
   const out = [];
@@ -1649,6 +1662,7 @@ function renderChrome() {
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
   const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  counts.costly = costlyUnused().size; el('viewCostly').hidden = ui.view !== 'costly';
   patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
@@ -1720,7 +1734,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [[']'], 'Show or hide the details panel'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [[']'], 'Show or hide the details panel'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, recent, or cost'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -1737,6 +1751,7 @@ function inventoryHtml() {
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
     ${inventoryUsageHtml(lv)}
+    ${costHtml()}
     <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
 }
@@ -1854,6 +1869,7 @@ function detailHtml(s) {
       ${field('Tools', s.allowed_tools, true)}
       ${field('Arguments', s.argument_hint, true)}
       ${field('Size', `${s.words.toLocaleString()} words · ${plural(s.file_count, 'file')}`)}
+      ${costFieldHtml(s)}
       ${field('Setting', setting, true)}
       ${field('Path', tilde(s.path), true)}
     </dl></div>
@@ -2482,6 +2498,55 @@ function inventoryUsageHtml(lv) {
     ${topHtml(lv)}
     ${unused ? `<p class="use-note" data-k="uu" data-leaf>${plural(unused, 'skill')} not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-unused>Show them</button></p>` : ''}
   </div>`;
+}
+
+// ---------------------------------------------------------------- context cost
+// Estimates from scan (about 4 characters per token), so the page marks them with ≈.
+const listed = s => s.tokens_listed;
+const approx = n => `≈${short(n)}`;
+const costTotal = list => list.reduce((n, s) => n + listed(s), 0);
+// Skills whose name and description a harness puts into every session.
+const listedIn = root => SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project'
+  && (harness(root) ? s.harnesses.includes(root) : s.harnesses.length > 0) && state(s, root).on)
+  .sort((a, b) => listed(b) - listed(a));
+let costMemo = null;
+// On, in the top quarter by listed tokens, and not used in 90 days. Kept for one task.
+function costlyUnused() {
+  if (costMemo?.root === ui.root) return costMemo.set;
+  const on = listedIn(ui.root);
+  const cut = on.length ? listed(on[Math.ceil(on.length / 4) - 1]) : Infinity;
+  costMemo = { root: ui.root, set: new Set(USE.ready ? on.filter(s => listed(s) >= cut && isUnused(s)) : []) };
+  queueMicrotask(() => { costMemo = null; });
+  return costMemo.set;
+}
+
+function costHtml() {
+  const on = listedIn(ui.root);
+  const where = ui.root === 'all' ? '' : ` in ${esc(harnessName())}`;
+  let body;
+  if (ui.root === 'all') {
+    const per = HARNESS_IDS.map(id => [id, listedIn(id)]).filter(([, l]) => l.length)
+      .sort((a, b) => costTotal(b[1]) - costTotal(a[1]) || a[0].localeCompare(b[0]));
+    body = per.length
+      ? `<p class="use-note" data-k="cl" data-leaf>Tokens each harness adds to every session</p>
+        <div class="top cost-per" data-k="cp" data-leaf>${per.map(([id, l]) => `<button data-cost-harness="${esc(id)}" title="Show ${esc(harness(id).label)}"><span class="hn">${esc(harness(id).label)}</span><span class="tnum">${approx(costTotal(l))} · ${l.length} on</span></button>`).join('')}</div>`
+      : '';
+  } else if (on.length) {
+    body = `<p class="cost-sum" data-k="cs" data-leaf><b class="tnum">${approx(costTotal(on))} tokens</b><span>in every session, from ${plural(on.length, 'skill')} that ${on.length === 1 ? 'is' : 'are'} on</span></p>`;
+  } else body = '';
+  if (!on.length) body = `<p class="use-note" data-k="ce" data-leaf>No skills are on${where}, so skills add no tokens to a session.</p>`;
+  const flagged = costlyUnused().size;
+  return `<div class="d-sec" data-k="ic">
+    <h3 class="sub" data-leaf>Context cost</h3>
+    ${body}
+    ${on.length ? `<div class="top cost-top" data-k="ct" data-leaf>${on.slice(0, 5).map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${approx(listed(s))}</span></button>`).join('')}</div>` : ''}
+    ${flagged ? `<p class="use-note" data-k="cu" data-leaf><span class="cost-flag">${plural(flagged, 'costly skill')}</span> not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-costly>Show them</button></p>` : ''}
+    <p class="use-note" data-k="cn" data-leaf>Estimate: about 4 characters per token. A skill's body loads only when it runs.</p>
+  </div>`;
+}
+
+function costFieldHtml(s) {
+  return `<dt>Context cost</dt><dd class="tnum" title="Estimate: about 4 characters per token">${approx(s.tokens_listed)} tokens listed, ${approx(s.tokens_body)} when used</dd>`;
 }
 
 // Counts up from zero with the reveal, so the number lands with the heatmap.
@@ -3117,6 +3182,9 @@ document.addEventListener('click', async e => {
   const pick = t.closest('[data-pick]');
   if (pick) return select(SKILLS[+pick.dataset.pick]);
   if (t.closest('[data-view-unused]')) return showView('unused');
+  if (t.closest('[data-view-costly]')) return showView('costly');
+  const ch = t.closest('[data-cost-harness]');
+  if (ch) { el('harness').value = ch.dataset.costHarness; el('harness').dispatchEvent(new Event('change')); return; }
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');
@@ -3328,7 +3396,7 @@ document.addEventListener('keydown', e => {
     if (k) { setMarks([k], !ui.marked.has(k)); ui.lastMark = k; }
     return;
   }
-  if (e.key === 's') { const order = ['name', 'uses', 'recent']; setSort(order[(order.indexOf(ui.sort) + 1) % 3]); toast(`Sorted by ${{ name: 'name', uses: 'most used', recent: 'recently used' }[ui.sort]}.`); return; }
+  if (e.key === 's') { const order = ['name', 'uses', 'recent', 'cost']; setSort(order[(order.indexOf(ui.sort) + 1) % order.length]); toast(`Sorted by ${{ name: 'name', uses: 'most used', recent: 'recently used', cost: 'context cost' }[ui.sort]}.`); return; }
   if (e.key === 'g') { setLayout(ui.layout === 'cards' ? 'list' : 'cards'); render(); return; }
   if (e.key === 'v') {
     const o = t.matches?.('.open') ? t : null;
