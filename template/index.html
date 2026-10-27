@@ -862,6 +862,25 @@
     #profBtn { width: 28px; padding: 0; }
     .pf-field input { font-size: 16px; }
   }
+  /* ---------- skill set: export, import, restore ---------- */
+  .ss-lead { margin: 0; font-size: 12.5px; color: var(--text-2); text-wrap: pretty; }
+  .ss-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+  .ss-acts .btn { min-width: 76px; }
+  .ss-missing { display: grid; justify-items: start; gap: var(--s2); padding: var(--s3); border-radius: var(--r-lg); background: var(--tint-warn); }
+  .ss-missing p { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 12.5px; color: var(--warn); }
+  .ss-missing svg { width: 14px; height: 14px; flex: none; }
+  #detail[data-drop] .inv { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: var(--r-lg); }
+  .ss-plan { display: grid; gap: var(--s3); max-height: min(56dvh, 460px); overflow: auto; overscroll-behavior: contain; }
+  .ss-plan fieldset { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .ss-plan .check { font-size: 13px; color: var(--text); white-space: normal; }
+  .ss-plan .check span { color: var(--text-3); }
+  .ss-plan .check input { width: 16px; height: 16px; }
+  .ss-plan .cd-list { max-height: 160px; }
+  .ss-plan fieldset:has(input:not(:checked)) .cd-list { opacity: .5; }
+  .ss-plan details { font-size: 12.5px; color: var(--text-2); }
+  .ss-plan summary { cursor: pointer; padding: 2px 0; }
+  .ss-plan summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
+  .ss-plan details .cd-list { margin-top: 6px; }
 
   #viewer {
     width: min(1120px, calc(100vw - 32px)); height: min(900px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
@@ -1111,6 +1130,7 @@
 <dialog id="confirmDel" aria-labelledby="cdTitle"></dialog>
 <dialog id="histDlg" aria-labelledby="hdTitle"></dialog>
 <dialog id="profileDlg" aria-labelledby="pfTitle"></dialog>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -1891,6 +1911,7 @@ function inventoryHtml() {
     ${storeHealthHtml()}
     ${inventoryUsageHtml(lv)}
     ${costHtml()}
+    ${skillSetHtml()}
     <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
 }
@@ -3325,6 +3346,185 @@ async function linkSkills(form) {
   }
 }
 
+// ---------------------------------------------------------------- skill set: export, import, restore
+const SS = { missing: [], busy: '', copied: false };
+
+function skillSetHtml() {
+  if (!WRITABLE) return '';
+  const n = SS.missing.length;
+  const busy = SS.busy;
+  const missing = n ? `<div class="ss-missing" role="status">
+      <p>${ICON.alert}${n === 1 ? '1 skill in the lock file has' : `${n} skills in the lock file have`} no folder.</p>
+      <button class="btn" data-ss="restore"${busy ? ' disabled' : ''}>Restore ${plural(n, 'missing skill')}</button>
+    </div>` : '';
+  return `<div class="d-sec" data-k="ss" data-leaf>
+    <h3>Skill set</h3>
+    ${missing}
+    <p class="ss-lead">Save your skills, sources, and switches to a file. Import the file on a different computer to get the same set.</p>
+    <div class="ss-acts">
+      <button class="btn" data-ss="export"${busy ? ' disabled' : ''}>${busy === 'export' ? 'Exporting…' : 'Export'}</button>
+      <button class="btn ghost" data-ss="copy"${busy ? ' disabled' : ''}>${SS.copied ? `${ICON.check}Copied` : busy === 'copy' ? 'Copying…' : 'Copy'}</button>
+      <button class="btn" data-ss="import"${busy ? ' disabled' : ''}>${busy === 'import' ? 'Reading…' : 'Import…'}</button>
+    </div>
+    <p class="note">You can also drop a manifest file on this panel.</p>
+  </div>`;
+}
+
+async function loadMissing() {
+  try { SS.missing = (await api('/api/restore')).install; } catch { SS.missing = []; }
+  if (!ui.selected) renderDetail();
+}
+
+function setBusy(what) { SS.busy = what; renderDetail(); }
+
+async function skillSetAction(what) {
+  if (SS.busy) return;
+  if (what === 'import') return el('importFile').click();
+  if (what === 'restore') {
+    setBusy('restore');
+    let p;
+    try { p = await api('/api/import/plan', { restore: true }); }
+    catch (err) { return toast(`Could not read the lock file: ${esc(err.message)}`); }
+    finally { setBusy(''); }
+    return showPlan(p, { restore: true });
+  }
+  setBusy(what);
+  try {
+    const m = await api('/api/export');
+    const text = JSON.stringify(m, null, 2) + '\n';
+    if (what === 'copy') {
+      await navigator.clipboard.writeText(text);
+      SS.copied = true;
+      setTimeout(() => { SS.copied = false; renderDetail(); }, 1500);
+      return;
+    }
+    const day = new Date().toLocaleDateString('en-CA');
+    const host = String(m.host || DATA.host || 'atlas').replace(/[^\w.-]+/g, '-');
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([text], { type: 'application/json' })),
+      download: `skills-${host}-${day}.json`,
+    });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(`Exported ${plural(m.skills.length, 'skill')} to <b>${esc(a.download)}</b>.`);
+  } catch (err) {
+    toast(`Could not ${what === 'copy' ? 'copy' : 'export'}: ${esc(err.message)}`);
+  } finally {
+    setBusy('');
+  }
+}
+
+async function importFile(file) {
+  if (!file || SS.busy) return;
+  if (file.size > 1 << 20) return toast(`<b>${esc(file.name)}</b> is too large to be a manifest.`);
+  setBusy('import');
+  let m, p;
+  try {
+    try { m = JSON.parse(await file.text()); } catch { return toast(`<b>${esc(file.name)}</b> is not a JSON file.`); }
+    p = await api('/api/import/plan', { manifest: m });
+  } catch (err) {
+    return toast(`Could not import <b>${esc(file.name)}</b>: ${esc(err.message)}`);
+  } finally {
+    setBusy('');
+  }
+  return showPlan(p, { manifest: m });
+}
+
+function planGroup(name, value, title, sub, items) {
+  return `<fieldset>
+    <label class="check"><input type="checkbox" name="${name}" value="${esc(value)}" checked> <b>${title}</b>${sub ? ` <span>${sub}</span>` : ''}</label>
+    <ul class="cd-list">${items.join('')}</ul>
+  </fieldset>`;
+}
+
+function planInfo(title, items) {
+  return items.length ? `<details><summary>${title}</summary><ul class="cd-list">${items.join('')}</ul></details>` : '';
+}
+
+const planItem = (name, sub = '', tag = '') => `<li><span class="nm">${esc(name)}</span>${tag}${sub ? `<span class="cd-path">${esc(sub)}</span>` : ''}</li>`;
+
+// Shows the plan in the confirm dialog, then runs the groups that stay checked.
+async function showPlan(p, body) {
+  const dlg = el('confirmDel');
+  const restore = Boolean(body.restore);
+  const m = body.manifest || {};
+  const acts = [];
+  if (p.install.length) acts.push(planGroup('install', 'all', `${restore ? 'Restore' : 'Install'} ${plural(p.install.length, 'skill')}`, 'from GitHub', p.install.map(i => planItem(i.name, i.repo))));
+  for (const h of p.harness) acts.push(planGroup('harness', h.harness, `Turn off ${plural(h.off.length, 'skill')}`, `in ${esc(h.name)}`, h.off.map(n => planItem(n))));
+  if (p.watch.length) acts.push(planGroup('watch', 'all', `Watch ${plural(p.watch.length, 'repo')}`, 'for new skills', p.watch.map(r => planItem(r))));
+  const here = [...p.same.map(s => planItem(s.name, s.source || '')), ...p.differ.map(s => planItem(s.name, s.source || '', '<span class="tag">other files</span>'))];
+  const info = [
+    planInfo(`Already here: ${here.length}`, here),
+    planInfo(`Cannot install: ${p.untracked.length}`, p.untracked.map(u => planItem(u.name, restore ? 'Its lock entry names a different folder' : 'Not from GitHub. Copy it by hand'))),
+  ].join('');
+  const skipped = p.skipped.length ? `<p class="note">Not on this computer, so switches stay as they are: ${esc(p.skipped.map(h => h.name).join(', '))}.</p>` : '';
+  const when = m.exported_at ? new Date(m.exported_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
+  const lead = restore
+    ? 'Download each skill again from its GitHub source, at the version in the lock file.'
+    : `${m.host ? `From ${esc(m.host)}` : 'From the file'}${when ? `, exported ${esc(when)}` : ''}. Clear a group to skip it.`;
+  const verb = restore ? 'Restore' : 'Import';
+  dlg.innerHTML = `<form method="dialog">
+    <h2 id="cdTitle">${restore ? `Restore ${plural(p.install.length, 'missing skill')}?` : 'Import skill set?'}</h2>
+    <p class="cd-lead">${acts.length ? lead : restore ? 'No skill is missing now.' : 'This computer already has everything in the file that the atlas can install.'}</p>
+    <div class="ss-plan">${acts.join('')}${info}${skipped}</div>
+    <div class="cd-acts">${acts.length
+      ? `<button class="btn" value="cancel">Cancel</button><button class="btn primary" value="ok" autofocus>${verb}</button>`
+      : '<button class="btn" value="cancel" autofocus>Close</button>'}</div>
+  </form>`;
+  const form = dlg.querySelector('form');
+  const go = form.querySelector('[value="ok"]');
+  form.onchange = () => { if (go) go.disabled = !form.querySelector('input:checked'); };
+  dlg.returnValue = '';
+  dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
+  dlg.showModal();
+  await new Promise(resolve => dlg.addEventListener('close', resolve, { once: true }));
+  if (dlg.returnValue !== 'ok') return;
+  const picked = name => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
+  const pick = {
+    install: picked('install').length ? p.install.map(i => i.name) : [],
+    harness: picked('harness'),
+    watch: picked('watch').length ? p.watch : [],
+  };
+  return runPlan({ ...body, ...pick });
+}
+
+async function runPlan(req) {
+  if (jobRunning()) return toast('Another job is still running.');
+  let r;
+  try { r = await api('/api/import/apply', req); }
+  catch (err) { return toast(`Could not ${req.restore ? 'restore' : 'import'}: ${esc(err.message)}`); }
+  const done = [
+    r.switched ? `Turned off ${r.switched} skill switch${r.switched === 1 ? '' : 'es'}.` : '',
+    r.watched ? `Watching ${plural(r.watched, 'new repo')}.` : '',
+    r.errors.length ? `<b>${plural(r.errors.length, 'step')} failed</b>: ${esc(r.errors[0])}.` : '',
+  ].filter(Boolean).join(' ');
+  if (r.job) {
+    await runJob('install', async () => r.job, Object.keys(r.job.items), done ? ' ' + done : '');
+  } else {
+    await reloadData();
+    if (r.watched) await checkUpdates(true);
+    rerender();
+    toast(done || 'Nothing changed.');
+  }
+  loadMissing();
+}
+
+el('importFile').addEventListener('change', e => { importFile(e.target.files[0]); e.target.value = ''; });
+const dropOk = e => WRITABLE && !ui.selected && e.dataTransfer?.types.includes('Files');
+el('detail').addEventListener('dragover', e => {
+  if (!dropOk(e)) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+  el('detail').setAttribute('data-drop', '');
+});
+el('detail').addEventListener('dragleave', e => { if (!el('detail').contains(e.relatedTarget)) el('detail').removeAttribute('data-drop'); });
+el('detail').addEventListener('drop', e => {
+  el('detail').removeAttribute('data-drop');
+  if (!dropOk(e)) return;
+  e.preventDefault();
+  importFile(e.dataTransfer.files[0]);
+});
+if (WRITABLE) loadMissing();
+
 // ---------------------------------------------------------------- interaction
 function closeMenu(focusButton = true) {
   if (!ui.menu) return;
@@ -3352,6 +3552,8 @@ document.addEventListener('click', async e => {
   const t = e.target;
   if (ui.menu && !t.closest('.menu-wrap')) closeMenu(false);
 
+  const ssa = t.closest('[data-ss]');
+  if (ssa) return skillSetAction(ssa.dataset.ss);
   const mk = t.closest('[data-mark]');
   if (mk) {
     const key = mk.dataset.mark;

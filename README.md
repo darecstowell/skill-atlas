@@ -49,6 +49,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **See context cost** | Shows about how many tokens each harness spends in every session to list the skills that are on, and the top five. It marks costly skills that you did not use in 90 days. Sort by **Cost** to put the largest first. |
 | **Find problems** | The **Issues** view lists skills with bad frontmatter, a wrong name, a long description, or links to files that are not there. The inventory panel shows lock entries with no folder and folders with no SKILL.md. The atlas does not fix them. |
 | **Profiles** | Save which skills are on and off as a named profile, from the **Profiles** menu or from a selection. Apply shows what changes in each harness first, and you can undo it. Profiles go in `~/.config/skill-atlas/profiles.json`. |
+| **Move your set** | **Export** in the Inventory panel saves your skills, sources, watched repos, and off switches to a JSON file. **Import** shows what it will install and change, then does it. **Restore** installs again the skills in the lock file that have no folder. |
 | **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 
 ## How it works
