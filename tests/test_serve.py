@@ -254,3 +254,16 @@ def test_texture_served(server):
         with pytest.raises(urllib.error.HTTPError) as e:
             urllib.request.urlopen(server + bad)
         assert e.value.code == 404
+
+
+def test_scanned_record_reuses_the_page_scan(monkeypatch):
+    calls = []
+    data = {"skills": [{"path": "/a/SKILL.md"}]}
+    monkeypatch.setattr(serve, "scan", lambda repo: calls.append(1) or data)
+    monkeypatch.setattr(serve, "LAST_SCAN", {})
+    serve.page_scan()
+    assert serve.scanned_record("/a/SKILL.md") == {"path": "/a/SKILL.md"}
+    assert len(calls) == 1
+    with pytest.raises(ValueError):
+        serve.scanned_record("/b/SKILL.md")
+    assert len(calls) == 2
