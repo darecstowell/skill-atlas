@@ -392,7 +392,7 @@
   .gsub + .gspark { margin-left: 0; }
   body.compact .use .spark { display: none; }
 
-  .uses h3, .inv h3.sub { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .loaded h3, .uses h3, .inv h3.sub { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
   .use-stats { display: flex; gap: var(--s5); }
   .use-stats div { display: grid; gap: 1px; }
   .use-stats b { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
@@ -571,6 +571,23 @@
   .d-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
   .d-meta .tag { height: 20px; }
   .d-meta:empty { display: none; }
+  .loaded { display: grid; gap: 2px; }
+  .loaded h3 { margin-bottom: 6px; }
+  .lb { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 32px; padding: 0 8px; margin: 0 -8px; border-radius: var(--r-md); font-size: 13px; color: var(--text-2); }
+  .lb.cur { background: var(--surface-2); color: var(--text); }
+  .lb .note { margin: 0; font-size: 12px; color: var(--text-3); }
+  .hdots { display: inline-flex; gap: 3px; justify-self: end; padding: 0 4px; }
+  .hdots i { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.25px var(--text-3); }
+  .hdots i[data-on] { background: var(--on); box-shadow: none; }
+  .harness { position: relative; display: inline-flex; flex: none; }
+  .harness[hidden] { display: none; }
+  .harness select {
+    appearance: none; height: 28px; padding: 0 26px 0 10px; border-radius: var(--r-md); border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text); font: 500 12.5px var(--sans); cursor: pointer;
+  }
+  .harness select:hover { background: var(--surface-2); }
+  .harness select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .harness::after { content: ""; position: absolute; right: 10px; top: 50%; width: 6px; height: 6px; border: solid var(--text-3); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
   .invoke { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: var(--s3) 0 0; }
   .who {
     display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 1px;
@@ -805,7 +822,7 @@
 <header id="head">
   <div class="bar1">
     <h1 class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="var(--accent)"/><path d="M19.6 7.2 12.4 24.8" stroke="var(--bg)" stroke-width="3.4" stroke-linecap="round"/></svg><span>Skill Atlas</span></h1>
-    <div class="seg" id="roots" role="group" aria-label="Settings file"></div>
+    <label class="harness"><span class="vh">Harness</span><select id="harness"></select></label>
     <div class="search">
       <svg class="glass" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <input type="search" id="q" placeholder="Search skills, sources, paths" aria-label="Search skills" autocomplete="off" spellcheck="false">
@@ -882,7 +899,9 @@
 let DATA = JSON.parse(document.getElementById('data').textContent);
 let SKILLS = DATA.skills;
 const WRITABLE = Boolean(DATA.api_token);
-const ROOT_LABELS = Object.keys(DATA.config_roots);
+const HARNESS_IDS = Object.keys(DATA.harnesses || {});
+const harness = (id = ui.root) => DATA.harnesses[id];
+const harnessName = () => harness()?.name || 'agent';
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
 
 const el = id => document.getElementById(id);
@@ -897,7 +916,7 @@ const groupMap = (list, fn) => {
 };
 
 const ui = {
-  root: ROOT_LABELS[0], view: 'all', q: '', showProject: false, showStale: false, selected: null,
+  root: HARNESS_IDS.includes(localStorage.getItem('atlas.harness')) ? localStorage.getItem('atlas.harness') : HARNESS_IDS[0] || 'all', view: 'all', q: '', showProject: false, showStale: false, selected: null,
   groupBy: localStorage.getItem('atlas.groupBy') || 'source',
   compact: localStorage.getItem('atlas.compact') === '1',
   layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
@@ -910,7 +929,11 @@ const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
 const groupLabel = s => (s.kind === 'group' ? s.label : s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? s.plugin : s.scope === 'project' ? s.project : sourceOf(s));
 const groupId = s => (s.kind === 'group' ? s.hueKey : s.kind === 'avail' ? s.repo : s.scope === 'plugin' ? 'plg:' + s.plugin_ref : s.scope === 'project' ? 'prj:' + s.project : sourceOf(s));
 const isLocalGroup = source => source === NO_SOURCE || source.endsWith('-*');
-const live = s => s.scope === 'personal' && s.config_roots.includes(ui.root);
+const loads = s => (ui.root === 'all' ? s.harnesses.length > 0 : s.harnesses.includes(ui.root));
+const live = s => s.scope === 'personal' && loads(s);
+const switchable = () => Boolean(harness()?.switch);
+// Installs land in the store, so only offer them where the harness reads it.
+const readsStore = () => ui.root === 'all' || Boolean(harness()?.store);
 
 const ICON = {
   user: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3 13.5c.6-2.5 2.6-4 5-4s4.4 1.5 5 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
@@ -1060,9 +1083,20 @@ function availOpen(repo, installed) {
   return byDefault ? !collapsed.has('av:' + repo) : collapsed.has('+av:' + repo);
 }
 
-// What the switch shows for one skill under the chosen settings file.
-function state(s) {
-  const cfg = DATA.settings[ui.root] || { skillOverrides: {}, enabledPlugins: {} };
+// What the switch shows for one skill in one harness. "All" counts a skill on when any harness has it on.
+function state(s, root = ui.root) {
+  const h = harness(root);
+  if (!h) {
+    if (s.scope === 'project') return { on: true, mode: 'project only' };
+    if (s.status === 'stale') return { on: false, mode: 'old version' };
+    return { on: s.harnesses.some(id => state(s, id).on), mode: '' };
+  }
+  if (h.switch !== 'claude' && s.scope !== 'project') {
+    if (!h.switch) return { on: true, mode: '' };
+    const off = (DATA.settings[root]?.off || []).includes(s.name);
+    return { on: !off, mode: off ? 'off' : 'on', toggle: 'skill', key: s.name };
+  }
+  const cfg = DATA.settings[root] || { skillOverrides: {}, enabledPlugins: {} };
   if (s.scope === 'personal') {
     const mode = cfg.skillOverrides[s.name] || 'on';
     return { on: mode !== 'off', mode, toggle: 'skill', key: s.name };
@@ -1076,7 +1110,7 @@ function state(s) {
 }
 
 function inView(s) {
-  if (s.scope !== 'project' && !s.config_roots.includes(ui.root)) return false;
+  if (s.scope !== 'project' && !loads(s)) return false;
   if (s.scope === 'project' && !ui.showProject) return false;
   if (s.status === 'stale' && !ui.showStale) return false;
   return true;
@@ -1153,6 +1187,13 @@ function patch(target, html) {
 }
 
 // ---------------------------------------------------------------- pieces
+// One dot per harness that loads the skill, filled when it is on there.
+function harnessDots(s) {
+  const ids = s.harnesses.filter(id => harness(id));
+  const names = ids.map(id => `${harness(id).label}: ${state(s, id).on ? 'on' : 'off'}`).join('\n');
+  return `<span class="hdots" data-k="sw" title="${esc(names)}" aria-label="${esc(names.replace(/\n/g, ', '))}">${ids.map(id => `<i${state(s, id).on ? ' data-on' : ''}></i>`).join('')}</span>`;
+}
+
 function switchHtml(on, label, attrs) {
   const disabled = !attrs || !WRITABLE;
   // aria-checked="mixed" is only valid on checkboxes, so a part-on group reports as one.
@@ -1165,8 +1206,8 @@ function tagsHtml(s, st) {
     s.local_edits ? '<span class="tag edited" title="Changed after install. Updating replaces your changes.">edited</span>' : '',
     updStatus(s) === 'unknown' ? '<span class="tag gone" title="Not found in the source repo. It may have moved or been removed.">not upstream</span>' : '',
     isOutdated(s) && !WRITABLE ? '<span class="tag update">update</span>' : '',
-    s.manual_only ? '<span class="tag manual" title="disable-model-invocation: Claude never calls it on its own">you only</span>' : '',
-    s.claude_only ? '<span class="tag manual" title="user-invocable: false. It is not in the / menu">Claude only</span>' : '',
+    s.manual_only ? '<span class="tag manual" title="disable-model-invocation: the agent never calls it on its own">you only</span>' : '',
+    s.claude_only ? '<span class="tag manual" title="user-invocable: false. It is not in the / menu">agent only</span>' : '',
     st.mode && !['on', 'off', 'not set', 'project only'].includes(st.mode) ? `<span class="tag">${esc(st.mode)}</span>` : '',
     s.status === 'stale' ? `<span class="tag">v${esc(s.plugin_version)}</span>` : '',
     s._dupes?.length ? `<span class="tag" title="Same description as ${esc(s._dupes.join(', '))}">same as ${esc(s._dupes[0])}</span>` : '',
@@ -1218,9 +1259,9 @@ function thumbHtml(s, name) {
 
 function row(s) {
   const st = state(s);
-  const ctl = s.scope === 'personal'
-    ? switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)
-    : '<span></span>';
+  const ctl = s.scope !== 'personal' ? '<span></span>'
+    : ui.root === 'all' ? harnessDots(s)
+    : switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, st.toggle ? `data-kind="skill" data-key="${esc(st.key)}"` : '');
   const hints = `<span class="kh" aria-hidden="true">${s.scope === 'personal' && WRITABLE ? `<kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}` : ''}</span>`;
   const cls = ui.restored.has(s.path) ? 'row enter restored' : 'row';
   return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'}${isMarked(s) ? ' data-marked' : ''} aria-current="${ui.selected === s}">
@@ -1397,7 +1438,7 @@ function sourceGroups(personal) {
   for (const repo of Object.keys(upd.available)) {
     if (have.has(repo)) continue;
     const watchedEmpty = upd.watched.includes(repo) && ui.view === 'all' && !ui.q && !SKILLS.some(s => live(s) && sourceOf(s) === repo);
-    if (availShown(repo).length || watchedEmpty) groups.push([repo, []]);
+    if (readsStore() && (availShown(repo).length || watchedEmpty)) groups.push([repo, []]);
   }
   // Repos first, then name-prefix groups, then the rest; bigger groups first within each.
   const rank = src => (src === NO_SOURCE ? 2 : isLocalGroup(src) ? 1 : 0);
@@ -1420,9 +1461,9 @@ function sourceGroups(personal) {
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
       <span class="gsub" data-leaf>${meta}</span>${groupSpark(all)}
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
-      ${all.length ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
+      ${all.length && switchable() ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
-    const block = local ? '' : availBlock(source, availShown(source), all.length);
+    const block = local || !readsStore() ? '' : availBlock(source, availShown(source), all.length);
     return group(id, head, form + list.map(row).join('') + block, ui.view === 'new' || isOpen(id), hue(source));
   }).join('');
 }
@@ -1452,7 +1493,7 @@ function render() {
   const byName = (a, b) => a.name.localeCompare(b.name);
   const sorter = ui.sort === 'uses' ? (a, b) => uses(b) - uses(a) || byName(a, b)
     : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b) : byName;
-  const inRoot = s => s.scope === 'project' || s.config_roots.includes(ui.root);
+  const inRoot = s => s.scope === 'project' || loads(s);
   const shown = SKILLS.filter(visible).sort(sorter);
   const out = [];
 
@@ -1506,7 +1547,7 @@ function render() {
 }
 
 function renderChrome() {
-  const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
+  const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && loads(s));
   const on = lv.filter(s => state(s).on).length;
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
@@ -1520,8 +1561,10 @@ function renderChrome() {
   document.title = WRITABLE && badge ? `(${badge}) Skill Atlas` : 'Skill Atlas';
 
   patch(el('meta'), [
-    DATA.bundled_skills_disabled ? '<span>built-ins off</span>' : '',
-    `<span>writes <code>${esc(tilde(DATA.settings[ui.root]?.path))}</code></span>`,
+    DATA.bundled_skills_disabled && harness()?.switch === 'claude' ? '<span>built-ins off</span>' : '',
+    ui.root === 'all' ? '<span>pick a harness to switch skills</span>'
+      : harness()?.switch ? `<span>writes <code>${esc(tilde(DATA.settings[ui.root]?.path))}</code></span>`
+      : `<span>${esc(harnessName())} has no per-skill switch</span>`,
   ].join(''));
 
   let cluster = '';
@@ -1577,7 +1620,7 @@ const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}
 const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
 
 function inventoryHtml() {
-  const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
+  const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && loads(s));
   const personal = lv.filter(s => s.scope === 'personal');
   return `<div class="inv" data-k="inv">
     <h3 data-leaf>Inventory</h3>
@@ -1609,7 +1652,7 @@ function invokeHtml(s) {
     `<div class="who"${on ? ' data-on' : ''} title="${esc(key)}">${icon}<b>${who}</b><span>${on ? yes : no}</span></div>`;
   return `<div class="invoke" data-k="inv" data-leaf role="group" aria-label="Who can call this skill">
     ${cell(!s.claude_only, ICON.user, 'You', `Type <code>/${esc(s.invoke)}</code>`, 'Not in the / menu', 'user-invocable')}
-    ${cell(!s.manual_only, ICON.spark, 'Claude', 'Loads it when it fits', 'Never on its own', 'disable-model-invocation')}
+    ${cell(!s.manual_only, ICON.spark, 'Agent', 'Loads it when it fits', 'Never on its own', 'disable-model-invocation')}
   </div>`;
 }
 const metaHtml = parts => `<p class="d-meta" data-k="meta" data-leaf>${parts.filter(Boolean).join('<span aria-hidden="true">·</span>')}</p>`;
@@ -1649,9 +1692,11 @@ function detailHtml(s) {
   const cards = [];
   let ctl = '';
   if (s.scope === 'personal') {
-    ctl = switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`);
+    if (st.toggle) ctl = switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`);
     const name = lockName(s);
-    if (!name && WRITABLE) {
+    if (!s.store) {
+      cards.push(`<div class="card" data-k="c-copy"><div><strong>A copy for one harness</strong>It lives in ${esc(tilde(s.source_root))}, outside ${esc(tilde(DATA.store))}/skills, so update, link, and delete do not apply.</div></div>`);
+    } else if (!name && WRITABLE) {
       cards.push(`<div class="card" data-k="c-link"><div><strong>Not linked to a repo</strong>Link it to get update checks.
         ${linkForm('skill:' + s.dir_name, [s.dir_name])}</div></div>`);
     } else if (name && (isOutdated(s) || jobState(name))) {
@@ -1679,7 +1724,9 @@ function detailHtml(s) {
     s._dupes.length ? `Same as ${esc(s._dupes.join(', '))}` : '',
   ];
   const gh = src && /^https?:/.test(src) ? String(src).replace(/\.git$/, '') : '';
-  const setting = s.scope === 'personal' ? `skillOverrides.${s.name}${st.mode === 'on' ? '' : ` = "${st.mode}"`}` : s.scope === 'plugin' ? `enabledPlugins["${s.plugin_ref}"]` : '';
+  const sw = harness()?.switch;
+  const setting = sw === 'claude' ? (s.scope === 'personal' ? `skillOverrides.${s.name}${st.mode === 'on' ? '' : ` = "${st.mode}"`}` : s.scope === 'plugin' ? `enabledPlugins["${s.plugin_ref}"]` : '')
+    : sw && s.scope === 'personal' ? tilde(harness().config) : '';
   return `${ownBannerHtml(s)}${crumbHtml(s)}
     <div class="d-top" data-k="top"><h2 class="d-title" data-leaf><span class="slash">/</span>${esc(s.invoke)}</h2>${ctl}${closeBtn}</div>
     ${metaHtml(meta)}
@@ -1693,6 +1740,7 @@ function detailHtml(s) {
       ${WRITABLE ? `<button class="btn ghost" data-k="rv" data-reveal="${esc(s.path)}">Reveal</button>` : ''}
     </div>
     ${cards.length ? `<div class="d-sec" data-k="cards">${cards.join('')}</div>` : ''}
+    ${s.scope === 'personal' ? loadedHtml(s) : ''}
     ${usageHtml(s)}
     <div class="d-sec" data-k="facts"><dl data-leaf>
       ${field('Version', s.plugin_version || s.version, true)}
@@ -1703,7 +1751,7 @@ function detailHtml(s) {
       ${field('Setting', setting, true)}
       ${field('Path', tilde(s.path), true)}
     </dl></div>
-    ${WRITABLE && s.scope === 'personal' ? `<div class="d-sec danger-zone" data-k="dz">
+    ${WRITABLE && s.scope === 'personal' && s.store ? `<div class="d-sec danger-zone" data-k="dz">
       <button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete="${esc(s.dir_name)}">${confirm ? 'Move to Trash' : 'Delete…'}</button>
       <p class="note" data-k="dn">Moves the folder to the Trash and removes its lock entry. You can undo it.</p></div>` : ''}`;
 }
@@ -1719,7 +1767,7 @@ function groupFor(id) {
   return { kind: 'group', type: 'src', id, key: 'g:' + id, source: key, label: key, repo: isLocalGroup(key) ? null : key, hueKey: key };
 }
 function membersOf(g) {
-  if (g.type === 'plg') return SKILLS.filter(x => x.plugin_ref === g.ref && x.status !== 'stale' && x.config_roots.includes(ui.root));
+  if (g.type === 'plg') return SKILLS.filter(x => x.plugin_ref === g.ref && x.status !== 'stale' && x.harnesses.includes(ui.root));
   if (g.type === 'prj') return SKILLS.filter(x => x.scope === 'project' && x.project === g.project);
   return SKILLS.filter(s => live(s) && sourceOf(s) === g.source);
 }
@@ -1727,6 +1775,17 @@ function sumDays(list) {
   const days = {};
   for (const s of list) for (const [d, k] of Object.entries(USE.by.get(s)?.days || {})) days[d] = (days[d] || 0) + k;
   return days;
+}
+// Every harness that loads the skill, each with its own switch where it has one.
+function loadedHtml(s) {
+  const rows = s.harnesses.filter(id => harness(id)).map(id => {
+    const h = harness(id), st = state(s, id);
+    const ctl = h.switch && WRITABLE
+      ? switchHtml(st.on, `${s.name} in ${h.label}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(s.name)}" data-h="${esc(id)}"`)
+      : '<span class="note">no switch</span>';
+    return `<div class="lb${id === ui.root ? ' cur' : ''}" data-k="lb:${esc(id)}"><span data-leaf>${esc(h.label)}</span>${ctl}</div>`;
+  });
+  return `<div class="d-sec loaded" data-k="lb"><h3 data-leaf>Loaded by</h3>${rows.join('') || '<p class="note">No harness loads this folder.</p>'}</div>`;
 }
 const useSec = body => `<div class="d-sec uses" data-k="use"><h3 data-leaf>Usage</h3>${body}</div>`;
 const useStats = (count, last, activeDays, play) => `<div class="use-stats${play ? ' play' : ''}" data-k="us" data-leaf>
@@ -1759,7 +1818,7 @@ function groupDetailHtml(g) {
     const avail = (upd.available[g.source] || []).filter(a => !a.taken);
     const fresh = avail.filter(a => a.new);
     const watching = upd.watched.includes(g.source);
-    if (list.length) ctl = switchHtml(checked, `All ${list.length} skills from ${g.source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(g.source)}"`);
+    if (list.length && switchable()) ctl = switchHtml(checked, `All ${list.length} skills from ${g.source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(g.source)}"`);
     meta = [`${on} of ${list.length} on`, avail.length ? `${avail.length} available` : '', m?.stars ? `★ ${short(m.stars)}` : '', watching ? 'Watching' : ''];
     desc = m?.description || (g.source === NO_SOURCE ? 'Skills with no upstream repo. Link one to get update checks.'
       : local ? `Skills that share the ${esc(g.source.replace(/\*$/, ''))} name prefix. They have no linked repo yet.` : '');
@@ -2283,7 +2342,7 @@ function waitHtml() {
   if (USE.status === 'error') return '<p class="use-note" data-k="uw">This server cannot read usage. Restart ./atlas to load the new version.</p>';
   if (USE.error) return `<p class="use-note" data-k="uw">Could not read usage: ${esc(USE.error)}</p>`;
   const [done, all] = USE.progress;
-  return `<div class="use-wait" data-k="uw"><span>Reading your Claude Code sessions… <span class="tnum">${done.toLocaleString()} of ${all.toLocaleString()}</span></span>
+  return `<div class="use-wait" data-k="uw"><span>Reading your agent sessions… <span class="tnum">${done.toLocaleString()} of ${all.toLocaleString()}</span></span>
     <span class="track"><i style="transform:scaleX(${all ? (done / all).toFixed(3) : 0})"></i></span></div>`;
 }
 
@@ -2356,16 +2415,16 @@ document.addEventListener('pointerout', e => {
 // What each action would touch among the marked skills, so every button shows a real count.
 function bulkPlan() {
   const list = markedSkills();
-  const own = list.filter(s => s.scope === 'personal' && live(s));
+  const own = list.filter(s => s.scope === 'personal' && live(s) && (switchable() || ui.root === 'all'));
   const plugins = [...new Set(list.filter(s => s.scope === 'plugin' && s.status !== 'stale').map(s => s.plugin_ref))];
   const pluginOn = ref => DATA.settings[ui.root]?.enabledPlugins?.[ref] === true;
   return {
     list,
     on: { skills: own.filter(s => !state(s).on), plugins: plugins.filter(r => !pluginOn(r)) },
     off: { skills: own.filter(s => state(s).on), plugins: plugins.filter(pluginOn) },
-    update: own.filter(isOutdated),
-    link: own.filter(s => !lockName(s)),
-    del: own,
+    update: own.filter(s => s.store && isOutdated(s)),
+    link: own.filter(s => s.store && !lockName(s)),
+    del: own.filter(s => s.store),
   };
 }
 
@@ -2401,7 +2460,7 @@ async function bulkToggle(on) {
   if (names.length) await post('skill', names, on);
   if (refs.length) await post('plugin', refs, on);
   const what = [names.length ? plural(names.length, 'skill') : '', refs.length ? plural(refs.length, 'plugin') : ''].filter(Boolean).join(' and ');
-  toast(`Turned <b>${what}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`, async () => {
+  toast(`Turned <b>${what}</b> ${on ? 'on' : 'off'}. Restart ${esc(harnessName())} sessions to pick it up.`, async () => {
     cascade(rowSwitches(names), !on);
     if (names.length) await post('skill', names, !on);
     if (refs.length) await post('plugin', refs, !on);
@@ -2497,8 +2556,8 @@ async function api(path, body) {
   return data;
 }
 
-async function post(kind, names, on) {
-  DATA.settings[ui.root] = await api('/api/toggle', { root: ui.root, kind, names, on });
+async function post(kind, names, on, root = ui.root) {
+  DATA.settings[root] = await api('/api/toggle', { root, kind, names, on });
   rerender();
 }
 
@@ -2523,16 +2582,16 @@ async function setSource(source, on) {
   const changed = all.filter(s => state(s).on !== on).map(s => s.name);
   cascade(rowSwitches(changed), on);
   await post('skill', changed, on);
-  toast(`Turned <b>${plural(changed.length, 'skill')}</b> from <b>${esc(source)}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`,
+  toast(`Turned <b>${plural(changed.length, 'skill')}</b> from <b>${esc(source)}</b> ${on ? 'on' : 'off'}. Restart ${esc(harnessName())} sessions to pick it up.`,
     async () => { cascade(rowSwitches(changed), !on); await post('skill', changed, !on); });
 }
 
-async function setSetting(kind, key, on, { quiet = false } = {}) {
-  await post(kind, [key], on);
+async function setSetting(kind, key, on, { quiet = false, root = ui.root } = {}) {
+  await post(kind, [key], on, root);
   if (!quiet) {
     const what = kind === 'plugin' ? `plugin ${key.split('@')[0]}` : key;
-    toast(`Turned <b>${esc(what)}</b> ${on ? 'on' : 'off'}. Restart Claude Code sessions to pick it up.`,
-      () => setSetting(kind, key, !on, { quiet: true }));
+    toast(`Turned <b>${esc(what)}</b> ${on ? 'on' : 'off'}. Restart ${esc(harness(root)?.name || harnessName())} sessions to pick it up.`,
+      () => setSetting(kind, key, !on, { quiet: true, root }));
   }
 }
 
@@ -2623,7 +2682,7 @@ async function runJob(kind, start, names, note = '', repo = '') {
   const where = kind === 'install' && repo ? ` from ${esc(repo)}` : '';
   const msg = failed.length
     ? `${ed} ${ok}, <b>${failed.length} failed</b>: ${esc(failed[0][1].error)}. Use Retry on the row.`
-    : `${ed} <b>${ok === 1 ? esc(names[0]) : plural(ok, 'skill')}</b>${where} in ${upd.job.seconds}s.${note} Restart Claude Code sessions to pick it up.`;
+    : `${ed} <b>${ok === 1 ? esc(names[0]) : plural(ok, 'skill')}</b>${where} in ${upd.job.seconds}s.${note} Restart ${esc(harnessName())} sessions to pick it up.`;
   toast(msg);
   announce(msg.replace(/<[^>]+>/g, ''));
 
@@ -2844,7 +2903,7 @@ document.addEventListener('click', async e => {
     sw.setAttribute('aria-checked', on);
     try {
       if (sw.dataset.kind === 'source') await setSource(sw.dataset.key, on);
-      else await setSetting(sw.dataset.kind, sw.dataset.key, on);
+      else await setSetting(sw.dataset.kind, sw.dataset.key, on, { root: sw.dataset.h || ui.root });
     } catch (err) { sw.setAttribute('aria-checked', was); rerender(); toast(`Could not save: ${esc(err.message)}`); }
     return;
   }
@@ -2960,11 +3019,14 @@ document.addEventListener('submit', e => {
 function setSeg(container, attr, value) {
   for (const b of el(container).querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset[attr] === value);
 }
-el('roots').innerHTML = ROOT_LABELS.map(r => `<button data-r="${esc(r)}" aria-pressed="${r === ui.root}" title="${esc(tilde(DATA.config_roots[r]))}">${esc(r)}</button>`).join('');
-el('roots').hidden = ROOT_LABELS.length < 2;
-el('roots').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  ui.root = b.dataset.r; setSeg('roots', 'r', ui.root); rerender();
+el('harness').innerHTML = (HARNESS_IDS.length > 1 ? '<option value="all">All harnesses</option>' : '')
+  + HARNESS_IDS.map(id => `<option value="${esc(id)}">${esc(harness(id).label)}</option>`).join('');
+el('harness').value = ui.root;
+el('harness').closest('.harness').hidden = !HARNESS_IDS.length;
+el('harness').addEventListener('change', e => {
+  ui.root = e.target.value;
+  try { localStorage.setItem('atlas.harness', ui.root); } catch {}
+  rerender();
 });
 el('view').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;

@@ -1,4 +1,4 @@
-"""Scan every place Claude Code loads skills from and emit one record per skill."""
+"""Scan every place agent harnesses load skills from and emit one record per skill."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+import harnesses
 
 HOME = Path.home()
 
@@ -308,38 +310,78 @@ def build_record(skill_md: Path, *, scope: str, **extra) -> dict:
 # --------------------------------------------------------------------------
 
 
-def collect_personal(host: HostConfig, lock_index: dict, seen: dict) -> list[dict]:
-    root = host.root / "skills"
-    if not root.exists():
-        return []
-    real = root.resolve()
+def global_dirs(found: list[harnesses.Harness]) -> dict[Path, list[harnesses.Harness]]:
+    """Each real skill folder, with the harnesses that read it. Symlinked folders count once."""
+    dirs: dict[Path, list[harnesses.Harness]] = {}
+    for h in found:
+        for d in h.dirs:
+            if d.is_dir():
+                dirs.setdefault(d.resolve(), []).append(h)
+    return dirs
+
+
+def lock_entries(skills_dir: Path, cache: dict) -> dict:
+    """The lock entries kept beside one real skills folder. Atlas links first, so npx wins."""
+    if skills_dir not in cache:
+        lock = skills_dir.parent / ".skill-lock.json"
+        entries: dict = {}
+        for path in (lock.with_name(ATLAS_LOCK), lock):
+            found = as_dict(read_json(path).get("skills"))
+            entries.update({k: v for k, v in found.items() if isinstance(v, dict)})
+        cache[skills_dir] = entries
+    return cache[skills_dir]
+
+
+def store_home(roots: dict[str, Path]) -> Path | None:
+    """Where installs and deletes happen: ~/.agents, as npx skills uses, else the first root."""
+    agents = Path.home() / ".agents"
+    if (agents / "skills").is_dir():
+        return agents
+    return next(iter(roots.values()), None)
+
+
+def collect_global(
+    dirs: dict[Path, list[harnesses.Harness]], store: Path | None, seen: dict
+) -> list[dict]:
     out = []
-    for skill_md in sorted(real.glob("*/SKILL.md")):
-        key = str(skill_md.resolve())
-        if key in seen:
-            seen[key]["config_roots"].append(host.label)
-            continue
-        rec = _record(
-            skill_md,
-            scope="personal",
-            config_roots=[host.label],
-            status="enabled",
-            source_root=str(real),
-            origin=lock_index.get(skill_md.parent.name, {}),
-        )
-        if rec is None:
-            continue
-        locked = rec["origin"].get("skillFolderHash", "")
-        try:
-            rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
-        except OSError:
-            rec["local_edits"] = False
-        seen[key] = rec
-        out.append(rec)
+    locks: dict = {}
+    for real, readers in dirs.items():
+        ids = [h.id for h in readers]
+        roots = [
+            h.label.removeprefix("Claude Code · ") or "main"
+            for h in readers
+            if h.switch == "claude"
+        ]
+        for skill_md in sorted(real.glob("*/SKILL.md")):
+            key = str(skill_md.resolve())
+            if key in seen:
+                seen[key]["harnesses"] += ids
+                seen[key]["config_roots"] += roots
+                continue
+            home = skill_md.resolve().parent.parent
+            rec = _record(
+                skill_md,
+                scope="personal",
+                harnesses=list(ids),
+                config_roots=list(roots),
+                status="enabled",
+                source_root=str(real),
+                store=home == store,
+                origin=lock_entries(home, locks).get(skill_md.parent.name, {}),
+            )
+            if rec is None:
+                continue
+            locked = rec["origin"].get("skillFolderHash", "")
+            try:
+                rec["local_edits"] = bool(locked) and git_tree_hash(skill_md.parent) != locked
+            except OSError:
+                rec["local_edits"] = False
+            seen[key] = rec
+            out.append(rec)
     return out
 
 
-def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
+def collect_plugins(host: HostConfig, harness_id: str, seen: dict) -> list[dict]:
     cache = host.root / "plugins" / "cache"
     if not cache.exists():
         return []
@@ -368,11 +410,13 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                     key = str(skill_md.resolve())
                     if key in seen:
                         seen[key]["config_roots"].append(host.label)
+                        seen[key]["harnesses"].append(harness_id)
                         continue
                     rec = _record(
                         skill_md,
                         scope="plugin",
                         config_roots=[host.label],
+                        harnesses=[harness_id],
                         status=status,
                         plugin=plugin_dir.name,
                         plugin_ref=ref,
@@ -418,6 +462,7 @@ def collect_projects(project_roots: list[Path], depth: int, seen: dict) -> list[
                     skill_md,
                     scope="project",
                     config_roots=[],
+                    harnesses=[],
                     status="project-only",
                     project=project_dir.name,
                     project_path=str(project_dir),
@@ -472,8 +517,10 @@ def load_config(repo: Path) -> dict:
         depth = int(cfg.get("project_scan_depth", 3))
     except (TypeError, ValueError):
         depth = 3
+    only = cfg.get("harnesses")
     return {
         **cfg,
+        "harnesses": [str(h) for h in only] if isinstance(only, list) else None,
         "config_roots": roots,
         "project_roots": [str(p) for p in projects if isinstance(p, str) and p],
         "project_scan_depth": depth,
@@ -516,21 +563,16 @@ def scan(repo: Path) -> dict:
         if Path(os.path.expanduser(p)).is_dir()
     ]
 
-    lock_index: dict = {}
-    for host in hosts:
-        skills_dir = host.root / "skills"
-        if skills_dir.exists():
-            # Skills linked in the atlas first, so the npx lock wins on a clash.
-            lock = skill_lock_path(host.root)
-            for path in (lock.with_name(ATLAS_LOCK), lock):
-                entries = as_dict(read_json(path).get("skills"))
-                lock_index.update({k: v for k, v in entries.items() if isinstance(v, dict)})
+    found = harnesses.detect({h.label: h.root for h in hosts}, cfg["harnesses"])
+    claude_ids = {h.home: h.id for h in found if h.switch == "claude"}
+    home = store_home({h.label: h.root for h in hosts})
+    store = (home / "skills").resolve() if home else None
 
     seen: dict = {}
-    records: list[dict] = []
+    records: list[dict] = collect_global(global_dirs(found), store, seen)
     for host in hosts:
-        records += collect_personal(host, lock_index, seen)
-        records += collect_plugins(host, seen)
+        if host.root in claude_ids:
+            records += collect_plugins(host, claude_ids[host.root], seen)
     records += collect_projects(
         [Path(os.path.expanduser(p)) for p in cfg["project_roots"]],
         int(cfg["project_scan_depth"]),
@@ -539,6 +581,7 @@ def scan(repo: Path) -> dict:
 
     for r in records:
         r["config_roots"] = sorted(set(r.get("config_roots") or []))
+        r["harnesses"] = list(dict.fromkeys(r.get("harnesses") or []))
         r["invocation"] = {
             (False, False): "auto + manual",
             (True, False): "manual only",
@@ -554,7 +597,15 @@ def scan(repo: Path) -> dict:
         "host": platform.node(),
         "config_roots": {h.label: str(h.root) for h in hosts},
         "bundled_skills_disabled": bundled_off,
-        "settings": {h.label: settings_state(h.root) for h in hosts},
+        "harnesses": {
+            h.id: {**h.view(), "store": any(d.is_dir() and d.resolve() == store for d in h.dirs)}
+            for h in found
+        },
+        "store": str(home) if home else "",
+        "settings": {
+            h.id: settings_state(h.home) if h.switch == "claude" else harnesses.state(h, records)
+            for h in found
+        },
         "count": len(records),
         "skills": records,
     }
