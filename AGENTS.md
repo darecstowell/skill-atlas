@@ -8,6 +8,8 @@ A local tool that inventories installed Claude Code skills. Read `README.md` fir
   (`from . import scan`). Tests patch module attributes, so import modules, not only names.
 - The page is `src/skill_atlas/web/index.html`, and its textures are in `web/bg/`. They are
   package data. Find them through `skill_atlas.WEB`, not through a path from the repo root.
+  `WEB` is an `importlib.resources` Traversable, so the `.pyz` build can read it from a zip. Use
+  `/`, `read_text`, `read_bytes`, and `iterdir` on it, not `Path` or `shutil` calls.
 - `skill_atlas.REPO` is the clone root when the code runs from a clone. `out/` and the fallback
   `config.json` go there. Outside a clone, `REPO` is `$XDG_DATA_HOME/skill-atlas`.
 - `./atlas`, `uv run skill-atlas`, and `python -m skill_atlas` start the same server.

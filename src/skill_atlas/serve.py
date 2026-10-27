@@ -22,6 +22,7 @@ from . import (
     PACKAGE,
     REPO,
     WEB,
+    __version__,
     assets,
     harnesses,
     history,
@@ -46,6 +47,8 @@ RESTART = "Stop ./atlas (Ctrl-C) and start it again"
 
 def source_hash() -> str:
     """A hash of the Python files, so a server can tell that its code changed on disk."""
+    if not PACKAGE.is_dir():
+        return __version__
     h = hashlib.sha256()
     for path in sorted(PACKAGE.glob("*.py")):
         try:

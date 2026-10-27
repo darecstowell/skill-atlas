@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+from importlib.resources import files
 from pathlib import Path
 
+__version__ = "0.1.0"
 PACKAGE = Path(__file__).resolve().parent
-WEB = PACKAGE / "web"
+# A Traversable, so the page and textures also load from inside a zipapp.
+WEB = files(__name__) / "web"
 
 
 def _home() -> Path:

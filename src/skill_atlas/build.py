@@ -2,9 +2,9 @@
 
 import argparse
 import json
-import shutil
 import sys
 import webbrowser
+from pathlib import Path
 
 from . import REPO, WEB
 from .scan import scan
@@ -17,6 +17,13 @@ def render_page(data: dict, api_token: str = "") -> str:
     payload = json.dumps({**data, "api_token": api_token}).replace("</", "<\\/")
     template = (WEB / "index.html").read_text(encoding="utf-8")
     return template.replace("__SKILL_ATLAS_DATA__", payload)
+
+
+def copy_textures(dest: Path) -> None:
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in (WEB / "bg").iterdir():
+        if f.name.endswith(".webp"):
+            (dest / f.name).write_bytes(f.read_bytes())
 
 
 def main() -> int:
@@ -36,7 +43,7 @@ def main() -> int:
 
     page = OUT / "index.html"
     page.write_text(render_page(data), encoding="utf-8")
-    shutil.copytree(WEB / "bg", OUT / "bg", dirs_exist_ok=True)
+    copy_textures(OUT / "bg")
 
     print(f"{data['count']} skills -> {page}")
     if args.open:
