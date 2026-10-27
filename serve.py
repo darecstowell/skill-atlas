@@ -160,9 +160,22 @@ def profile_call(action: str, req: dict) -> dict:
     )
 
 
+LAST_SCAN: dict = {}
+
+
+def page_scan() -> dict:
+    """A fresh scan for the page, kept so per-skill routes need not scan again."""
+    LAST_SCAN["data"] = scan(REPO)
+    return LAST_SCAN["data"]
+
+
+def _find(data: dict | None, path: str) -> dict | None:
+    return next((s for s in data["skills"] if s["path"] == path), None) if data else None
+
+
 def scanned_record(path: str) -> dict:
     """Only skills the scan itself reported, so the page cannot reach arbitrary files."""
-    rec = next((s for s in scan(REPO)["skills"] if s["path"] == path), None)
+    rec = _find(LAST_SCAN.get("data"), path) or _find(page_scan(), path)
     if rec is None:
         raise ValueError("unknown skill path")
     return rec
@@ -243,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
         path, _, query = self.path.partition("?")
         if path in ("/", "/index.html"):
             try:
-                data = {**scan(REPO), "server": server_info()}
+                data = {**page_scan(), "server": server_info()}
                 page = render_page(data, api_token=TOKEN)
             except Exception as e:
                 traceback.print_exc()
@@ -264,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/version":
             return self._json(200, server_info())
         if path == "/api/data":
-            return self._json(200, {**scan(REPO), "server": server_info()})
+            return self._json(200, {**page_scan(), "server": server_info()})
         if path == "/api/profiles":
             return self._json(200, profiles.listing())
         if path == "/api/usage":

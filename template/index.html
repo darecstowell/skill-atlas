@@ -2880,8 +2880,13 @@ function secTag(s) {
   return '';
 }
 
+// Wait for the selection to rest, so holding j does not queue a request per skill.
+const settle = () => new Promise(r => setTimeout(r, 150));
+
 async function loadSec(s) {
   SEC.by.set(s.path, 'loading');
+  await settle();
+  if (ui.selected?.path !== s.path) return SEC.by.delete(s.path);
   try {
     SEC.by.set(s.path, await api('/api/security?path=' + encodeURIComponent(s.path)));
   } catch (e) {
@@ -3314,6 +3319,8 @@ const kb = n => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)}
 
 async function loadHistory(name) {
   hist[name] = { loading: true };
+  await settle();
+  if (lockName(ui.selected || {}) !== name) return delete hist[name];
   try {
     hist[name] = { list: (await api('/api/history?name=' + encodeURIComponent(name))).snapshots };
   } catch (err) {
@@ -3627,7 +3634,7 @@ async function showPlan(p, body) {
   const skipped = p.skipped.length ? `<p class="note">Not on this computer, so switches stay as they are: ${esc(p.skipped.map(h => h.name).join(', '))}.</p>` : '';
   const when = m.exported_at ? new Date(m.exported_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
   const lead = restore
-    ? 'Download each skill again from its GitHub source, at the version in the lock file.'
+    ? 'Download each skill again from its GitHub source. You get the version that the repo has now.'
     : `${m.host ? `From ${esc(m.host)}` : 'From the file'}${when ? `, exported ${esc(when)}` : ''}. Clear a group to skip it.`;
   const verb = restore ? 'Restore' : 'Import';
   const dlg = showDialog(el('confirmDel'), `<form method="dialog">
