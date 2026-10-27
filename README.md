@@ -74,9 +74,8 @@ its skills installed yet.
 | Source | `skillOverrides` for each skill in the group | All skills from one repo |
 | Plugin | `enabledPlugins` in `settings.json` | A whole plugin. Plugin skills cannot be turned off one by one. |
 
-When you have more than one config root, the root picker sets which settings file to change
-(`personal` is `~/.claude`, `work` is `~/.claude-work`). When `CLAUDE_CONFIG_DIR` is set, that
-folder is a root too. Restart Claude Code sessions to load a change.
+When you have more than one config root, the root picker sets which settings file to change.
+Restart Claude Code sessions to load a change.
 
 ## Keyboard
 
@@ -97,15 +96,28 @@ folder is a root too. Restart Claude Code sessions to load a change.
 
 ## Configuration
 
-`config.json` sets where the atlas looks:
+No setup is needed. The atlas reads `~/.claude`, and also the folder in `CLAUDE_CONFIG_DIR` when
+it is set.
+
+To add project folders, or a second Claude Code config folder, run:
+
+```bash
+./atlas init
+```
+
+This writes `~/.config/skill-atlas/config.json` with the config folders it finds, and prints it.
+Edit it to add `project_roots` or to rename a tab:
 
 ```json
 {
-  "config_roots": { "personal": "~/.claude", "work": "~/.claude-work" },
-  "project_roots": ["~/Documents/dev-personal", "~/Documents/dev"],
+  "config_roots": { "main": "~/.claude", "work": "~/.claude-work" },
+  "project_roots": ["~/code"],
   "project_scan_depth": 3
 }
 ```
+
+The atlas reads `$SKILL_ATLAS_CONFIG` first, then `~/.config/skill-atlas/config.json`, then a
+`config.json` next to the code.
 
 | Source | Where |
 | --- | --- |

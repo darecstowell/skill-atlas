@@ -24,7 +24,7 @@ import remove
 import updates
 import usage
 from build import render_page
-from scan import read_json_strict, scan, settings_state
+from scan import config_path, read_json_strict, scan, settings_state, write_user_config
 
 REPO = Path(__file__).resolve().parent
 TOKEN = secrets.token_urlsafe(24)
@@ -280,16 +280,32 @@ def bind(port: int, tries: int = 20) -> ThreadingHTTPServer:
     raise SystemExit(f"No free port from {port} to {port + tries - 1}.")
 
 
+def init(force: bool) -> int:
+    try:
+        path = write_user_config(force)
+    except FileExistsError as e:
+        print(f"{e} already exists. Edit it, or run ./atlas init --force to replace it.")
+        return 1
+    print(f"Wrote {path}:\n{path.read_text(encoding='utf-8')}")
+    print("Add folders to project_roots to see project skills. Rename a root to change its tab.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Serve the Skill Atlas with working switches.")
+    ap.add_argument("command", nargs="?", choices=["init"], help="init: write a starter config")
     ap.add_argument("--port", type=int, default=7381)
     ap.add_argument("--no-open", action="store_true")
+    ap.add_argument("--force", action="store_true", help="with init: replace an existing config")
     args = ap.parse_args()
+    if args.command == "init":
+        return init(args.force)
 
     data = scan(REPO)
     ROOTS.update({label: Path(p) for label, p in data["config_roots"].items()})
     if not ROOTS:
-        print("No Claude config folder found. Set config_roots in config.json.", file=sys.stderr)
+        where = config_path(REPO)
+        print(f"No Claude config folder found. Set config_roots in {where}.", file=sys.stderr)
     usage.start(list(ROOTS.values()))
 
     server = bind(args.port)
