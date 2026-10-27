@@ -44,6 +44,7 @@
     --id-bg: .33 .07; --id-fg: .87 .1; --id-line: .68 .13; --id-tint: 7%;
     --img-edge: oklch(1 0 0 / .1);
     --tint-violet: color-mix(in oklab, oklch(.76 .11 300) 14%, var(--surface-1)); --violet: oklch(.8 .1 300);
+    --hl1: .34 .055; --hl2: .47 .09; --hl3: .61 .12; --hl4: .76 .14;
     --elevation-raised: 0 0 0 1px oklch(1 0 0 / .09);
     --elevation-raised-hover: 0 0 0 1px oklch(1 0 0 / .15);
   }
@@ -59,6 +60,7 @@
     --id-bg: .93 .045; --id-fg: .44 .12; --id-line: .6 .14; --id-tint: 6%;
     --img-edge: oklch(0 0 0 / .1);
     --tint-violet: oklch(.95 .03 300); --violet: oklch(.47 .14 300);
+    --hl1: .91 .045; --hl2: .8 .09; --hl3: .67 .13; --hl4: .53 .15;
     --elevation-raised: 0 0 0 1px oklch(0 0 0 / .05), 0 1px 3px oklch(0 0 0 / .05), 0 4px 10px -4px oklch(0 0 0 / .05);
     --elevation-raised-hover: 0 0 0 1px oklch(0 0 0 / .07), 0 1px 3px oklch(0 0 0 / .07), 0 4px 10px -4px oklch(0 0 0 / .08);
   }
@@ -221,7 +223,7 @@
 
   /* ---------- rows ---------- */
   .row {
-    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--s3);
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: var(--s3);
     min-height: 44px; padding: 4px var(--s2) 4px 15px; border-radius: var(--r-md);
     scroll-margin-top: calc(var(--head-h) + 76px); scroll-margin-bottom: 24px;
   }
@@ -279,9 +281,11 @@
   }
   @media (hover: hover) and (pointer: fine) { body.cards .row:hover { background: var(--surface-1); box-shadow: var(--elevation-raised-hover); } }
   body.cards .row[aria-current="true"] { background: var(--surface-1); }
-  body.cards .row > :nth-child(2) { display: none; }
+  body.cards .row > .kh { display: none; }
+  body.cards .row .use { grid-column: 1; grid-row: 2; justify-content: flex-start; padding-left: 16px; min-width: 0; }
   body.cards .row .open { grid-column: 1 / -1; align-self: start; display: grid; gap: 4px; padding: 0; }
   body.cards .row .uslot { grid-column: 2; grid-row: 2; min-width: 0; }
+  body.cards .row .open { grid-row: 1; }
   body.cards .row > :last-child { grid-column: 3; grid-row: 2; }
   /* The state rail becomes a status dot in the card footer. */
   body.cards .row::before { left: 12px; top: auto; bottom: 17px; width: 8px; height: 8px; border-radius: 50%; }
@@ -297,6 +301,57 @@
   body.cards.compact .row .open { display: grid; }
   body.cards.compact .thumb { display: none; }
   body.cards.compact .row { padding-top: 10px; }
+
+  /* ---------- usage ---------- */
+  .use { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 64px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .use:empty { min-width: 0; }
+  .spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 14px; }
+  .spark i { width: 3px; height: 14px; border-radius: 1px; background: oklch(var(--id-line) var(--h, 250)); transform-origin: bottom; transform: scaleY(max(.08, var(--v))); opacity: calc(.35 + var(--v) * .65); }
+  .row[data-off] .spark i { background: var(--text-disabled); }
+  .gspark { flex: none; }
+  body.compact .use .spark { display: none; }
+
+  .uses h3, .inv h3.sub { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+  .use-stats { display: flex; gap: var(--s5); }
+  .use-stats div { display: grid; gap: 1px; }
+  .use-stats b { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .use-stats span { font-size: 12px; color: var(--text-3); }
+  .use-note { margin: 0; font-size: 12px; color: var(--text-3); }
+  .use-wait { display: grid; gap: 6px; font-size: 12px; color: var(--text-3); }
+  .use-wait .track { height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .use-wait .track i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 400ms var(--ease-out-quart); }
+
+  .heat { --cell: 11px; --gap: 3px; display: grid; gap: 6px; }
+  .heat-months, .heat-grid { display: grid; grid-template-columns: repeat(26, var(--cell)); column-gap: var(--gap); }
+  .heat-months { height: 14px; font-size: 10.5px; color: var(--text-3); }
+  .heat-months span { white-space: nowrap; }
+  .heat-grid { grid-template-rows: repeat(7, var(--cell)); row-gap: var(--gap); width: fit-content; }
+  .heat i { width: var(--cell); height: var(--cell); border-radius: 3px; background: var(--surface-3); }
+  .heat i[data-l="1"] { background: oklch(var(--hl1) var(--h, 250)); }
+  .heat i[data-l="2"] { background: oklch(var(--hl2) var(--h, 250)); }
+  .heat i[data-l="3"] { background: oklch(var(--hl3) var(--h, 250)); }
+  .heat i[data-l="4"] { background: oklch(var(--hl4) var(--h, 250)); }
+  .heat-grid i[data-today] { box-shadow: 0 0 0 1px var(--bg), 0 0 0 2px var(--text-3); }
+  @media (hover: hover) and (pointer: fine) { .heat-grid i:hover { box-shadow: 0 0 0 1px var(--bg), 0 0 0 2px var(--text); } }
+  .heat-foot { display: flex; align-items: center; gap: var(--s2); font-size: 11.5px; color: var(--text-3); }
+  .heat-read { flex: 1; min-width: 0; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .heat-scale { display: inline-flex; align-items: center; gap: 3px; }
+  .heat-scale i { --cell: 9px; border-radius: 2px; }
+  /* One reveal per skill: a diagonal sweep from the oldest week to today. */
+  .heat.play .heat-grid i { animation: cell-in 260ms var(--ease-out) backwards; animation-delay: var(--d); }
+  @keyframes cell-in { from { opacity: 0; transform: scale(.4); } }
+  .proj { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--s3); align-items: center; font-size: 12px; }
+  .proj span { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj .bar { grid-column: 1 / -1; height: 4px; margin-top: -3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .proj .bar i { display: block; height: 100%; border-radius: inherit; background: oklch(var(--id-line) var(--h, 250)); transform-origin: left; transform: scaleX(var(--v)); }
+  .play .proj .bar i { animation: bar-in 420ms var(--ease-out) backwards; animation-delay: calc(140ms + var(--i) * 50ms); }
+  @keyframes bar-in { from { transform: scaleX(0); } }
+  .top { display: grid; gap: 2px; }
+  .top button { all: unset; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s3); align-items: center; padding: 5px 8px; margin: 0 -8px; border-radius: var(--r-md); cursor: pointer; font-size: 12.5px; }
+  .top button:hover { background: var(--surface-2); }
+  .top button:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+  .top .nmt { font-size: 12.5px; }
+  .top .tnum { color: var(--text-3); font-size: 12px; }
 
   .tags { display: inline-flex; gap: 4px; flex: none; }
   .tag {
@@ -606,6 +661,7 @@
     .switch, .switch::after { transition-delay: 0ms !important; }
     .spin { display: none; }
     @starting-style { .menu, .linkform, #toast, #help, #help .sheet, .row.enter { opacity: 1; transform: none; } }
+    .heat.play .heat-grid i, .play .proj .bar i { animation: none !important; }
   }
 </style>
 </head>
@@ -631,6 +687,13 @@
             <button data-l="cards" aria-pressed="false"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Cards</button>
           </div>
         </div>
+        <div class="pop-row"><span>Sort</span>
+          <div class="seg" id="sortBy" role="group" aria-label="Sort skills">
+            <button data-o="name" aria-pressed="true">Name</button>
+            <button data-o="uses" aria-pressed="false">Most used</button>
+            <button data-o="recent" aria-pressed="false">Recent</button>
+          </div>
+        </div>
         <div class="pop-row"><span>Group by</span>
           <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
             <button data-g="source" aria-pressed="true">Source</button>
@@ -651,6 +714,7 @@
       <button data-v="off" aria-pressed="false">Off <span class="n" data-n="off"></span></button>
       <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
       <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
+      <button data-v="unused" aria-pressed="false" id="viewUnused" hidden title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
     </div>
     <div class="meta" id="meta"></div>
   </div>
@@ -696,6 +760,7 @@ const ui = {
   groupBy: localStorage.getItem('atlas.groupBy') || 'source',
   compact: localStorage.getItem('atlas.compact') === '1',
   layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
+  sort: localStorage.getItem('atlas.sort') || 'name',
   menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
@@ -891,6 +956,7 @@ function visible(s) {
   if (!inView(s)) return false;
   if (ui.view === 'new') return false;
   if (ui.view === 'updates') { if (!isOutdated(s)) return false; }
+  else if (ui.view === 'unused') { if (s.scope === 'project' || !isUnused(s)) return false; }
   else if (ui.view !== 'all' && state(s).on !== (ui.view === 'on')) return false;
   const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
   return terms.every(t => s._hay.includes(t));
@@ -1022,11 +1088,11 @@ function row(s) {
   const ctl = s.scope === 'personal'
     ? switchHtml(st.on, `${s.name}: turn ${st.on ? 'off' : 'on'}`, `data-kind="skill" data-key="${esc(st.key)}"`)
     : '<span></span>';
-  const hints = s.scope === 'personal' && WRITABLE ? `<span class="kh" aria-hidden="true"><kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}</span>` : '<span></span>';
+  const hints = `<span class="kh" aria-hidden="true">${s.scope === 'personal' && WRITABLE ? `<kbd>x</kbd>${isOutdated(s) ? '<kbd>u</kbd>' : ''}` : ''}</span>`;
   const cls = ui.restored.has(s.path) ? 'row enter restored' : 'row';
   return `<div class="${cls}" data-k="r:${esc(s.path)}" data-st="${rowState(s, st)}"${st.on ? '' : ' data-off'} aria-current="${ui.selected === s}">
     <button class="open" data-id="${s.id}" data-leaf>${thumbHtml(s, s.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(s.invoke)}</span>${tagsHtml(s, st)}</span><span class="desc">${highlight(s._desc || 'No description')}</span></button>
-    ${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
+    ${useCell(s)}${hints}<span class="uslot" data-k="u">${updateSlot(s)}</span>${ctl}
   </div>`;
 }
 
@@ -1122,11 +1188,11 @@ function availRow(repo, a) {
   } else if (WRITABLE) {
     slot = `<button class="btn ${js === 'failed' ? 'danger' : 'accent'}" data-k="ins" data-install-one="${esc(repo)}" data-path="${esc(a.path)}"${js === 'failed' ? ` title="${esc(upd.job.items[a.name].error)}"` : ''}>${js === 'failed' ? 'Retry' : 'Install'}</button>`;
   }
-  const hints = !a.taken && WRITABLE ? '<span class="kh" aria-hidden="true"><kbd>i</kbd></span>' : '<span></span>';
+  const hints = `<span class="kh" aria-hidden="true">${!a.taken && WRITABLE ? '<kbd>i</kbd>' : ''}</span>`;
   const tag = a.new ? '<span class="tags"><span class="tag update">new</span></span>' : '';
   return `<div class="row avail" data-k="${esc(key)}" data-st="${js === 'done' ? 'done' : RUNNING.has(js) ? 'busy' : a.new ? 'outdated' : 'avail'}" aria-current="${selKey(ui.selected) === key}">
     <button class="open" data-avail="${esc(repo)}" data-path="${esc(a.path)}" data-leaf>${thumbHtml({ kind: 'avail', repo, path: a.path }, a.name)}<span class="nm"><span class="nmt"><span class="slash">/</span>${highlight(a.name)}</span>${tag}</span><span class="desc">${desc}</span></button>
-    ${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
+    <span class="use" data-k="use"></span>${hints}<span class="uslot" data-k="u">${slot}</span><span></span>
   </div>`;
 }
 
@@ -1186,7 +1252,7 @@ function sourceGroups(personal) {
     const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
     const head = `${fold(id, `${avatar(source, local ? null : source)}<span class="gname" data-leaf>${highlight(source)}</span>`, source, ui.view === 'new' || isOpen(id))}
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
-      <span class="gsub" data-leaf>${meta}</span>
+      ${groupSpark(all)}<span class="gsub" data-leaf>${meta}</span>
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
       ${all.length ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
@@ -1210,6 +1276,7 @@ function emptyHtml() {
       <p>${when}${ui.view === 'new' ? ' Your sources have not added skills since you last looked.' : ''}</p>
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
+  if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
   return '<div class="empty" data-k="empty"><h2>No skills here</h2><p>Turn on Project skills or Old plugin versions to see more.</p></div>';
 }
@@ -1217,8 +1284,10 @@ function emptyHtml() {
 // ---------------------------------------------------------------- render
 function render() {
   const byName = (a, b) => a.name.localeCompare(b.name);
+  const sorter = ui.sort === 'uses' ? (a, b) => uses(b) - uses(a) || byName(a, b)
+    : ui.sort === 'recent' ? (a, b) => lastUsed(b) - lastUsed(a) || byName(a, b) : byName;
   const inRoot = s => s.scope === 'project' || s.config_roots.includes(ui.root);
-  const shown = SKILLS.filter(visible).sort(byName);
+  const shown = SKILLS.filter(visible).sort(sorter);
   const out = [];
 
   const personal = shown.filter(s => s.scope === 'personal');
@@ -1249,7 +1318,7 @@ function render() {
         switchHtml(st.on, `Plugin ${lv.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
       const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
       const head = `${fold('plg:' + ref, `${avatar(lv.plugin, repoOf(lv))}<span class="gname" data-leaf>${highlight(lv.plugin)}</span>`, lv.plugin)}
-        <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span><span class="gctl" data-k="c">${ctl}</span>`;
+        ${groupSpark(list)}<span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span><span class="gctl" data-k="c">${ctl}</span>`;
       return group('plg:' + ref, head, list.map(row).join(''));
     });
     out.push(section('sec:plugins', 'Plugins', refs.length, groups.join(''), refs.map(([r]) => 'plg:' + r)));
@@ -1275,7 +1344,8 @@ function renderChrome() {
   const on = lv.filter(s => state(s).on).length;
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
-  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh };
+  const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  el('viewUnused').hidden = !USE.ready;
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
   el('viewUpdates').hidden = !WRITABLE;
   el('viewNew').hidden = !WRITABLE || (!fresh && ui.view !== 'new');
@@ -1331,7 +1401,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -1339,14 +1409,15 @@ function inventoryHtml() {
   const lv = SKILLS.filter(s => s.status !== 'stale' && s.scope !== 'project' && s.config_roots.includes(ui.root));
   const personal = lv.filter(s => s.scope === 'personal');
   const stat = (n, label, tone = '') => `<div class="stat"${tone && n ? ` data-tone="${tone}"` : ''}><b>${n}</b><span>${label}</span></div>`;
-  return `<div class="inv" data-k="inv" data-leaf>
-    <h3>Inventory</h3>
-    <div class="stats">
+  return `<div class="inv" data-k="inv">
+    <h3 data-leaf>Inventory</h3>
+    <div class="stats" data-k="st" data-leaf>
       ${stat(lv.filter(s => state(s).on).length, 'on', 'on')}${stat(lv.filter(s => !state(s).on).length, 'off')}
       ${stat(WRITABLE ? lv.filter(isOutdated).length : '–', 'updates', WRITABLE ? 'accent' : '')}${stat(personal.filter(s => !lockName(s)).length, 'untracked')}
       ${stat(personal.filter(s => s._dupes.length).length, 'duplicates')}${stat(personal.filter(s => s.local_edits).length, 'edited', 'warn')}
     </div>
-    <div class="d-sec"><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
+    ${inventoryUsageHtml(lv)}
+    <div class="d-sec" data-k="kb" data-leaf><h3>Keyboard</h3><div class="keys">${keysHtml()}</div></div>
   </div>`;
 }
 
@@ -1430,6 +1501,7 @@ function detailHtml(s) {
     <p class="d-desc${long && !ui.descOpen ? ' clamp' : ''}" data-k="desc" data-leaf>${esc(s.description || 'No description')}</p>
     ${long ? `<button class="linkbtn d-more" data-k="more" data-more aria-expanded="${ui.descOpen}">${ui.descOpen ? 'Show less' : 'Show more'}</button>` : ''}
     <div class="d-sec" data-k="cards">${cards.join('')}</div>
+    ${usageHtml(s)}
     <div class="d-sec" data-k="facts"><dl data-leaf>
       ${field('Who calls it', s.manual_only ? 'Only you, by name' : 'You or Claude')}
       ${field('Source', srcShort, true)}
@@ -1455,7 +1527,8 @@ function renderDetail() {
   const s = ui.selected;
   const key = selKey(s);
   const html = s ? detailHtml(s) : inventoryHtml();
-  if (key !== detailFor) {
+  const fresh = key !== detailFor;
+  if (fresh) {
     d.innerHTML = html; d.scrollTop = 0; detailFor = key;
   } else {
     patch(d, html);
@@ -1463,6 +1536,7 @@ function renderDetail() {
   if (s) d.setAttribute('data-open', ''); else d.removeAttribute('data-open');
   d.style.setProperty('--h', s ? hue(groupId(s)) : 250);
   if (s) loadRepos([repoOf(s)]);
+  if (fresh) for (const n of d.querySelectorAll('.play [data-count]')) countUp(n);
   for (const repo of needDescs) loadDescs(repo);
 }
 
@@ -1783,6 +1857,196 @@ el('theme').addEventListener('click', e => {
 });
 SYSTEM_LIGHT.addEventListener('change', () => { if (themePick === 'system') applyTheme(); });
 
+// ---------------------------------------------------------------- usage
+const USE = { raw: null, ready: false, status: null, progress: [0, 0], by: new Map(), played: new Map() };
+// True while a key's first reveal runs, so a re-render in that window does not cut it short.
+function playing(key) {
+  if (REDUCED.matches) return false;
+  if (!USE.played.has(key)) USE.played.set(key, performance.now() + 700);
+  return performance.now() < USE.played.get(key);
+}
+const DAY = 864e5;
+const WEEKS = 26;
+const UNUSED_DAYS = 90;
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const useKeys = s => [s.invoke, s.name, s.dir_name, s.plugin && `${s.plugin}:${s.name}`].filter(Boolean);
+
+// Usage is keyed by the name a skill was called by; map each name to one installed skill.
+function indexUsage(d) {
+  USE.raw = d;
+  const recs = SKILLS.filter(s => s.status !== 'stale');
+  const exact = new Map();
+  for (const s of recs) for (const k of useKeys(s)) if (!exact.has(k)) exact.set(k, s);
+  const by = new Map();
+  for (const n of new Set([...Object.keys(d.counters || {}), ...Object.keys(d.skills || {})])) {
+    let s = exact.get(n);
+    // A skill that was renamed with a prefix: design-foundations became emil-design-foundations.
+    if (!s) { const m = recs.filter(r => r.name.endsWith('-' + n)); if (m.length === 1) s = m[0]; }
+    if (!s) continue;
+    if (!by.has(s)) by.set(s, { counted: 0, seen: 0, days: {}, projects: {}, last: 0 });
+    const u = by.get(s), c = d.counters?.[n], t = d.skills?.[n];
+    if (c) { u.counted += c.count; u.last = Math.max(u.last, Date.parse(c.last) || 0); }
+    if (t) {
+      for (const [day, k] of Object.entries(t.days)) { u.days[day] = (u.days[day] || 0) + k; u.seen += k; }
+      for (const [pr, k] of Object.entries(t.projects)) u.projects[pr] = (u.projects[pr] || 0) + k;
+      u.last = Math.max(u.last, Date.parse(t.last) || 0);
+    }
+  }
+  // Claude Code's counter keeps the full history; old transcripts get cleaned up. Trust the larger.
+  for (const u of by.values()) u.count = Math.max(u.counted, u.seen);
+  USE.by = by;
+}
+const uses = s => USE.by.get(s)?.count || 0;
+const lastUsed = s => USE.by.get(s)?.last || 0;
+const isUnused = s => USE.ready && s.scope !== 'project' && s.status !== 'stale' && Date.now() - lastUsed(s) > UNUSED_DAYS * DAY;
+const short = n => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
+function ago(ms) {
+  const days = Math.floor((midnight() - new Date(ms).setHours(0, 0, 0, 0)) / DAY);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
+
+// Weekly totals ending today, oldest first.
+function weekly(days, n) {
+  const out = Array(n).fill(0);
+  const today = midnight();
+  for (const [day, k] of Object.entries(days)) {
+    const back = Math.round((today - new Date(day + 'T00:00')) / DAY);
+    const w = n - 1 - Math.floor(back / 7);
+    if (w >= 0 && w < n) out[w] += k;
+  }
+  return out;
+}
+function spark(values, cls = 'spark') {
+  const max = Math.max(...values, 1);
+  return `<span class="${cls}" aria-hidden="true">${values.map(v => `<i style="--v:${(v / max).toFixed(2)}"></i>`).join('')}</span>`;
+}
+
+function useCell(s) {
+  if (!USE.ready || s.status === 'stale') return '<span class="use" data-k="use"></span>';
+  const u = USE.by.get(s);
+  if (!u?.count) return '<span class="use" data-k="use"></span>';
+  return `<span class="use" data-k="use" data-leaf title="${plural(u.count, 'use')} · last ${ago(u.last)}">${spark(weekly(u.days, 12))}<span>${short(u.count)}</span></span>`;
+}
+function groupSpark(list) {
+  if (!USE.ready) return '';
+  const days = {};
+  for (const s of list) for (const [d, k] of Object.entries(USE.by.get(s)?.days || {})) days[d] = (days[d] || 0) + k;
+  const w = weekly(days, 12);
+  return w.some(Boolean) ? `<span class="gspark" data-k="gs" data-leaf title="Uses per week, last 12 weeks">${spark(w)}</span>` : '';
+}
+
+const fmtDay = day => new Date(day + 'T00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+// A 26-week calendar. Each key plays its reveal once; later renders paint it still.
+function heatmap(days, key) {
+  const today = midnight();
+  const start = new Date(today);
+  start.setDate(start.getDate() - start.getDay() - (WEEKS - 1) * 7);
+  const cells = [];
+  let max = 0, total = 0, active = 0;
+  for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const day = isoDay(d), n = days[day] || 0;
+    cells.push([day, n, d.getMonth(), d.getDate()]);
+    max = Math.max(max, n); total += n; if (n) active++;
+  }
+  const lvl = n => (n ? Math.max(1, Math.min(4, Math.ceil(4 * Math.log1p(n) / Math.log1p(max)))) : 0);
+  const play = playing(key);
+  const months = [];
+  const grid = cells.map(([day, n, m, date], i) => {
+    const w = Math.floor(i / 7), dow = i % 7;
+    if (date <= 7 && dow === 0 && w > 0) months.push(`<span style="grid-column:${w + 1}">${new Date(day + 'T00:00').toLocaleDateString(undefined, { month: 'short' })}</span>`);
+    const title = `${fmtDay(day)} · ${n ? plural(n, 'use') : 'no uses'}`;
+    return `<i data-l="${lvl(n)}" data-t="${esc(title)}" style="grid-area:${dow + 1}/${w + 1};--d:${(w + dow) * 9}ms"${day === isoDay(today) ? ' data-today' : ''}></i>`;
+  }).join('');
+  const summary = `${plural(total, 'use')} on ${plural(active, 'day')}, last ${WEEKS} weeks`;
+  return `<div class="heat${play ? ' play' : ''}" data-k="heat:${esc(key)}" data-leaf>
+    <div class="heat-months" aria-hidden="true">${months.join('')}</div>
+    <div class="heat-grid" role="img" aria-label="${esc(summary)}">${grid}</div>
+    <div class="heat-foot"><span class="heat-read" data-default="${esc(summary)}">${esc(summary)}</span>
+      <span class="heat-scale" aria-hidden="true">Less<i data-l="0"></i><i data-l="1"></i><i data-l="2"></i><i data-l="3"></i><i data-l="4"></i>More</span></div>
+  </div>`;
+}
+
+function waitHtml() {
+  const [done, all] = USE.progress;
+  return `<div class="use-wait" data-k="uw"><span>Reading your Claude Code sessions… <span class="tnum">${done.toLocaleString()} of ${all.toLocaleString()}</span></span>
+    <span class="track"><i style="transform:scaleX(${all ? (done / all).toFixed(3) : 0})"></i></span></div>`;
+}
+
+function usageHtml(s) {
+  if (!WRITABLE || s.kind === 'avail' || s.scope === 'project' || s.status === 'stale') return '';
+  const u = USE.by.get(s);
+  const key = selKey(s);
+  let body;
+  if (!USE.ready && !u) body = waitHtml();
+  else if (!u?.count) {
+    body = `<p class="use-note" data-k="un" data-leaf>No recorded uses yet.${s.scope === 'personal' && state(s).on ? ' Every skill that is on costs a little context in each session, so turn off the ones you never use.' : ''}</p>`;
+  } else {
+    const play = playing(key);
+    const top = Object.entries(u.projects).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const most = top[0]?.[1] || 1;
+    body = `<div class="use-stats${play ? ' play' : ''}" data-k="us" data-leaf>
+        <div><b data-count="${u.count}">${u.count.toLocaleString()}</b><span>uses</span></div>
+        <div><b>${ago(u.last)}</b><span>last used</span></div>
+        <div><b>${Object.keys(u.days).length}</b><span>active days</span></div>
+      </div>
+      ${USE.ready ? heatmap(u.days, key) : waitHtml()}
+      ${top.length ? `<div class="proj${play ? ' play' : ''}" data-k="pj" data-leaf>${top.map(([name, n], i) => `<span>${esc(name)}</span><span class="tnum">${n}</span><span class="bar"><i style="--v:${(n / most).toFixed(3)};--i:${i}"></i></span>`).join('')}</div>` : ''}`;
+  }
+  return `<div class="d-sec uses" data-k="use"><h3 data-leaf>Usage</h3>${body}</div>`;
+}
+
+function inventoryUsageHtml(lv) {
+  if (!WRITABLE) return '';
+  if (!USE.ready) return `<div class="d-sec uses" data-k="iu"><h3 class="sub" data-leaf>Usage</h3>${waitHtml()}</div>`;
+  const days = {};
+  for (const s of lv) for (const [d, k] of Object.entries(USE.by.get(s)?.days || {})) days[d] = (days[d] || 0) + k;
+  const ranked = lv.filter(uses).sort((a, b) => uses(b) - uses(a)).slice(0, 5);
+  const unused = lv.filter(isUnused).length;
+  return `<div class="d-sec uses" data-k="iu" style="--h: 240">
+    <h3 class="sub" data-leaf>Usage</h3>
+    ${heatmap(days, 'all')}
+    <div class="top" data-k="top" data-leaf>${ranked.map(s => `<button data-pick="${s.id}"><span class="nmt"><span class="slash">/</span>${esc(s.invoke)}</span><span class="tnum">${uses(s).toLocaleString()}</span></button>`).join('')}</div>
+    ${unused ? `<p class="use-note" data-k="uu" data-leaf>${plural(unused, 'skill')} not used in ${UNUSED_DAYS} days. <button class="linkbtn" data-view-unused>Show them</button></p>` : ''}
+  </div>`;
+}
+
+// Counts up from zero with the reveal, so the number lands with the heatmap.
+function countUp(node) {
+  const end = +node.dataset.count;
+  const t0 = performance.now();
+  const step = t => {
+    const k = Math.min(1, (t - t0) / 500);
+    node.textContent = Math.round(end * (1 - (1 - k) ** 3)).toLocaleString();
+    if (k < 1 && node.isConnected) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function loadUsage() {
+  try {
+    const d = await api('/api/usage');
+    USE.status = d.status; USE.progress = d.progress;
+    indexUsage(d);
+    USE.ready = d.status === 'ready';
+  } catch { USE.status = 'error'; }
+  rerender();
+  if (USE.status === 'indexing') setTimeout(loadUsage, 1200);
+}
+
+document.addEventListener('pointerover', e => {
+  const c = e.target.closest?.('.heat-grid i');
+  if (c) c.closest('.heat').querySelector('.heat-read').textContent = c.dataset.t;
+});
+document.addEventListener('pointerout', e => {
+  const g = e.target.closest?.('.heat-grid');
+  if (g && !g.contains(e.relatedTarget)) { const r = g.closest('.heat').querySelector('.heat-read'); r.textContent = r.dataset.default; }
+});
+
 // ---------------------------------------------------------------- toast
 let toastTimer, toastGone, toastUndo = null;
 function toast(html, undo) {
@@ -1883,6 +2147,7 @@ async function reloadData() {
   const prev = ui.selected;
   DATA = { ...(await api('/api/data')), api_token: token };
   SKILLS = DATA.skills; index();
+  if (USE.raw) indexUsage(USE.raw);
   // An available skill that just got installed stays selected as the installed skill.
   ui.selected = prev?.kind === 'avail'
     ? SKILLS.find(s => live(s) && s.dir_name === prev.a.name && s.origin?.source === prev.repo) || prev
@@ -2238,6 +2503,9 @@ document.addEventListener('click', async e => {
   if (open) return select(SKILLS[+open.dataset.id]);
   if (t.closest('[data-close]')) { const k = selKey(ui.selected); select(null); focusRow(k); return; }
   if (t.closest('[data-view]')) return openViewer(ui.selected);
+  const pick = t.closest('[data-pick]');
+  if (pick) return select(SKILLS[+pick.dataset.pick]);
+  if (t.closest('[data-view-unused]')) { ui.view = 'unused'; setSeg('view', 'v', 'unused'); render(); scrollTo({ top: 0 }); return; }
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
   if (t.closest('[data-undo]')) return runUndo();
   const copy = t.closest('[data-copy]');
@@ -2303,6 +2571,12 @@ el('layout').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   setLayout(b.dataset.l); render();
 });
+
+function setSort(o) {
+  ui.sort = o; localStorage.setItem('atlas.sort', o); setSeg('sortBy', 'o', o); render();
+}
+setSeg('sortBy', 'o', ui.sort);
+el('sortBy').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSort(b.dataset.o); });
 
 function setDisplay(open, focusButton = false) {
   el('display').hidden = !open;
@@ -2396,6 +2670,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === 's') { const order = ['name', 'uses', 'recent']; setSort(order[(order.indexOf(ui.sort) + 1) % 3]); toast(`Sorted by ${{ name: 'name', uses: 'most used', recent: 'recently used' }[ui.sort]}.`); return; }
   if (e.key === 'g') { setLayout(ui.layout === 'cards' ? 'list' : 'cards'); render(); return; }
   if (e.key === 'v') {
     const o = t.matches?.('.open') ? t : null;
@@ -2430,7 +2705,7 @@ setLayout(ui.layout);
 applyTheme();
 render();
 renderDetail();
-if (WRITABLE) checkUpdates();
+if (WRITABLE) { checkUpdates(); loadUsage(); }
 </script>
 </body>
 </html>

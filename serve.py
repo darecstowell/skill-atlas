@@ -18,6 +18,7 @@ from urllib.parse import parse_qs
 import assets
 import remove
 import updates
+import usage
 from build import render_page
 from scan import scan, settings_state
 
@@ -81,6 +82,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "forbidden"})
         if path == "/api/data":
             return self._json(200, scan(REPO))
+        if path == "/api/usage":
+            return self._json(200, usage.snapshot(list(ROOTS.values())))
         if path == "/api/updates":
             return self._json(
                 200, updates.check(list(ROOTS.values()), refresh="refresh=1" in query)
@@ -168,6 +171,7 @@ def main() -> int:
 
     data = scan(REPO)
     ROOTS.update({label: Path(p) for label, p in data["config_roots"].items()})
+    usage.start(list(ROOTS.values()))
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}/"

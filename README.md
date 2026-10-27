@@ -148,6 +148,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 | `serve.py` | Local server and the only writer of `settings.json` |
 | `updates.py` | Update checks, updates, installs, and watched sources |
 | `assets.py` | Avatars, banners, and image paths for source repos |
+| `usage.py` | Counts skill use from Claude Code's counters and session transcripts |
 | `remove.py` | Moves skills to the Trash, and puts them back |
 | `build.py` | Puts the records into `template/index.html` |
 | `template/index.html` | The page: one file of HTML, CSS, and JavaScript |
