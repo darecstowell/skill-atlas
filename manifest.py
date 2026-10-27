@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,14 +22,6 @@ def _personal(data: dict) -> dict[str, dict]:
     return {s["dir_name"]: s for s in data["skills"] if s.get("scope") == "personal"}
 
 
-def _tracked(origin: dict) -> bool:
-    return bool(
-        origin.get("sourceType") == "github"
-        and isinstance(origin.get("source"), str)
-        and origin.get("skillPath")
-    )
-
-
 def _off(data: dict, hid: str) -> list[str]:
     st = data["settings"].get(hid) or {}
     if "skillOverrides" in st:
@@ -44,7 +35,7 @@ def export(data: dict, roots: list[Path]) -> dict:
     for name, s in sorted(_personal(data).items()):
         o = s.get("origin") or {}
         item: dict = {"name": name, "dir": tilde(s["dir"])}
-        if _tracked(o):
+        if updates.from_github(o):
             item.update(source=o["source"], skillPath=o["skillPath"], ref=o.get("ref") or "")
             item["skillFolderHash"] = o.get("skillFolderHash") or ""
         else:
@@ -82,10 +73,6 @@ def _repo(text) -> str | None:
         return None
 
 
-def _safe(path: str) -> bool:
-    return path.endswith("SKILL.md") and not path.startswith("/") and ".." not in path.split("/")
-
-
 def _local_hash(s: dict) -> str:
     h = (s.get("origin") or {}).get("skillFolderHash")
     if h:
@@ -118,7 +105,7 @@ def plan(manifest: dict, data: dict, roots: list[Path]) -> dict:
             continue
         name = item["name"]
         repo, path = _repo(item.get("source")), item.get("skillPath")
-        if repo and isinstance(path, str) and _safe(path):
+        if repo and isinstance(path, str) and updates.safe_skill_path(path):
             name = updates.skill_name(repo, path)
         else:
             repo = path = None
@@ -183,28 +170,6 @@ def missing(roots: list[Path]) -> dict:
     return out
 
 
-def start_install(items: list[dict], roots: list[Path]) -> dict:
-    """One background job that installs from several repos, through the update job runner."""
-    by_repo: dict[str, list[str]] = {}
-    for i in items:
-        by_repo.setdefault(i["repo"], []).append(i["path"])
-    if len(by_repo) == 1:
-        repo, paths = next(iter(by_repo.items()))
-        return updates.start_install(repo, paths, roots)
-
-    def run(job: dict, roots: list[Path]) -> None:
-        try:
-            for repo, paths in by_repo.items():
-                updates._install_source(repo, paths, job, roots)
-        finally:
-            updates._cache.clear()
-            job["seconds"] = round(time.time() - job["started"], 1)
-            job["done"] = True
-
-    names = [updates.skill_name(r, p) for r, ps in by_repo.items() for p in ps]
-    return updates._start_job(names, run, roots)
-
-
 def apply(
     full: dict,
     pick: dict,
@@ -245,5 +210,8 @@ def apply(
             switched += len(st["off"])
         except (ValueError, OSError, NotImplementedError) as e:
             errors.append(f"{h.name}: {e}")
-    job = updates.job_view(start_install(items, roots)) if items else None
+    by_repo: dict[str, list[str]] = {}
+    for i in items:
+        by_repo.setdefault(i["repo"], []).append(i["path"])
+    job = updates.job_view(updates.start_install(by_repo, roots)) if by_repo else None
     return {"job": job, "watched": watched, "switched": switched, "errors": errors}

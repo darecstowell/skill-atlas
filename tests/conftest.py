@@ -18,6 +18,7 @@ def no_user_config(tmp_path_factory, monkeypatch):
     # Tests must never read the real home: its config, skills, or harness settings.
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg")))
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path_factory.mktemp("cache")))
     for var in ("SKILL_ATLAS_CONFIG", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME"):
         monkeypatch.delenv(var, raising=False)
 

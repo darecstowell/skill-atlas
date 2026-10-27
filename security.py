@@ -238,9 +238,10 @@ def _scan_text(rel: str, text: str, script: bool, doc: bool) -> list[dict]:
                         "Docs tell the agent to pipe a download into a shell.",
                     )
                 add(f)
-    for m in ENV_DUMP.finditer(text if "env-leak" in hinted else ""):
-        if NET.search(t.at(m.start())[1]):
-            add(t.hit("env-leak", m))
+    if "env-leak" in hinted:
+        for m in ENV_DUMP.finditer(text):
+            if NET.search(t.at(m.start())[1]):
+                add(t.hit("env-leak", m))
     if not minified:
         for m in BLOB.finditer(text):
             if DATA_URI.search(text[max(0, m.start() - 60) : m.start()]):
@@ -270,11 +271,12 @@ def _scan_text(rel: str, text: str, script: bool, doc: bool) -> list[dict]:
                 continue
             hosts.add(host)
             out.append({**t.hit("network", m, f"Calls {host}."), "host": host})
-    if doc:
-        for m in INJECTION.finditer(text if "injection" in hinted else ""):
+    if doc and "injection" in hinted:
+        for m in INJECTION.finditer(text):
             # A quoted phrase is usually a warning about injection, not an attempt.
             if text[max(0, m.start() - 1) : m.start()] not in QUOTES:
                 add(t.hit("injection", m))
+    if doc:
         for m in COMMENT.finditer(text):
             body = " ".join(m.group(1).split())
             if len(body) >= 40 and len(IMPERATIVE.findall(body)) >= 2:
