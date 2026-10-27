@@ -125,7 +125,7 @@
   .btn.warn { color: var(--warn); }
   .btn.warn.confirm { background: var(--warn); border-color: transparent; color: oklch(.2 .02 75); }
   .btn.icon { width: 28px; padding: 0; }
-  .btn[disabled] { color: var(--text-disabled); cursor: default; }
+  .btn[disabled], .btn[aria-disabled="true"] { color: var(--text-disabled); cursor: default; }
   .btn svg { width: 14px; height: 14px; flex: none; }
 
   /* ---------- header ---------- */
@@ -1847,11 +1847,12 @@ function emptyHtml() {
       <p>${when}${ui.view === 'new' ? ' Your sources have not added skills since you last looked.' : ''}</p>
       <span class="acts"><button class="btn" data-recheck>Check again</button></span></div>`;
   }
-  if (ui.view === 'issues') return '<div class="empty" data-k="empty"><h2>No problems found</h2><p>Each SKILL.md in this view has valid frontmatter, and each file it names is there.</p></div>';
+  const toAll = '<span class="acts"><button class="btn" data-view-all>Show all skills</button></span>';
+  if (ui.view === 'issues') return `<div class="empty" data-k="empty"><h2>No problems found</h2><p>Each SKILL.md in this view has valid frontmatter, and each file it names is there.</p>${toAll}</div>`;
   if (ui.view === 'similar' || ui.view === 'diverged') return overlapEmpty();
-  if (ui.view === 'review') return `<div class="empty" data-k="empty"><h2>Nothing to review</h2><p>No skill in this view has high-risk patterns. ${SEC_NOTE}</p></div>`;
+  if (ui.view === 'review') return `<div class="empty" data-k="empty"><h2>Nothing to review</h2><p>No skill in this view has high-risk patterns. ${SEC_NOTE}</p>${toAll}</div>`;
   if (ui.view === 'unused') return '<div class="empty" data-k="empty"><h2>Every skill is in use</h2><p>Each one ran in the last 90 days.</p></div>';
-  if (ui.view === 'costly') return '<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last 90 days.</p></div>';
+  if (ui.view === 'costly') return `<div class="empty" data-k="empty"><h2>No costly skills sit unused</h2><p>Each costly skill that is on ran in the last ${UNUSED_DAYS} days.</p>${toAll}</div>`;
   if (ui.view === 'off') return '<div class="empty" data-k="empty"><h2>Nothing is off</h2><p>Every skill in this view loads.</p></div>';
   return '<div class="empty" data-k="empty"><h2>No skills here</h2><p>Turn on Project skills or Old plugin versions to see more.</p></div>';
 }
@@ -2939,7 +2940,7 @@ function securityHtml(s) {
   const rep = SEC.by.get(s.path);
   if (!rep) loadSec(s);
   if (!rep || rep === 'loading') return wrap('<p class="use-note" data-k="ss" data-leaf>Scanning the files…</p>');
-  if (rep.error) return wrap(`<p class="use-note" data-k="ss" data-leaf>Could not scan this skill: ${esc(rep.error)}</p>`);
+  if (rep.error) return wrap(`<p class="use-note" data-k="ss" data-leaf>Could not scan this skill: ${esc(rep.error)} <button class="linkbtn" data-sec-retry>Try again</button></p>`);
   if (!rep.findings.length) return wrap(`<p class="use-note" data-k="ss" data-leaf>No risky patterns in ${plural(rep.files, 'file')}.</p>`);
   const groups = new Map();
   for (const f of rep.findings) {
@@ -3357,7 +3358,7 @@ function historyHtml(s) {
   const h = hist[name];
   let body;
   if (!h || h.loading) body = '<p class="note">Reading saved versions…</p>';
-  else if (h.error) body = `<p class="note warn">Could not read the history: ${esc(h.error)}</p>`;
+  else if (h.error) body = `<p class="note warn">Could not read the history: ${esc(h.error)} <button class="linkbtn" data-hist-retry="${esc(name)}">Try again</button></p>`;
   else if (!h.list.length) body = '<p class="note">No saved versions yet. Before each update, the atlas saves a copy of this skill here.</p>';
   else body = `<ul class="hs-list">${h.list.map(x => `<li><span><b>${esc(snapTime(x.at))}</b>${x.reason === 'restore' ? 'Before a restore' : 'Before an update'}${x.hash ? ` · <code>${esc(x.hash)}</code>` : ''}</span>
     <button class="btn ghost" data-restore="${esc(name)}" data-id="${esc(x.id)}">Restore…</button></li>`).join('')}</ul>`;
@@ -3400,7 +3401,7 @@ function diffHtml(s, d) {
   const edited = d.local_edits ?? s.local_edits;
   const name = lockName(s);
   const go = isOutdated(s) && !jobRunning()
-    ? `<button class="btn ${edited ? 'warn confirm' : 'primary'}" value="update">${edited ? 'Replace my edits' : 'Update'}</button>` : '';
+    ? `<button class="btn ${edited ? 'warn confirm' : 'primary'}" value="update"${d.loading || d.error ? ' disabled' : ''}>${edited ? 'Replace my edits' : 'Update'}</button>` : '';
   return `<form method="dialog">
     <div><h2 id="hdTitle">Changes in <code>/${esc(s.invoke)}</code></h2>
     <p class="cd-lead">From your copy to the latest version on ${esc(o.source)}.</p></div>
@@ -3548,20 +3549,22 @@ function skillSetHtml() {
   if (!WRITABLE) return '';
   const n = SS.missing.length;
   const busy = SS.busy;
-  const missing = n ? `<div class="ss-missing" role="status">
-      <p>${ICON.alert}${n === 1 ? '1 skill in the lock file has' : `${n} skills in the lock file have`} no folder.</p>
-      <button class="btn" data-ss="restore"${busy ? ' disabled' : ''}>Restore ${plural(n, 'missing skill')}</button>
+  // aria-disabled, not disabled: a disabled button drops keyboard focus.
+  const off = busy ? ' aria-disabled="true"' : '';
+  const missing = n ? `<div class="ss-missing" role="status" data-k="m">
+      <p data-k="t" data-leaf>${ICON.alert}${n === 1 ? '1 skill in the lock file has' : `${n} skills in the lock file have`} no folder.</p>
+      <button class="btn" data-k="r" data-leaf data-ss="restore"${off}>${busy === 'restore' ? 'Reading…' : `Restore ${plural(n, 'missing skill')}`}</button>
     </div>` : '';
-  return `<div class="d-sec" data-k="ss" data-leaf>
-    <h3>Skill set</h3>
+  return `<div class="d-sec" data-k="ss">
+    <h3 data-k="h" data-leaf>Skill set</h3>
     ${missing}
-    <p class="ss-lead">Save your skills, sources, and switches to a file. Import the file on a different computer to get the same set.</p>
-    <div class="ss-acts">
-      <button class="btn" data-ss="export"${busy ? ' disabled' : ''}>${busy === 'export' ? 'Exporting…' : 'Export'}</button>
-      <button class="btn ghost" data-ss="copy"${busy ? ' disabled' : ''}>${SS.copied ? `${ICON.check}Copied` : busy === 'copy' ? 'Copying…' : 'Copy'}</button>
-      <button class="btn" data-ss="import"${busy ? ' disabled' : ''}>${busy === 'import' ? 'Reading…' : 'Import…'}</button>
+    <p class="ss-lead" data-k="l" data-leaf>Save your skills, sources, and switches to a file. Import the file on a different computer to get the same set.</p>
+    <div class="ss-acts" data-k="a">
+      <button class="btn" data-k="e" data-leaf data-ss="export"${off}>${busy === 'export' ? 'Exporting…' : 'Export'}</button>
+      <button class="btn ghost" data-k="c" data-leaf data-ss="copy"${off}>${SS.copied ? `${ICON.check}Copied` : busy === 'copy' ? 'Copying…' : 'Copy'}</button>
+      <button class="btn" data-k="i" data-leaf data-ss="import"${off}>${busy === 'import' ? 'Reading…' : 'Import…'}</button>
     </div>
-    <p class="note">You can also drop a manifest file on this panel.</p>
+    <p class="note" data-k="n" data-leaf>You can also drop a manifest file on this panel.</p>
   </div>`;
 }
 
@@ -3590,6 +3593,7 @@ async function skillSetAction(what) {
     if (what === 'copy') {
       await navigator.clipboard.writeText(text);
       SS.copied = true;
+      announce('Copied the skill set.');
       setTimeout(() => { SS.copied = false; renderDetail(); }, 1500);
       return;
     }
@@ -3663,7 +3667,7 @@ async function showPlan(p, body) {
     <p class="cd-lead">${acts.length ? lead : restore ? 'No skill is missing now.' : 'This computer already has everything in the file that the atlas can install.'}</p>
     <div class="ss-plan">${acts.join('')}${info}${skipped}</div>
     <div class="cd-acts">${acts.length
-      ? `<button class="btn" value="cancel">Cancel</button><button class="btn primary" value="ok" autofocus>${verb}</button>`
+      ? `<button class="btn" value="cancel" autofocus>Cancel</button><button class="btn primary" value="ok">${verb}</button>`
       : '<button class="btn" value="cancel" autofocus>Close</button>'}</div>
   </form>`;
   const form = dlg.querySelector('form');
@@ -3875,9 +3879,13 @@ document.addEventListener('click', async e => {
   if (pick) return select(SKILLS[+pick.dataset.pick]);
   if (t.closest('[data-view-unused]')) return showView('unused');
   if (t.closest('[data-view-costly]')) return showView('costly');
+  if (t.closest('[data-view-all]')) { showView('all'); return el('view').querySelector('[data-v="all"]').focus(); }
   const ch = t.closest('[data-cost-harness]');
   if (ch) { el('harness').value = ch.dataset.costHarness; el('harness').dispatchEvent(new Event('change')); return; }
   if (t.closest('[data-view-review]')) return showView('review');
+  if (t.closest('[data-sec-retry]') && ui.selected) { SEC.by.delete(ui.selected.path); return renderDetail(); }
+  const hr = t.closest('[data-hist-retry]');
+  if (hr) { delete hist[hr.dataset.histRetry]; return renderDetail(); }
   const secGroup = t.closest('[data-sec-group]');
   if (secGroup) return toggleSecGroup(secGroup);
   if (t.closest('[data-more]')) { ui.descOpen = !ui.descOpen; renderDetail(); return; }
