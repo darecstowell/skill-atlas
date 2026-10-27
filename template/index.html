@@ -12,6 +12,7 @@
     document.documentElement.dataset.theme = pick === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pick;
     document.documentElement.dataset.palette = localStorage.getItem('atlas.palette') || 'atlas';
     document.documentElement.dataset.bg = localStorage.getItem('atlas.bg') || 'none';
+    document.documentElement.dataset.scale = localStorage.getItem('atlas.scale') || 'default';
   } catch { document.documentElement.dataset.theme = 'dark'; }
 </script>
 <style>
@@ -79,6 +80,10 @@
     --elevation-raised: 0 0 0 1px oklch(0 0 0 / .05), 0 1px 3px oklch(0 0 0 / .05), 0 4px 10px -4px oklch(0 0 0 / .05);
     --elevation-raised-hover: 0 0 0 1px oklch(0 0 0 / .07), 0 1px 3px oklch(0 0 0 / .07), 0 4px 10px -4px oklch(0 0 0 / .08);
   }
+  /* The whole page scales together, spacing and all, so nothing has to change size on its own. */
+  :root { zoom: 1.08; }
+  :root[data-scale="small"] { zoom: 1; }
+  :root[data-scale="large"] { zoom: 1.16; }
   .theming, .theming *, .theming *::before, .theming *::after { transition: none !important; }
 
   * { box-sizing: border-box; }
@@ -147,6 +152,26 @@
   .cluster { margin-left: auto; display: flex; align-items: center; gap: var(--s2); font-size: 12px; color: var(--text-2); white-space: nowrap; }
   .cluster b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
   .cluster .warn { color: var(--warn); }
+  .check-btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 10px; border: 0; border-radius: var(--r-md);
+    background: transparent; color: var(--text-2); font: 500 12px var(--sans); cursor: pointer;
+    transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), scale 150ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) { .check-btn:hover { background: var(--surface-2); color: var(--text); } }
+  .check-btn:active { scale: .97; }
+  .check-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .check-btn[data-busy] { cursor: progress; }
+  .check-btn[data-busy]:active { scale: 1; }
+  .ck-label, .ck-icon { display: inline-grid; place-items: center; animation: ck-in 180ms var(--ease-out); }
+  .ck-icon svg { width: 14px; height: 14px; }
+  .ck-icon.done { color: var(--on); }
+  .check-btn[data-busy] .ck-icon svg { animation: ck-spin 800ms linear infinite; }
+  @keyframes ck-in { from { opacity: 0; transform: translateY(2px); filter: blur(2px); } }
+  @keyframes ck-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ck-label, .ck-icon, .check-btn[data-busy] .ck-icon svg { animation: none; }
+    .check-btn { transition: none; }
+  }
   .meta { margin-left: auto; display: flex; gap: var(--s3); font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
   .meta b { color: var(--text-2); font-weight: 500; font-variant-numeric: tabular-nums; }
   .meta code { font: 11.5px var(--mono); color: var(--text-2); }
@@ -217,7 +242,7 @@
 
   /* ---------- layout ---------- */
   main { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: start; }
-  #list { min-width: 0; padding: 0 var(--s3) 96px var(--s5); }
+  #list { min-width: 0; padding: 0 var(--s3) 96px 34px; }
 
   .sec { margin-top: var(--s3); }
   .sec-head {
@@ -242,6 +267,11 @@
     background: var(--page); border-bottom: 1px solid var(--border);
   }
   .group + .group { margin-top: 4px; }
+  body.big-groups .group-head { height: 52px; gap: 10px; }
+  body.big-groups .group-head .ava { width: 28px; height: 28px; border-radius: var(--r-md); font-size: 13px; }
+  body.big-groups .gname { font-size: 14.5px; }
+  body.big-groups .gsub { font-size: 12.5px; }
+  body.big-groups .group + .group { margin-top: 6px; }
   .gname { font: 600 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gsub { color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .gsub .tnum { color: var(--text-2); }
@@ -324,9 +354,13 @@
   .mark:focus-visible, .mark[aria-checked="true"], .mark[aria-checked="mixed"], body.marking .mark { opacity: 1; }
   @media (hover: none) { .mark { opacity: 1; } #list { padding-left: 32px !important; } }
   body.ro .mark { display: none; }
+  .mark.all { position: relative; left: auto; top: auto; translate: none; flex: none; opacity: 1; }
+  .all-slot { display: inline-flex; flex: none; }
+  .all-slot:empty { display: none; }
   .row[data-marked] { background: color-mix(in oklab, var(--accent) 9%, transparent); }
   @media (hover: hover) and (pointer: fine) { .row[data-marked]:hover { background: color-mix(in oklab, var(--accent) 13%, transparent); } }
-  .group-head > .mark { left: -22px; }
+  .group-head > .mark { left: -24px; }
+  .sec > .group:first-of-type { margin-top: 4px; }
   /* Sticky heads reach into the gutter, so marks scrolling under them stay hidden. */
   .sec-head::before, .group-head::before { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: inherit; }
 
@@ -672,6 +706,29 @@
   #help h2 .btn { margin-left: auto; }
 
   /* ---------- skill viewer ---------- */
+  #confirmDel {
+    width: min(460px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 14px;
+    background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop);
+    opacity: 1; transform: none; transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  }
+  @starting-style { #confirmDel[open] { opacity: 0; transform: scale(.97); } }
+  #confirmDel::backdrop { background: oklch(0 0 0 / .45); transition: opacity 180ms var(--ease-out); }
+  @starting-style { #confirmDel[open]::backdrop { opacity: 0; } }
+  #confirmDel form { padding: 20px var(--s5) var(--s4); }
+  #confirmDel h2 { margin: 0; font-size: 15px; font-weight: 600; text-wrap: balance; }
+  #confirmDel h2 code { font: 600 14px var(--mono); }
+  .cd-lead { margin: 6px 0 var(--s3); font-size: 13px; color: var(--text-2); text-wrap: pretty; }
+  .cd-list { margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow: auto; border-radius: var(--r-lg); background: var(--surface-2); }
+  .cd-list li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: 8px; padding: 5px 8px; font-size: 12.5px; }
+  .cd-list .nm { font: 500 12.5px var(--mono); color: var(--text); }
+  .cd-list .tag { align-self: center; }
+  .cd-path { grid-column: 1 / -1; font: 11.5px var(--mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #confirmDel .note { margin: var(--s3) 0 0; }
+  .cd-undo { margin: var(--s3) 0 0; font-size: 12px; color: var(--text-3); }
+  .cd-acts { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
+  .btn.danger.solid { background: var(--danger); border-color: transparent; color: var(--on-accent); }
+  @media (hover: hover) and (pointer: fine) { .btn.danger.solid:hover { background: color-mix(in oklab, var(--danger) 88%, var(--text)); color: var(--on-accent); } }
+
   #viewer {
     width: min(1120px, calc(100vw - 32px)); height: min(900px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; border: 0;
     border-radius: 14px; background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-pop); overflow: hidden;
@@ -753,7 +810,14 @@
   @property --fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
   @property --fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
   @keyframes edges { from { --fade-l: 0px; --fade-r: 24px; } to { --fade-l: 24px; --fade-r: 0px; } }
+  #panelBtn .pane { opacity: 0; transition: opacity 150ms var(--ease-out); }
+  #panelBtn[aria-pressed="true"] .pane { opacity: 1; }
+  @media (min-width: 1101px) {
+    body.nopanel main { grid-template-columns: minmax(0, 1fr); }
+    body.nopanel #detail { display: none; }
+  }
   @media (max-width: 1100px) {
+    #panelBtn { display: none; }
     main { grid-template-columns: minmax(0, 1fr); }
     .bar2 { overflow-x: auto; scrollbar-width: none; }
     /* Fade an edge only while more tabs sit past it. */
@@ -847,6 +911,19 @@
             <button data-o="recent" aria-pressed="false">Recent</button>
           </div>
         </div>
+        <div class="pop-row"><span>Size</span>
+          <div class="seg" id="scale" role="group" aria-label="Page size">
+            <button data-s="small" aria-pressed="false">Small</button>
+            <button data-s="default" aria-pressed="true">Default</button>
+            <button data-s="large" aria-pressed="false">Large</button>
+          </div>
+        </div>
+        <div class="pop-row"><span>Collections</span>
+          <div class="seg" id="groupSize" role="group" aria-label="Collection row size">
+            <button data-z="regular" aria-pressed="true">Regular</button>
+            <button data-z="large" aria-pressed="false">Large</button>
+          </div>
+        </div>
         <div class="pop-row"><span>Group by</span>
           <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
             <button data-g="source" aria-pressed="true">Source</button>
@@ -861,8 +938,10 @@
         <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
       </div>
     </div>
+    <button class="btn ghost icon" id="panelBtn" aria-pressed="true" aria-controls="detail" aria-label="Details panel" title="Hide the details panel (])"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 3.5v9" stroke="currentColor" stroke-width="1.3"/><path class="pane" d="M10.6 3.6h2.6a.8.8 0 0 1 .8.8v7.2a.8.8 0 0 1-.8.8h-2.6Z" fill="currentColor"/></svg></button>
   </div>
   <div class="bar2 filters">
+    <span class="all-slot" id="allMark"></span>
     <div class="seg" id="view" role="group" aria-label="Show">
       <button data-v="all" aria-pressed="true">All <span class="n" data-n="all"></span></button>
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
@@ -887,6 +966,7 @@
 <div id="toast" role="status" hidden></div>
 <div id="announce" class="vh" aria-live="polite"></div>
 <dialog id="viewer" aria-label="Skill file"></dialog>
+<dialog id="confirmDel" aria-labelledby="cdTitle"></dialog>
 <div id="help" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Keyboard shortcuts <button class="btn ghost icon" data-help-close aria-label="Close shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></h2>
@@ -921,8 +1001,8 @@ const ui = {
   compact: localStorage.getItem('atlas.compact') === '1',
   layout: localStorage.getItem('atlas.layout') === 'cards' ? 'cards' : 'list',
   sort: localStorage.getItem('atlas.sort') || 'name',
-  marked: new Set(), lastMark: null, bulkConfirm: null, bulkLink: false, bulkErr: null,
-  menu: null, confirm: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
+  marked: new Set(), lastMark: null, bulkLink: false, bulkErr: null,
+  menu: null, linkOpen: null, linkErr: null, watchOpen: false, descOpen: false, restored: new Set(),
 };
 const NO_SOURCE = 'Local, no upstream';
 const sourceOf = s => s.origin?.source || s._prefix || NO_SOURCE;
@@ -1051,7 +1131,7 @@ function index() {
 index();
 
 // Update state for GitHub-tracked skills, keyed by their lock name (the folder name).
-const upd = { status: {}, errors: {}, checking: false, checkedAt: null, job: null, confirm: null, available: {}, watched: [], descs: {} };
+const upd = { status: {}, errors: {}, checking: false, justChecked: 0, checkedAt: null, job: null, confirm: null, available: {}, watched: [], descs: {} };
 const RUNNING = new Set(['queued', 'downloading', 'installing']);
 const jobState = name => upd.job?.items[name]?.state;
 const isBusy = name => RUNNING.has(jobState(name));
@@ -1285,9 +1365,18 @@ function markGroupHtml(id, list) {
   const checked = n === 0 ? 'false' : n === list.length ? 'true' : 'mixed';
   return `<button class="mark" data-k="mg" data-mark-group="${esc(list.map(markKey).join('\n'))}" role="checkbox" aria-checked="${checked}" aria-label="Select all ${list.length} in ${esc(id.slice(4))}">${MARK_ICONS}</button>`;
 }
+// One box for every skill the filters show, collapsed groups included.
+function allMarkHtml() {
+  if (!WRITABLE) return '';
+  const list = SKILLS.filter(s => visible(s) && s.kind !== 'avail');
+  if (!list.length) return '';
+  const n = list.filter(isMarked).length;
+  const checked = n === 0 ? 'false' : n === list.length ? 'true' : 'mixed';
+  const label = checked === 'true' ? `Clear all ${list.length}` : `Select all ${list.length} shown`;
+  return `<button class="mark all" data-k="ma" data-mark-group="${esc(list.map(markKey).join('\n'))}" role="checkbox" aria-checked="${checked}" aria-label="${label}" title="${label}">${MARK_ICONS}</button>`;
+}
 function setMarks(keys, on) {
   for (const k of keys) on ? ui.marked.add(k) : ui.marked.delete(k);
-  ui.bulkConfirm = null;
   if (!ui.marked.size) { ui.bulkLink = false; ui.bulkErr = null; }
   render();
 }
@@ -1341,12 +1430,11 @@ function groupUpdateButton(list, attrs, { label = 'Update', cls = 'btn accent', 
 function groupMenu(source, all) {
   if (!WRITABLE) return '';
   const open = ui.menu === source;
-  const confirm = ui.confirm === 'group:' + source;
   const watching = upd.watched.includes(source);
   const items = [
     watching ? `<button role="menuitem" data-unwatch="${esc(source)}">Stop watching</button>` : '',
     isLocalGroup(source) ? `<button role="menuitem" data-show-link="${esc(source)}">Link to GitHub…</button>` : '',
-    all.length ? `<button role="menuitem" class="danger${confirm ? ' confirm' : ''}" data-delete-source="${esc(source)}">${confirm ? `Move ${all.length} to Trash` : `Delete ${plural(all.length, 'skill')}…`}</button>` : '',
+    all.some(s => s.store) ? `<button role="menuitem" class="danger" data-delete-source="${esc(source)}">Delete ${plural(all.filter(s => s.store).length, 'skill')}…</button>` : '',
   ].filter(Boolean);
   if (!items.length) return '';
   if (all.length && items.length > 1) items.splice(items.length - 1, 0, '<hr>');
@@ -1431,6 +1519,14 @@ function availBlock(repo, shown, installed) {
   </div>`;
 }
 
+// Collections follow the skill sort: by name, by total uses, or by the latest use.
+function byGroup([a, x], [b, y]) {
+  const name = a.localeCompare(b, undefined, { sensitivity: 'base' });
+  if (ui.sort === 'uses') return y.reduce((n, s) => n + uses(s), 0) - x.reduce((n, s) => n + uses(s), 0) || name;
+  if (ui.sort === 'recent') return Math.max(0, ...y.map(lastUsed)) - Math.max(0, ...x.map(lastUsed)) || name;
+  return name;
+}
+
 function sourceGroups(personal) {
   const groups = groupMap(personal, sourceOf);
   // Repos with skills to offer, or watched with nothing installed, still get a group.
@@ -1440,9 +1536,8 @@ function sourceGroups(personal) {
     const watchedEmpty = upd.watched.includes(repo) && ui.view === 'all' && !ui.q && !SKILLS.some(s => live(s) && sourceOf(s) === repo);
     if (readsStore() && (availShown(repo).length || watchedEmpty)) groups.push([repo, []]);
   }
-  // Repos first, then name-prefix groups, then the rest; bigger groups first within each.
-  const rank = src => (src === NO_SOURCE ? 2 : isLocalGroup(src) ? 1 : 0);
-  groups.sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
+  // The catch-all bucket stays last whatever the sort.
+  groups.sort((g, h) => (g[0] === NO_SOURCE) - (h[0] === NO_SOURCE) || byGroup(g, h));
   return groups.map(([source, list]) => {
     const all = SKILLS.filter(s => live(s) && sourceOf(s) === source);
     const onCount = all.filter(s => state(s).on).length;
@@ -1517,7 +1612,7 @@ function render() {
 
   const plugins = shown.filter(s => s.scope === 'plugin');
   if (plugins.length) {
-    const refs = groupMap(plugins, s => s.plugin_ref).sort(([a], [b]) => a.localeCompare(b));
+    const refs = groupMap(plugins, s => s.plugin_ref).sort(byGroup);
     const groups = refs.map(([ref, list]) => {
       const lv = list.find(s => s.status !== 'stale') || list[0];
       const st = state(lv);
@@ -1533,7 +1628,7 @@ function render() {
 
   const project = shown.filter(s => s.scope === 'project');
   if (project.length) {
-    const byProject = groupMap(project, s => s.project).sort(([a], [b]) => a.localeCompare(b));
+    const byProject = groupMap(project, s => s.project).sort(byGroup);
     const groups = byProject.map(([name, list]) => group('prj:' + name,
       `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name), list)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
       list.map(row).join('')));
@@ -1552,6 +1647,7 @@ function renderChrome() {
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
   const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
@@ -1580,17 +1676,26 @@ function renderChrome() {
         ? `<span data-k="t">${ed} <b>${items.filter(i => i.state === 'done').length}</b> of <b>${items.length}</b></span>`
         : `<span data-k="t">${ing} <b>${finished}</b> of <b>${items.length}</b>…</span>`;
     } else if (upd.checking) {
-      cluster = '<span data-k="t">Checking for updates…</span>';
+      cluster = checkButton();
     } else if (upd.checkedAt) {
       const chip = fresh && ui.view !== 'new' ? `<button class="chip" data-k="nw" data-view-new>${plural(fresh, 'new skill')}</button>` : '';
       cluster = chip + (outdated.length
         ? `<span data-k="t"><b>${outdated.length}</b> ${outdated.length === 1 ? 'update' : 'updates'}</span>${warn}${groupUpdateButton(lv, 'data-update-all', { label: 'Update all', cls: 'btn primary', count: false })}${again}`
-        : `<span data-k="t">Up to date</span>${warn}${again}`);
+        : `${warn}${checkButton()}`);
     }
   }
   patch(el('cluster'), cluster);
   renderBulk();
   renderBar();
+}
+
+// "Up to date" and its refresh arrow as one button: the arrow spins while checking, then turns into a tick.
+function checkButton() {
+  const done = !upd.checking && Date.now() - upd.justChecked < 1400;
+  const label = upd.checking ? 'Checking…' : 'Up to date';
+  const icon = done ? ICON.check : ICON.refresh;
+  return `<button class="check-btn" data-k="ck" data-recheck${upd.checking ? ' aria-busy="true" data-busy' : ''} aria-label="${upd.checking ? 'Checking for updates' : 'Up to date. Check again'}" title="${upd.checking ? '' : 'Check again'}">
+    <span class="ck-label" data-k="l" data-leaf>${label}</span><span class="ck-icon${done ? ' done' : ''}" data-k="i" data-leaf>${icon}</span></button>`;
 }
 
 function renderBar() {
@@ -1613,7 +1718,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [[']'], 'Show or hide the details panel'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -1715,7 +1820,6 @@ function detailHtml(s) {
   }
   const src = ms.url || ms.repo || o.sourceUrl || o.source;
   const long = (s.description || '').length > 420;
-  const confirm = ui.confirm === 'skill:' + s.dir_name;
   const pluginCount = s.scope === 'plugin' ? SKILLS.filter(x => x.plugin_ref === s.plugin_ref && x.status !== 'stale').length : 0;
   const meta = [
     s.local_edits ? '<span class="tag edited">edited</span>' : '',
@@ -1752,7 +1856,7 @@ function detailHtml(s) {
       ${field('Path', tilde(s.path), true)}
     </dl></div>
     ${WRITABLE && s.scope === 'personal' && s.store ? `<div class="d-sec danger-zone" data-k="dz">
-      <button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete="${esc(s.dir_name)}">${confirm ? 'Move to Trash' : 'Delete…'}</button>
+      <button class="btn danger" data-k="del" data-delete="${esc(s.dir_name)}">Delete…</button>
       <p class="note" data-k="dn">Moves the folder to the Trash and removes its lock entry. You can undo it.</p></div>` : ''}`;
 }
 
@@ -1832,9 +1936,9 @@ function groupDetailHtml(g) {
     facts = `${field('Kind', local ? (g.source === NO_SOURCE ? 'Local skills' : 'Name prefix') : 'GitHub repo')}${field('Repo', g.repo, true)}
       ${field('Checked', g.repo && upd.checkedAt ? ago(checkedMs()) : '')}
       ${field('Folder', list[0] ? tilde(list[0].dir.replace(/\/[^/]+$/, '')) : '', true)}`;
-    const confirm = ui.confirm === 'group:' + g.source;
-    if (WRITABLE && list.length) danger = `<div class="d-sec danger-zone" data-k="dz">
-      <button class="btn danger${confirm ? ' confirm' : ''}" data-k="del" data-delete-source="${esc(g.source)}">${confirm ? `Move ${list.length} to Trash` : `Delete ${plural(list.length, 'skill')}…`}</button>
+    const stored = list.filter(s => s.store);
+    if (WRITABLE && stored.length) danger = `<div class="d-sec danger-zone" data-k="dz">
+      <button class="btn danger" data-k="del" data-delete-source="${esc(g.source)}">Delete ${plural(stored.length, 'skill')}…</button>
       <p class="note" data-k="dn">Moves every folder in this collection to the Trash. You can undo it.</p></div>`;
   } else if (g.type === 'plg') {
     const lv = list[0];
@@ -2435,7 +2539,6 @@ function renderBulk() {
   const hidden = b.list.filter(s => !visible(s)).length;
   const n = x => x.skills.length + x.plugins.length;
   const btn = (k, label, count, attrs, cls = 'btn ghost') => `<button class="${cls}" data-k="${k}" ${attrs}${count ? '' : ' disabled'}>${label}${count ? ` <span class="tnum">${count}</span>` : ''}</button>`;
-  const confirm = ui.bulkConfirm === 'del';
   const acts = ui.bulkLink
     ? `<form data-k="blf" data-bulk-link><input name="repo" placeholder="owner/repo" aria-label="GitHub repo to link ${plural(b.link.length, 'skill')} to" autocomplete="off" spellcheck="false" required>
         <button class="btn">Link ${b.link.length}</button><button type="button" class="btn ghost" data-bulk-link-cancel>Cancel</button>
@@ -2446,9 +2549,9 @@ function renderBulk() {
       btn('up', 'Update', b.update.length, 'data-bulk="update"', 'btn accent'),
       btn('ln', 'Link to GitHub…', b.link.length, 'data-bulk="link"'),
       `<button class="btn ghost" data-k="cp" data-bulk="copy">${ICON.copy}Copy as prompt</button>`,
-      btn('del', confirm ? `Move ${b.del.length} to Trash` : 'Delete…', confirm ? 0 : b.del.length, 'data-bulk="delete"', `btn danger${confirm ? ' confirm' : ''}`),
+      btn('del', 'Delete…', b.del.length, 'data-bulk="delete"', 'btn danger'),
     ].join('');
-  patch(el('bulk'), `<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
+  patch(el('bulk'), `${allMarkHtml()}<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
     <span class="acts" data-k="a">${acts}</span>
     <span class="end" data-k="e"><button class="btn ghost" data-k="cl" data-bulk="clear">Clear <kbd>esc</kbd></button></span>`);
 }
@@ -2491,12 +2594,7 @@ async function bulk(action) {
     return navigator.clipboard.writeText(text).then(() => toast(`Copied ${plural(b.list.length, 'skill')}: <code>${esc(text.length > 80 ? text.slice(0, 80) + '…' : text)}</code>`), () => toast('Could not copy.'));
   }
   if (action === 'delete') {
-    if (ui.bulkConfirm !== 'del') {
-      ui.bulkConfirm = 'del'; renderBulk();
-      setTimeout(() => { if (ui.bulkConfirm === 'del') { ui.bulkConfirm = null; renderBulk(); } }, 4000);
-      return;
-    }
-    ui.bulkConfirm = null;
+    if (!await confirmDelete(b.del)) return;
     for (const s of b.del) ui.marked.delete(markKey(s));
     return deleteSkills(b.del);
   }
@@ -2600,6 +2698,7 @@ async function checkUpdates(refresh = false) {
   try {
     const data = await api('/api/updates' + (refresh ? '?refresh=1' : ''));
     Object.assign(upd, { status: data.skills, errors: data.errors, checkedAt: data.checked_at, available: data.available || {}, watched: data.watched || [] });
+    if (refresh) { upd.justChecked = Date.now(); setTimeout(renderChrome, 1450); }
     // Drop cached descriptions that miss a path the repo now offers.
     for (const [repo, d] of Object.entries(upd.descs)) {
       if (d.skills && (upd.available[repo] || []).some(a => !d.skills[a.path])) delete upd.descs[repo];
@@ -2797,8 +2896,31 @@ function flip(before) {
   }
 }
 
+// Ask before a delete: what moves, from where, and which harnesses stop loading it. Resolves true to go on.
+function confirmDelete(list) {
+  const dlg = el('confirmDel');
+  const n = list.length;
+  const ids = [...new Set(list.flatMap(s => s.harnesses))].filter(id => harness(id));
+  const names = ids.map(id => harness(id).label);
+  const who = names.length > 3 ? `${names.slice(0, 3).join(', ')}, and ${names.length - 3} more` : names.join(names.length === 2 ? ' and ' : ', ');
+  const edited = list.filter(s => s.local_edits).length;
+  dlg.innerHTML = `<form method="dialog">
+    <h2 id="cdTitle">Move ${n === 1 ? `<code>/${esc(list[0].invoke)}</code>` : plural(n, 'skill')} to the Trash?</h2>
+    <p class="cd-lead">${who ? `${n === 1 ? 'It stops' : 'They stop'} loading in ${esc(who)}.` : ''} Lock entries and on/off settings for ${n === 1 ? 'it' : 'them'} go too.</p>
+    <ul class="cd-list">${list.map(s => `<li><span class="nm">/${esc(s.invoke)}</span>${s.local_edits ? '<span class="tag edited">edited</span>' : ''}<span class="cd-path">${esc(tilde(s.dir))}</span></li>`).join('')}</ul>
+    ${edited ? `<p class="note warn">${plural(edited, 'skill')} ${edited === 1 ? 'has' : 'have'} changes you made after install.</p>` : ''}
+    <p class="cd-undo">You can undo this from the toast, or take the folders back out of the Trash.</p>
+    <div class="cd-acts"><button class="btn" value="cancel" autofocus>Cancel</button><button class="btn danger solid" value="ok">Move ${n === 1 ? '' : `${n} `}to Trash</button></div>
+  </form>`;
+  dlg.returnValue = '';
+  // A click on the backdrop lands on the dialog itself; the form covers the panel.
+  dlg.onclick = e => { if (e.target === dlg) dlg.close('cancel'); };
+  dlg.showModal();
+  return new Promise(resolve => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true }));
+}
+
 async function deleteSkills(list) {
-  ui.confirm = null; ui.menu = null;
+  ui.menu = null;
   const names = list.map(s => s.dir_name);
   try {
     await api('/api/delete', { names });
@@ -2850,16 +2972,10 @@ async function linkSkills(form) {
 }
 
 // ---------------------------------------------------------------- interaction
-function armConfirm(key) {
-  ui.confirm = key; rerender();
-  setTimeout(() => { if (ui.confirm === key) { ui.confirm = null; rerender(); } }, 4000);
-}
-
 function closeMenu(focusButton = true) {
   if (!ui.menu) return;
   const src = ui.menu;
   ui.menu = null;
-  if (ui.confirm?.startsWith('group:')) ui.confirm = null;
   render();
   if (focusButton) el('list').querySelector(`[data-menu="${CSS.escape(src)}"]`)?.focus();
 }
@@ -2912,7 +3028,7 @@ document.addEventListener('click', async e => {
   if (t.closest('[data-update-all]')) return updateBatch(SKILLS.filter(live));
   const us = t.closest('[data-update-source]');
   if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
-  if (t.closest('[data-recheck]')) return checkUpdates(true);
+  if (t.closest('[data-recheck]')) return upd.checking ? undefined : checkUpdates(true);
   if (t.closest('[data-view-new]')) return showView('new');
   const io = t.closest('[data-install-one]');
   if (io) {
@@ -2979,12 +3095,12 @@ document.addEventListener('click', async e => {
   }
   const del = t.closest('[data-delete], [data-delete-source]');
   if (del) {
-    const key = del.dataset.delete ? 'skill:' + del.dataset.delete : 'group:' + del.dataset.deleteSource;
-    if (ui.confirm !== key) return armConfirm(key);
-    const list = del.dataset.delete
+    const list = (del.dataset.delete
       ? SKILLS.filter(s => live(s) && s.dir_name === del.dataset.delete)
-      : SKILLS.filter(s => live(s) && sourceOf(s) === del.dataset.deleteSource);
-    return deleteSkills(list);
+      : SKILLS.filter(s => live(s) && sourceOf(s) === del.dataset.deleteSource)).filter(s => s.store);
+    ui.menu = null;
+    if (await confirmDelete(list)) return deleteSkills(list);
+    return rerender();
   }
   const rv = t.closest('[data-reveal]');
   if (rv) return api('/api/reveal', { path: rv.dataset.reveal }).catch(err => toast(`Could not reveal: ${esc(err.message)}`));
@@ -3052,6 +3168,35 @@ function setCompact(on) {
   ui.compact = on; document.body.classList.toggle('compact', on);
   localStorage.setItem('atlas.compact', on ? '1' : '0');
 }
+
+function setPanel(open) {
+  document.body.classList.toggle('nopanel', !open);
+  el('panelBtn').setAttribute('aria-pressed', open);
+  el('panelBtn').title = `${open ? 'Hide' : 'Show'} the details panel (])`;
+  try { localStorage.setItem('atlas.panel', open ? '1' : '0'); } catch {}
+}
+el('panelBtn').addEventListener('click', () => setPanel(document.body.classList.contains('nopanel')));
+setPanel(localStorage.getItem('atlas.panel') !== '0');
+
+function setScale(size) {
+  document.documentElement.dataset.scale = size;
+  try { localStorage.setItem('atlas.scale', size); } catch {}
+  setSeg('scale', 's', size);
+}
+el('scale').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) setScale(b.dataset.s);
+});
+setScale(['small', 'large'].includes(document.documentElement.dataset.scale) ? document.documentElement.dataset.scale : 'default');
+
+function setGroupSize(size) {
+  document.body.classList.toggle('big-groups', size === 'large');
+  try { localStorage.setItem('atlas.groupSize', size); } catch {}
+  setSeg('groupSize', 'z', size);
+}
+el('groupSize').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) setGroupSize(b.dataset.z);
+});
+setGroupSize(localStorage.getItem('atlas.groupSize') === 'large' ? 'large' : 'regular');
 
 function setLayout(layout) {
   ui.layout = layout; document.body.classList.toggle('cards', layout === 'cards');
@@ -3129,6 +3274,7 @@ document.addEventListener('keydown', e => {
   const typing = t.matches('input[type="search"], input[type="text"], input:not([type]), textarea');
   const mod = e.metaKey || e.ctrlKey;
 
+  if (el('confirmDel').open) return;
   if (el('viewer').open) {
     if (!typing && !mod && e.key === 'r') { e.preventDefault(); setRaw(!viewer.raw); }
     return;
@@ -3156,8 +3302,7 @@ document.addEventListener('keydown', e => {
     if (typing && t.closest('.linkform')) { ui.linkOpen = null; ui.watchOpen = false; ui.linkErr = null; render(); return; }
     if (typing && t.closest('#bulk')) { ui.bulkLink = false; ui.bulkErr = null; renderBulk(); return; }
     if (ui.menu) return closeMenu();
-    if (ui.confirm || upd.confirm) { ui.confirm = null; upd.confirm = null; rerender(); return; }
-    if (ui.bulkConfirm) { ui.bulkConfirm = null; renderBulk(); return; }
+    if (upd.confirm) { upd.confirm = null; rerender(); return; }
     if (ui.marked.size) return setMarks([...ui.marked], false);
     if (ui.selected) { const k = selKey(ui.selected); select(null); focusRow(k); }
     return;
@@ -3167,6 +3312,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === ']') { setPanel(document.body.classList.contains('nopanel')); return; }
   if (e.key === 'm' && WRITABLE) {
     const k = t.closest?.('.row')?.querySelector(':scope > .mark')?.dataset.mark;
     if (k) { setMarks([k], !ui.marked.has(k)); ui.lastMark = k; }
