@@ -12,6 +12,7 @@
     document.documentElement.dataset.theme = pick === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pick;
     document.documentElement.dataset.palette = localStorage.getItem('atlas.palette') || 'atlas';
     document.documentElement.dataset.bg = localStorage.getItem('atlas.bg') || 'none';
+    document.documentElement.dataset.scale = localStorage.getItem('atlas.scale') || 'default';
   } catch { document.documentElement.dataset.theme = 'dark'; }
 </script>
 <style>
@@ -79,6 +80,10 @@
     --elevation-raised: 0 0 0 1px oklch(0 0 0 / .05), 0 1px 3px oklch(0 0 0 / .05), 0 4px 10px -4px oklch(0 0 0 / .05);
     --elevation-raised-hover: 0 0 0 1px oklch(0 0 0 / .07), 0 1px 3px oklch(0 0 0 / .07), 0 4px 10px -4px oklch(0 0 0 / .08);
   }
+  /* The whole page scales together, spacing and all, so nothing has to change size on its own. */
+  :root { zoom: 1.08; }
+  :root[data-scale="small"] { zoom: 1; }
+  :root[data-scale="large"] { zoom: 1.16; }
   .theming, .theming *, .theming *::before, .theming *::after { transition: none !important; }
 
   * { box-sizing: border-box; }
@@ -217,7 +222,7 @@
 
   /* ---------- layout ---------- */
   main { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: start; }
-  #list { min-width: 0; padding: 0 var(--s3) 96px var(--s5); }
+  #list { min-width: 0; padding: 0 var(--s3) 96px 34px; }
 
   .sec { margin-top: var(--s3); }
   .sec-head {
@@ -242,6 +247,11 @@
     background: var(--page); border-bottom: 1px solid var(--border);
   }
   .group + .group { margin-top: 4px; }
+  body.big-groups .group-head { height: 52px; gap: 10px; }
+  body.big-groups .group-head .ava { width: 28px; height: 28px; border-radius: var(--r-md); font-size: 13px; }
+  body.big-groups .gname { font-size: 14.5px; }
+  body.big-groups .gsub { font-size: 12.5px; }
+  body.big-groups .group + .group { margin-top: 6px; }
   .gname { font: 600 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gsub { color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .gsub .tnum { color: var(--text-2); }
@@ -324,9 +334,13 @@
   .mark:focus-visible, .mark[aria-checked="true"], .mark[aria-checked="mixed"], body.marking .mark { opacity: 1; }
   @media (hover: none) { .mark { opacity: 1; } #list { padding-left: 32px !important; } }
   body.ro .mark { display: none; }
+  .mark.all { position: relative; left: auto; top: auto; translate: none; flex: none; opacity: 1; }
+  .all-slot { display: inline-flex; flex: none; }
+  .all-slot:empty { display: none; }
   .row[data-marked] { background: color-mix(in oklab, var(--accent) 9%, transparent); }
   @media (hover: hover) and (pointer: fine) { .row[data-marked]:hover { background: color-mix(in oklab, var(--accent) 13%, transparent); } }
-  .group-head > .mark { left: -22px; }
+  .group-head > .mark { left: -24px; }
+  .sec > .group:first-of-type { margin-top: 4px; }
   /* Sticky heads reach into the gutter, so marks scrolling under them stay hidden. */
   .sec-head::before, .group-head::before { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: inherit; }
 
@@ -776,7 +790,14 @@
   @property --fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
   @property --fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
   @keyframes edges { from { --fade-l: 0px; --fade-r: 24px; } to { --fade-l: 24px; --fade-r: 0px; } }
+  #panelBtn .pane { opacity: 0; transition: opacity 150ms var(--ease-out); }
+  #panelBtn[aria-pressed="true"] .pane { opacity: 1; }
+  @media (min-width: 1101px) {
+    body.nopanel main { grid-template-columns: minmax(0, 1fr); }
+    body.nopanel #detail { display: none; }
+  }
   @media (max-width: 1100px) {
+    #panelBtn { display: none; }
     main { grid-template-columns: minmax(0, 1fr); }
     .bar2 { overflow-x: auto; scrollbar-width: none; }
     /* Fade an edge only while more tabs sit past it. */
@@ -870,6 +891,19 @@
             <button data-o="recent" aria-pressed="false">Recent</button>
           </div>
         </div>
+        <div class="pop-row"><span>Size</span>
+          <div class="seg" id="scale" role="group" aria-label="Page size">
+            <button data-s="small" aria-pressed="false">Small</button>
+            <button data-s="default" aria-pressed="true">Default</button>
+            <button data-s="large" aria-pressed="false">Large</button>
+          </div>
+        </div>
+        <div class="pop-row"><span>Collections</span>
+          <div class="seg" id="groupSize" role="group" aria-label="Collection row size">
+            <button data-z="regular" aria-pressed="true">Regular</button>
+            <button data-z="large" aria-pressed="false">Large</button>
+          </div>
+        </div>
         <div class="pop-row"><span>Group by</span>
           <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
             <button data-g="source" aria-pressed="true">Source</button>
@@ -884,8 +918,10 @@
         <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
       </div>
     </div>
+    <button class="btn ghost icon" id="panelBtn" aria-pressed="true" aria-controls="detail" aria-label="Details panel" title="Hide the details panel (])"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 3.5v9" stroke="currentColor" stroke-width="1.3"/><path class="pane" d="M10.6 3.6h2.6a.8.8 0 0 1 .8.8v7.2a.8.8 0 0 1-.8.8h-2.6Z" fill="currentColor"/></svg></button>
   </div>
   <div class="bar2 filters">
+    <span class="all-slot" id="allMark"></span>
     <div class="seg" id="view" role="group" aria-label="Show">
       <button data-v="all" aria-pressed="true">All <span class="n" data-n="all"></span></button>
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
@@ -1309,6 +1345,16 @@ function markGroupHtml(id, list) {
   const checked = n === 0 ? 'false' : n === list.length ? 'true' : 'mixed';
   return `<button class="mark" data-k="mg" data-mark-group="${esc(list.map(markKey).join('\n'))}" role="checkbox" aria-checked="${checked}" aria-label="Select all ${list.length} in ${esc(id.slice(4))}">${MARK_ICONS}</button>`;
 }
+// One box for every skill the filters show, collapsed groups included.
+function allMarkHtml() {
+  if (!WRITABLE) return '';
+  const list = SKILLS.filter(s => visible(s) && s.kind !== 'avail');
+  if (!list.length) return '';
+  const n = list.filter(isMarked).length;
+  const checked = n === 0 ? 'false' : n === list.length ? 'true' : 'mixed';
+  const label = checked === 'true' ? `Clear all ${list.length}` : `Select all ${list.length} shown`;
+  return `<button class="mark all" data-k="ma" data-mark-group="${esc(list.map(markKey).join('\n'))}" role="checkbox" aria-checked="${checked}" aria-label="${label}" title="${label}">${MARK_ICONS}</button>`;
+}
 function setMarks(keys, on) {
   for (const k of keys) on ? ui.marked.add(k) : ui.marked.delete(k);
   if (!ui.marked.size) { ui.bulkLink = false; ui.bulkErr = null; }
@@ -1574,6 +1620,7 @@ function renderChrome() {
   const outdated = lv.filter(isOutdated);
   const fresh = newTotal();
   const counts = { all: lv.length, on, off: lv.length - on, updates: outdated.length, new: fresh, unused: lv.filter(isUnused).length };
+  patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
   for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
@@ -1635,7 +1682,7 @@ function field(label, value, mono) {
 
 const KEYS = [
   [['/'], 'Search'], [['j', 'k'], 'Move between skills'], [['↵'], 'Open details'], [['x'], 'Turn on or off'],
-  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
+  [['u'], 'Update'], [['i'], 'Install an available skill'], [['v'], 'Read the whole SKILL.md'], [['r'], 'Formatted or Markdown, in the reader'], [['c'], 'Compact rows'], [[']'], 'Show or hide the details panel'], [['g'], 'List or cards'], [['s'], 'Sort by name, uses, or recent'], [['m'], 'Select for bulk actions'], [['⌘', 'A'], 'Select all shown'], [['esc'], 'Close or clear'], [['⌘', 'Z'], 'Undo'], [['?'], 'All shortcuts'],
 ];
 const keysHtml = () => KEYS.map(([ks, label]) => `<span>${ks.map(k => `<kbd>${k}</kbd>`).join('')}</span><span>${label}</span>`).join('');
 
@@ -2468,7 +2515,7 @@ function renderBulk() {
       `<button class="btn ghost" data-k="cp" data-bulk="copy">${ICON.copy}Copy as prompt</button>`,
       btn('del', 'Delete…', b.del.length, 'data-bulk="delete"', 'btn danger'),
     ].join('');
-  patch(el('bulk'), `<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
+  patch(el('bulk'), `${allMarkHtml()}<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
     <span class="acts" data-k="a">${acts}</span>
     <span class="end" data-k="e"><button class="btn ghost" data-k="cl" data-bulk="clear">Clear <kbd>esc</kbd></button></span>`);
 }
@@ -3085,6 +3132,35 @@ function setCompact(on) {
   localStorage.setItem('atlas.compact', on ? '1' : '0');
 }
 
+function setPanel(open) {
+  document.body.classList.toggle('nopanel', !open);
+  el('panelBtn').setAttribute('aria-pressed', open);
+  el('panelBtn').title = `${open ? 'Hide' : 'Show'} the details panel (])`;
+  try { localStorage.setItem('atlas.panel', open ? '1' : '0'); } catch {}
+}
+el('panelBtn').addEventListener('click', () => setPanel(document.body.classList.contains('nopanel')));
+setPanel(localStorage.getItem('atlas.panel') !== '0');
+
+function setScale(size) {
+  document.documentElement.dataset.scale = size;
+  try { localStorage.setItem('atlas.scale', size); } catch {}
+  setSeg('scale', 's', size);
+}
+el('scale').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) setScale(b.dataset.s);
+});
+setScale(['small', 'large'].includes(document.documentElement.dataset.scale) ? document.documentElement.dataset.scale : 'default');
+
+function setGroupSize(size) {
+  document.body.classList.toggle('big-groups', size === 'large');
+  try { localStorage.setItem('atlas.groupSize', size); } catch {}
+  setSeg('groupSize', 'z', size);
+}
+el('groupSize').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) setGroupSize(b.dataset.z);
+});
+setGroupSize(localStorage.getItem('atlas.groupSize') === 'large' ? 'large' : 'regular');
+
 function setLayout(layout) {
   ui.layout = layout; document.body.classList.toggle('cards', layout === 'cards');
   localStorage.setItem('atlas.layout', layout);
@@ -3199,6 +3275,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/') { e.preventDefault(); el('q').focus(); el('q').select(); return; }
   if (e.key === '?') { e.preventDefault(); openHelp(); return; }
   if (e.key === 'c') { setCompact(!ui.compact); return; }
+  if (e.key === ']') { setPanel(document.body.classList.contains('nopanel')); return; }
   if (e.key === 'm' && WRITABLE) {
     const k = t.closest?.('.row')?.querySelector(':scope > .mark')?.dataset.mark;
     if (k) { setMarks([k], !ui.marked.has(k)); ui.lastMark = k; }
