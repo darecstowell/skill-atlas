@@ -15,9 +15,11 @@ import serve
 
 @pytest.fixture(autouse=True)
 def no_user_config(tmp_path_factory, monkeypatch):
-    # Tests must never read the real ~/.config/skill-atlas/config.json.
+    # Tests must never read the real home: its config, skills, or harness settings.
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("xdg")))
-    monkeypatch.delenv("SKILL_ATLAS_CONFIG", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+    for var in ("SKILL_ATLAS_CONFIG", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME"):
+        monkeypatch.delenv(var, raising=False)
 
 
 @pytest.fixture

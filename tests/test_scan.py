@@ -162,7 +162,7 @@ def test_scan_odd_files(tmp_path, home):
         "fine": "d",
         "latin": "caf�",
     }
-    assert data["settings"]["main"]["skillOverrides"] == {}
+    assert data["settings"]["claude-code"]["skillOverrides"] == {}
 
 
 @pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="needs file modes")

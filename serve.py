@@ -20,11 +20,12 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 import assets
+import harnesses
 import remove
 import updates
 import usage
 from build import render_page
-from scan import config_path, read_json_strict, scan, settings_state, write_user_config
+from scan import config_path, read_json_strict, scan, settings_state, store_home, write_user_config
 
 REPO = Path(__file__).resolve().parent
 TEXTURES = REPO / "template" / "bg"
@@ -108,9 +109,33 @@ def reveal(path: str) -> None:
 
 
 def roots() -> list[Path]:
-    if not ROOTS:
-        raise ValueError("no Claude config folder found. Set config_roots in config.json")
-    return list(ROOTS.values())
+    """The skill store first, where installs and deletes go, then each Claude Code root."""
+    home = store_home(dict(ROOTS))
+    if home is None:
+        raise ValueError(
+            "no skills folder found. Install a skill, or set config_roots in the config"
+        )
+    return list(dict.fromkeys([home, *ROOTS.values()]))
+
+
+def toggle(req: dict) -> dict:
+    """Turn skills or a plugin on or off in one harness, and return that harness's new state."""
+    found = {h.id: h for h in harnesses.detect(dict(ROOTS))}
+    h = found.get(str(req["root"]))
+    if h is None:
+        raise ValueError(f"unknown harness {req['root']!r}")
+    names = str_list(req, "names") if req.get("names") else [str(req["name"])]
+    if h.switch == "claude":
+        write_setting(h.home, req["kind"], names, bool(req["on"]))
+        return settings_state(h.home)
+    if req["kind"] != "skill":
+        raise ValueError(f"{h.name} has no plugin switch")
+    skills = scan(REPO)["skills"]
+    mine = [s for s in skills if s["name"] in names and h.id in s["harnesses"]]
+    if not mine:
+        raise ValueError(f"{h.name} does not load {', '.join(names)}")
+    harnesses.set_skills(h, mine, bool(req["on"]))
+    return harnesses.state(h, scan(REPO)["skills"])
 
 
 def scanned_path(path: str) -> str:
@@ -231,10 +256,7 @@ class Handler(BaseHTTPRequestHandler):
     def _post(self, path: str) -> None:
         req = self._body()
         if path == "/api/toggle":
-            root = ROOTS[req["root"]]
-            names = str_list(req, "names") if req.get("names") else [str(req["name"])]
-            write_setting(root, req["kind"], names, bool(req["on"]))
-            return self._json(200, settings_state(root))
+            return self._json(200, toggle(req))
         if path == "/api/reveal":
             reveal(scanned_path(str(req["path"])))
             return self._json(200, {"ok": True})
@@ -309,9 +331,9 @@ def main() -> int:
 
     data = scan(REPO)
     ROOTS.update({label: Path(p) for label, p in data["config_roots"].items()})
-    if not ROOTS:
+    if not data["harnesses"]:
         where = config_path(REPO)
-        print(f"No Claude config folder found. Set config_roots in {where}.", file=sys.stderr)
+        print(f"No agent harness found. Set config_roots in {where}.", file=sys.stderr)
     usage.start(list(ROOTS.values()))
 
     server = bind(args.port)

@@ -41,7 +41,7 @@ def test_token_required(server):
 
 
 def test_toggle_endpoint(server, tmp_path):
-    body = {"root": "personal", "kind": "skill", "name": "demo", "on": False}
+    body = {"root": "claude-code", "kind": "skill", "name": "demo", "on": False}
     code, data = post(f"{server}/api/toggle", body)
     assert code == 200
     assert data["skillOverrides"] == {"demo": "off"}
