@@ -1499,6 +1499,14 @@ function availBlock(repo, shown, installed) {
   </div>`;
 }
 
+// Collections follow the skill sort: by name, by total uses, or by the latest use.
+function byGroup([a, x], [b, y]) {
+  const name = a.localeCompare(b, undefined, { sensitivity: 'base' });
+  if (ui.sort === 'uses') return y.reduce((n, s) => n + uses(s), 0) - x.reduce((n, s) => n + uses(s), 0) || name;
+  if (ui.sort === 'recent') return Math.max(0, ...y.map(lastUsed)) - Math.max(0, ...x.map(lastUsed)) || name;
+  return name;
+}
+
 function sourceGroups(personal) {
   const groups = groupMap(personal, sourceOf);
   // Repos with skills to offer, or watched with nothing installed, still get a group.
@@ -1508,9 +1516,8 @@ function sourceGroups(personal) {
     const watchedEmpty = upd.watched.includes(repo) && ui.view === 'all' && !ui.q && !SKILLS.some(s => live(s) && sourceOf(s) === repo);
     if (readsStore() && (availShown(repo).length || watchedEmpty)) groups.push([repo, []]);
   }
-  // Repos first, then name-prefix groups, then the rest; bigger groups first within each.
-  const rank = src => (src === NO_SOURCE ? 2 : isLocalGroup(src) ? 1 : 0);
-  groups.sort(([a, x], [b, y]) => rank(a) - rank(b) || y.length - x.length || a.localeCompare(b));
+  // The catch-all bucket stays last whatever the sort.
+  groups.sort((g, h) => (g[0] === NO_SOURCE) - (h[0] === NO_SOURCE) || byGroup(g, h));
   return groups.map(([source, list]) => {
     const all = SKILLS.filter(s => live(s) && sourceOf(s) === source);
     const onCount = all.filter(s => state(s).on).length;
@@ -1585,7 +1592,7 @@ function render() {
 
   const plugins = shown.filter(s => s.scope === 'plugin');
   if (plugins.length) {
-    const refs = groupMap(plugins, s => s.plugin_ref).sort(([a], [b]) => a.localeCompare(b));
+    const refs = groupMap(plugins, s => s.plugin_ref).sort(byGroup);
     const groups = refs.map(([ref, list]) => {
       const lv = list.find(s => s.status !== 'stale') || list[0];
       const st = state(lv);
@@ -1601,7 +1608,7 @@ function render() {
 
   const project = shown.filter(s => s.scope === 'project');
   if (project.length) {
-    const byProject = groupMap(project, s => s.project).sort(([a], [b]) => a.localeCompare(b));
+    const byProject = groupMap(project, s => s.project).sort(byGroup);
     const groups = byProject.map(([name, list]) => group('prj:' + name,
       `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name), list)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
       list.map(row).join('')));
