@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import re
@@ -163,6 +164,17 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def bind(port: int, tries: int = 20) -> ThreadingHTTPServer:
+    """The first free port from `port` up, so a second atlas or another app is no blocker."""
+    for p in range(port, port + tries):
+        try:
+            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE:
+                raise
+    raise SystemExit(f"No free port from {port} to {port + tries - 1}.")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Serve the Skill Atlas with working switches.")
     ap.add_argument("--port", type=int, default=7381)
@@ -173,8 +185,8 @@ def main() -> int:
     ROOTS.update({label: Path(p) for label, p in data["config_roots"].items()})
     usage.start(list(ROOTS.values()))
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    url = f"http://127.0.0.1:{args.port}/"
+    server = bind(args.port)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Skill Atlas on {url}  (Ctrl-C to stop)")
     if not args.no_open:
         webbrowser.open(url)

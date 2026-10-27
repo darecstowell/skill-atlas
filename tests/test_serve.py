@@ -126,3 +126,14 @@ def test_repos(server, monkeypatch):
 def test_repos_bad(server, monkeypatch):
     monkeypatch.setattr(serve.assets, "fetch", lambda repos: {})
     assert post(f"{server}/api/repos", {"repos": ["not a repo"]})[0] == 400
+
+
+def test_bind_skips_a_taken_port():
+    taken = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
+    port = taken.server_address[1]
+    try:
+        server = serve.bind(port)
+        assert server.server_address[1] != port
+        server.server_close()
+    finally:
+        taken.server_close()
