@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import sys
@@ -11,7 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from scan import ATLAS_LOCK, read_json_strict, skill_lock_path
+from scan import ATLAS_LOCK, as_dict, read_json_strict, skill_lock_path
+from updates import write_json
 
 
 def _default_trash() -> tuple[Path | None, Path | None]:
@@ -28,23 +28,11 @@ TRASH, TRASH_INFO = _default_trash()
 _last: dict = {}
 
 
-def _write_json(path: Path, data: dict) -> None:
-    path = path.resolve()
-    tmp = path.with_name(path.name + ".atlas-tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
-
-
-def _section(data: dict, key: str) -> dict:
-    v = data.get(key)
-    return v if isinstance(v, dict) else {}
-
-
 def _put_entries(path: Path, key: str, entries: dict) -> None:
     if entries:
         data = read_json_strict(path)
-        data[key] = {**_section(data, key), **entries}
-        _write_json(path, data)
+        data[key] = {**as_dict(data.get(key)), **entries}
+        write_json(path, data)
 
 
 def _trash_dir() -> Path:
@@ -109,10 +97,10 @@ def trash(names: list[str], roots: list[Path]) -> dict:
     record: dict[str, dict] = {"folders": moved, "locks": {}, "settings": {}}
     for path, key in files:
         data = contents[path]
-        section = _section(data, key)
+        section = as_dict(data.get(key))
         removed = {n: section.pop(n) for n in names if n in section}
         if removed:
-            _write_json(path, data)
+            write_json(path, data)
         record["locks" if key == "skills" else "settings"][str(path)] = removed
 
     _last.clear()

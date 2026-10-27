@@ -22,7 +22,14 @@ COMMAND = re.compile(r"<command-name>/([^<\s]+)</command-name>")
 MARKERS = (b'"Skill"', b"<command-name>/")
 
 _lock = threading.Lock()
-_state: dict = {"running": False, "done": 0, "total": 0, "finished": 0.0, "agg": None}
+_state: dict = {
+    "running": False,
+    "done": 0,
+    "total": 0,
+    "finished": 0.0,
+    "agg": None,
+    "error": None,
+}
 _counter_cache: dict[str, tuple[tuple[int, int], dict]] = {}
 
 
@@ -276,7 +283,7 @@ def snapshot(roots: list[Path]) -> dict:
     agg = _state["agg"] or {"skills": {}, "first_day": None}
     return {
         "status": "indexing" if _state["running"] else "ready",
-        "error": _state.get("error"),
+        "error": _state["error"],
         "progress": [_state["done"], _state["total"]],
         "counters": counters(roots),
         "skills": agg["skills"],

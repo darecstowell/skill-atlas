@@ -1,13 +1,13 @@
 import errno
 import json
 import os
-import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
 import pytest
+from conftest import get, post, raw
 
 import serve
 
@@ -36,28 +36,6 @@ def test_unknown_kind(tmp_path):
         serve.write_setting(tmp_path, "theme", ["x"], on=True)
 
 
-@pytest.fixture
-def server(tmp_path):
-    serve.ROOTS.clear()
-    serve.ROOTS["personal"] = tmp_path
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{httpd.server_address[1]}"
-    httpd.shutdown()
-    serve.ROOTS.clear()
-
-
-def post(url, body, token=serve.TOKEN):
-    req = urllib.request.Request(
-        url, data=json.dumps(body).encode(), headers={"X-Atlas-Token": token}, method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.status, json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
-
-
 def test_token_required(server):
     assert post(f"{server}/api/toggle", {}, token="wrong")[0] == 403
 
@@ -77,15 +55,6 @@ def test_bad_names_refused(server, names):
 @pytest.mark.parametrize("paths", [[], ["/abs/SKILL.md"], ["a/../SKILL.md"], ["a/README.md"]])
 def test_bad_paths_refused(server, paths):
     assert post(f"{server}/api/install", {"repo": "owner/repo", "paths": paths})[0] == 400
-
-
-def get(url, token=serve.TOKEN):
-    req = urllib.request.Request(url, headers={"X-Atlas-Token": token})
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.status, json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
 
 
 @pytest.fixture
@@ -169,20 +138,6 @@ def test_toggle_refuses_a_read_only_file(tmp_path):
     with pytest.raises(ValueError, match="read-only"):
         serve.write_setting(tmp_path, "skill", ["demo"], on=False)
     assert settings.read_text() == "{}"
-
-
-def raw(url, method="GET", body=b"", headers=None, token=serve.TOKEN):
-    req = urllib.request.Request(
-        url,
-        data=body if method == "POST" else None,
-        method=method,
-        headers={"X-Atlas-Token": token, **(headers or {})},
-    )
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.status, json.loads(r.read()), r.headers
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read()), e.headers
 
 
 def test_unknown_api_is_json(server, monkeypatch):

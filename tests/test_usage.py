@@ -1,13 +1,10 @@
 import json
 import threading
-import urllib.error
-import urllib.request
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from conftest import get
 
-import serve
 import usage
 
 
@@ -47,7 +44,9 @@ def write(path: Path, *lines: str) -> Path:
 def fresh_state(tmp_path, monkeypatch):
     monkeypatch.setattr(usage, "CACHE", tmp_path / "out" / "usage-index.json")
     monkeypatch.setattr(
-        usage, "_state", {"running": False, "done": 0, "total": 0, "finished": 0.0, "agg": None}
+        usage,
+        "_state",
+        {"running": False, "done": 0, "total": 0, "finished": 0.0, "agg": None, "error": None},
     )
 
 
@@ -161,25 +160,10 @@ def test_counters_sum_across_roots(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def server(tmp_path, monkeypatch):
+def server_root(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     write(tmp_path / "root" / "projects" / "p" / "a.jsonl", skill_line("show-me"))
-    serve.ROOTS.clear()
-    serve.ROOTS["personal"] = tmp_path / "root"
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), serve.Handler)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{httpd.server_address[1]}"
-    httpd.shutdown()
-    serve.ROOTS.clear()
-
-
-def get(url, token=serve.TOKEN):
-    req = urllib.request.Request(url, headers={"X-Atlas-Token": token})
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.status, json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
+    return tmp_path / "root"
 
 
 def test_usage_endpoint(server):

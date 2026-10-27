@@ -22,6 +22,7 @@ from pathlib import Path
 
 from scan import (
     ATLAS_LOCK,
+    as_dict,
     git_tree_hash,
     parse_frontmatter,
     read_json,
@@ -108,7 +109,7 @@ def _https(url: str, timeout: int = 30) -> bytes | None:
 def fetch_tree(repo: str, ref: str) -> dict | None:
     # gh first: it is signed in, so the 60-an-hour anonymous API limit does not apply.
     out = _gh([f"repos/{repo}/git/trees/{ref}?recursive=1"], timeout=TREE_TIMEOUT)
-    if out is None and getattr(_net, "timed_out", False):
+    if out is None and _net.timed_out:
         # The network is the problem, so HTTPS would only wait again.
         _why[repo] = "GitHub did not answer in time"
         return None
@@ -171,8 +172,7 @@ def tracked(roots: list[Path]) -> dict[str, tuple[Path, dict]]:
     out: dict[str, tuple[Path, dict]] = {}
     for npx_lock in {skill_lock_path(r) for r in roots}:
         for lock in (npx_lock.with_name(ATLAS_LOCK), npx_lock):
-            skills = read_json(lock).get("skills")
-            for name, e in (skills if isinstance(skills, dict) else {}).items():
+            for name, e in as_dict(read_json(lock).get("skills")).items():
                 if (
                     isinstance(e, dict)
                     and e.get("sourceType") == "github"
@@ -184,7 +184,7 @@ def tracked(roots: list[Path]) -> dict[str, tuple[Path, dict]]:
     return out
 
 
-def _write_json(path: Path, data: dict) -> None:
+def write_json(path: Path, data: dict) -> None:
     path = path.resolve()  # write through a symlink, so a linked lock stays linked
     tmp = path.with_name(path.name + ".atlas-tmp")
     tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -192,16 +192,15 @@ def _write_json(path: Path, data: dict) -> None:
 
 
 def _read_lock(lock: Path) -> dict:
-    data = read_json_strict(lock) or {"version": 1, "skills": {}}
-    if not isinstance(data.get("skills"), dict):
-        data["skills"] = {}
+    data = read_json_strict(lock) or {"version": 1}
+    data["skills"] = as_dict(data.get("skills"))
     return data
 
 
 def write_lock_entries(lock: Path, entries: dict[str, dict]) -> None:
     data = _read_lock(lock)
     data["skills"].update(entries)
-    _write_json(lock, data)
+    write_json(lock, data)
 
 
 def _atlas_lock(roots: list[Path]) -> Path:
@@ -214,14 +213,12 @@ def _edit_atlas_lock(roots: list[Path], change) -> None:
     lock = _atlas_lock(roots)
     data = _read_lock(lock)
     change(data)
-    _write_json(lock, data)
+    write_json(lock, data)
 
 
 def mark_seen(roots: list[Path], repo: str, paths: list[str]) -> None:
     def change(data):
-        if not isinstance(data.get("seen"), dict):
-            data["seen"] = {}
-        seen = data["seen"]
+        seen = data["seen"] = as_dict(data.get("seen"))
         seen[repo] = sorted(set(seen.get(repo) or []) | set(paths))
 
     _edit_atlas_lock(roots, change)
@@ -324,8 +321,7 @@ def check(roots: list[Path], refresh: bool = False) -> dict:
         for p in (skill_lock_path(r).parent / "skills").glob("*")
         if p.is_dir()
     }
-    seen = read_json(_atlas_lock(roots)).get("seen") if roots else {}
-    seen = seen if isinstance(seen, dict) else {}
+    seen = as_dict(read_json(_atlas_lock(roots)).get("seen")) if roots else {}
     with ThreadPoolExecutor(max_workers=8) as pool:
         trees = dict(zip(by_source, pool.map(lambda key: fetch_tree(*key), by_source), strict=True))
     for (repo, ref), tree in trees.items():

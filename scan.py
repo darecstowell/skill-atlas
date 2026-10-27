@@ -114,6 +114,10 @@ def as_list(v) -> list[str]:
     return [str(v)]
 
 
+def as_dict(v) -> dict:
+    return v if isinstance(v, dict) else {}
+
+
 # --------------------------------------------------------------------------
 # host config
 # --------------------------------------------------------------------------
@@ -157,7 +161,7 @@ class HostConfig:
             label=label,
             root=root,
             settings=read_json(root / "settings.json"),
-            installed_plugins=_dict(
+            installed_plugins=as_dict(
                 read_json(root / "plugins" / "installed_plugins.json").get("plugins")
             ),
             marketplaces=read_json(root / "plugins" / "known_marketplaces.json"),
@@ -177,13 +181,9 @@ def settings_state(root: Path) -> dict:
     s = read_json(root / "settings.json")
     return {
         "path": str(root / "settings.json"),
-        "skillOverrides": _dict(s.get("skillOverrides")),
-        "enabledPlugins": _dict(s.get("enabledPlugins")),
+        "skillOverrides": as_dict(s.get("skillOverrides")),
+        "enabledPlugins": as_dict(s.get("enabledPlugins")),
     }
-
-
-def _dict(v) -> dict:
-    return v if isinstance(v, dict) else {}
 
 
 def iso(ts: float) -> str:
@@ -375,7 +375,7 @@ def collect_plugins(host: HostConfig, seen: dict) -> list[dict]:
                         plugin=plugin_dir.name,
                         plugin_ref=ref,
                         marketplace=marketplace_dir.name,
-                        marketplace_source=_dict(host.marketplaces.get(marketplace_dir.name)).get(
+                        marketplace_source=as_dict(host.marketplaces.get(marketplace_dir.name)).get(
                             "source", {}
                         ),
                         plugin_version=version_dir.name,
@@ -479,7 +479,7 @@ def scan(repo: Path) -> dict:
             # Skills linked in the atlas first, so the npx lock wins on a clash.
             lock = skill_lock_path(host.root)
             for path in (lock.with_name(ATLAS_LOCK), lock):
-                entries = _dict(read_json(path).get("skills"))
+                entries = as_dict(read_json(path).get("skills"))
                 lock_index.update({k: v for k, v in entries.items() if isinstance(v, dict)})
 
     seen: dict = {}

@@ -112,6 +112,13 @@ def roots() -> list[Path]:
     return list(ROOTS.values())
 
 
+def scanned_path(path: str) -> str:
+    """Only paths the scan itself reported, so the page cannot reach arbitrary files."""
+    if path not in {s["path"] for s in scan(REPO)["skills"]}:
+        raise ValueError("unknown skill path")
+    return path
+
+
 def str_list(req: dict, key: str) -> list[str]:
     v = req.get(key)
     if not isinstance(v, list):
@@ -202,10 +209,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/updates":
             return self._json(200, updates.check(roots(), refresh="refresh=1" in query))
         if path == "/api/skill":
-            # Only files the scan itself reported, so the page cannot read arbitrary files.
-            want = parse_qs(query).get("path", [""])[0]
-            if want not in {s["path"] for s in scan(REPO)["skills"]}:
-                return self._json(400, {"error": "unknown skill path"})
+            want = scanned_path(parse_qs(query).get("path", [""])[0])
             text = Path(want).read_text(encoding="utf-8", errors="replace")
             return self._json(200, {"text": text})
         if path.startswith("/api/jobs/"):
@@ -226,11 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             write_setting(root, req["kind"], names, bool(req["on"]))
             return self._json(200, settings_state(root))
         if path == "/api/reveal":
-            # Only paths the scan itself reported, so the page cannot open arbitrary files.
-            want = str(req["path"])
-            if want not in {s["path"] for s in scan(REPO)["skills"]}:
-                raise ValueError("unknown skill path")
-            reveal(want)
+            reveal(scanned_path(str(req["path"])))
             return self._json(200, {"ok": True})
         if path == "/api/repos":
             repos = sorted({updates.parse_repo(r) for r in str_list(req, "repos")})[:50]
