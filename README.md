@@ -43,7 +43,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
 | **See where it comes from** | Each source shows its owner's GitHub avatar, and the detail panel shows the repo's banner, or a picture from the skill's own folder. |
 | **List or cards** | Switch between dense rows and a card grid. Pick light, dark, or the system theme. |
-| **Tidy up** | Delete moves a skill to the macOS Trash, with Undo. A **same as** tag marks skills with the same description. |
+| **Tidy up** | Delete moves a skill to the Trash, with Undo. A **same as** tag marks skills with the same description. |
 
 ## How it works
 
@@ -75,8 +75,8 @@ its skills installed yet.
 | Plugin | `enabledPlugins` in `settings.json` | A whole plugin. Plugin skills cannot be turned off one by one. |
 
 When you have more than one config root, the root picker sets which settings file to change
-(`personal` is `~/.claude`, `work` is `~/.claude-work`). Restart Claude Code sessions to load a
-change.
+(`personal` is `~/.claude`, `work` is `~/.claude-work`). When `CLAUDE_CONFIG_DIR` is set, that
+folder is a root too. Restart Claude Code sessions to load a change.
 
 ## Keyboard
 
@@ -121,7 +121,8 @@ Bundled skills are inside the Claude Code binary, not on disk, so the atlas cann
   the server starts, so other web pages cannot call it.
 - In `settings.json`, the atlas changes only `skillOverrides` and `enabledPlugins`. It makes a
   one-time backup at `settings.json.atlas-bak` before the first write.
-- Deletes go to the macOS Trash, never `rm`.
+- Deletes go to the Trash (`~/.Trash` on macOS, the freedesktop Trash on Linux), never `rm`.
+  Where there is no Trash, delete is not available.
 - Plugin skills are not checked for updates.
 - The page loads avatars, banners, and the SKILL.md of skills you have not installed straight
   from GitHub, so GitHub sees those requests.

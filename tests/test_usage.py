@@ -186,7 +186,15 @@ def test_usage_endpoint(server):
     assert get(f"{server}/api/usage", token="wrong")[0] == 403
     code, data = get(f"{server}/api/usage")
     assert code == 200
-    assert set(data) == {"status", "progress", "counters", "skills", "first_day", "today"}
+    assert set(data) == {
+        "status",
+        "error",
+        "progress",
+        "counters",
+        "skills",
+        "first_day",
+        "today",
+    }
     for _ in range(100):
         if data["status"] == "ready" and data["skills"]:
             break
@@ -195,3 +203,65 @@ def test_usage_endpoint(server):
         data = get(f"{server}/api/usage")[1]
     assert data["skills"]["show-me"]["projects"] == {"proj": 1}
     assert data["progress"] == [1, 1]
+
+
+def test_non_object_line():
+    assert usage.parse_line(b'["Skill"]') == []
+
+
+def test_unwritable_cache_still_counts(tmp_path):
+    write(tmp_path / "projects" / "a.jsonl", skill_line("one"))
+    blocker = tmp_path / "blocker"
+    blocker.write_text("")
+    files = usage.index([tmp_path], blocker / "cache.json")
+    assert [e[2] for f in files.values() for e in f["events"]] == ["one"]
+
+
+@pytest.mark.parametrize(
+    "cache",
+    ["[]", '{"files": []}', '{"files": {"x": {"size": "1"}}}', '{"files": {"x": {"events": 3}}}'],
+)
+def test_odd_cache_is_ignored(tmp_path, cache):
+    write(tmp_path / "projects" / "a.jsonl", skill_line("one"))
+    (tmp_path / "cache.json").write_text(cache)
+    files = usage.index([tmp_path], tmp_path / "cache.json")
+    assert [e[2] for f in files.values() for e in f["events"]] == ["one"]
+
+
+def test_replaced_file_is_read_from_the_start(tmp_path):
+    f = write(tmp_path / "projects" / "a.jsonl", skill_line("one"))
+    cache = tmp_path / "cache.json"
+    usage.index([tmp_path], cache)
+    new = write(tmp_path / "new.jsonl", skill_line("two"), skill_line("three"))
+    new.replace(f)
+    files = usage.index([tmp_path], cache)
+    assert [e[2] for e in files[str(f)]["events"]] == ["two", "three"]
+
+
+def test_long_pass_saves_checkpoints(tmp_path, monkeypatch):
+    for n in range(3):
+        write(tmp_path / "projects" / f"{n}.jsonl", skill_line(f"s{n}"))
+    saves = []
+    monkeypatch.setattr(usage, "CHECKPOINT_SECONDS", -1)
+    monkeypatch.setattr(usage, "save", lambda cache, files: saves.append(len(files)))
+    usage.index([tmp_path], tmp_path / "cache.json")
+    assert saves == [1, 2, 3, 3]
+
+
+def test_counters_odd_values(tmp_path):
+    root = tmp_path / "work"
+    root.mkdir()
+    (root / ".claude.json").write_text(
+        json.dumps({"skillUsage": {"a": {"usageCount": "many", "lastUsedAt": None}, "b": 3}})
+    )
+    assert usage.counters([root]) == {"a": {"count": 0, "last": None}}
+
+
+def test_failed_pass_reports_an_error(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("disk gone")
+
+    monkeypatch.setattr(usage, "index", boom)
+    usage._run([tmp_path])
+    snap = usage.snapshot([])
+    assert "disk gone" in snap["error"] and not usage._state["running"]

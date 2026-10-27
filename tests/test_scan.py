@@ -1,9 +1,12 @@
+import json
+import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
-from scan import as_list, git_tree_hash, parse_frontmatter
+from scan import as_list, git_tree_hash, parse_frontmatter, scan
 
 
 def test_frontmatter_scalars_lists_and_maps():
@@ -51,3 +54,124 @@ def test_git_tree_hash_matches_git(tmp_path):
     git("init", "-q")
     git("add", ".")
     assert git_tree_hash(skill) == git("rev-parse", f"{git('write-tree')}:skill")
+
+
+def test_read_json_shapes(tmp_path):
+    from scan import read_json, read_json_strict
+
+    f = tmp_path / "f.json"
+    assert read_json(f) == {} and read_json_strict(f) == {}
+    f.write_text("[1, 2]")
+    assert read_json(f) == {}
+    with pytest.raises(ValueError, match="JSON object"):
+        read_json_strict(f)
+    f.write_text("{broken")
+    assert read_json(f) == {}
+    with pytest.raises(ValueError, match="Fix the file"):
+        read_json_strict(f)
+
+
+def test_frontmatter_with_bom_and_crlf():
+    fm, _ = parse_frontmatter("﻿---\r\nname: demo\r\ndescription: x\r\n---\r\nbody")
+    assert fm == {"name": "demo", "description": "x"}
+
+
+def test_git_tree_hash_symlink_loop(tmp_path):
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("x\n")
+    (skill / "loop").symlink_to(".")
+    got = git_tree_hash(skill)
+    if shutil.which("git"):
+
+        def git(*args):
+            return subprocess.run(
+                ["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True
+            ).stdout.strip()
+
+        git("init", "-q")
+        git("add", ".")
+        assert got == git("rev-parse", f"{git('write-tree')}:skill")
+
+
+@pytest.fixture
+def home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    return home
+
+
+def repo_with(tmp_path, config) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir(exist_ok=True)
+    (repo / "config.json").write_text(config if isinstance(config, str) else json.dumps(config))
+    return repo
+
+
+def skill(root, name, text="---\nname: {name}\ndescription: d\n---\nbody\n"):
+    md = root / "skills" / name / "SKILL.md"
+    md.parent.mkdir(parents=True)
+    if isinstance(text, bytes):
+        md.write_bytes(text)
+    else:
+        md.write_text(text.format(name=name))
+    return md
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        "{not json",
+        "[]",
+        {"config_roots": ["~/.claude"], "project_roots": "~/nowhere", "project_scan_depth": "x"},
+        {"config_roots": {"personal": "~/.claude", "gone": "~/missing"}, "project_roots": [3]},
+    ],
+)
+def test_scan_odd_config(tmp_path, home, config):
+    skill(home / ".claude", "demo")
+    data = scan(repo_with(tmp_path, config))
+    assert data["config_roots"] == {"personal": str(home / ".claude")}
+    assert [s["name"] for s in data["skills"]] == ["demo"]
+
+
+def test_scan_no_roots(tmp_path, home):
+    data = scan(repo_with(tmp_path, {}))
+    assert data["config_roots"] == {} and data["skills"] == []
+
+
+def test_scan_claude_config_dir(tmp_path, home, monkeypatch):
+    work = tmp_path / ".claude-work"
+    skill(work, "only-here")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(work))
+    data = scan(repo_with(tmp_path, {}))
+    assert data["config_roots"] == {"claude-work": str(work)}
+    assert [s["name"] for s in data["skills"]] == ["only-here"]
+
+
+def test_scan_odd_files(tmp_path, home):
+    root = home / ".claude"
+    skill(root, "latin", b"---\nname: latin\ndescription: caf\xe9\n---\n")
+    skill(root, "fine")
+    (root / "skills" / "broken").mkdir()
+    (root / "skills" / "broken" / "SKILL.md").symlink_to(tmp_path / "nowhere")
+    (root / "settings.json").write_text("[]")
+    data = scan(repo_with(tmp_path, {}))
+    assert {s["name"]: s["description"] for s in data["skills"]} == {
+        "fine": "d",
+        "latin": "caf�",
+    }
+    assert data["settings"]["personal"]["skillOverrides"] == {}
+
+
+@pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="needs file modes")
+def test_scan_skips_unreadable_skill(tmp_path, home):
+    md = skill(home / ".claude", "secret")
+    skill(home / ".claude", "fine")
+    md.chmod(0)
+    try:
+        data = scan(repo_with(tmp_path, {}))
+    finally:
+        md.chmod(0o644)
+    assert [s["name"] for s in data["skills"]] == ["fine"]
