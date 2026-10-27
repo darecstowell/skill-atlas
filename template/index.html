@@ -356,6 +356,7 @@
   body.ro .mark { display: none; }
   .mark.all { position: relative; left: auto; top: auto; translate: none; flex: none; opacity: 1; }
   .all-slot { display: inline-flex; flex: none; }
+  body.nokeys kbd:not(#help kbd), body.nokeys .kh, body.nokeys #detail [data-k="kb"] { display: none; }
   .all-slot:empty { display: none; }
   .row[data-marked] { background: color-mix(in oklab, var(--accent) 9%, transparent); }
   @media (hover: hover) and (pointer: fine) { .row[data-marked]:hover { background: color-mix(in oklab, var(--accent) 13%, transparent); } }
@@ -936,6 +937,7 @@
         <hr>
         <label class="check"><input type="checkbox" id="showProject"> Show project skills</label>
         <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
+        <label class="check"><input type="checkbox" id="showKeys"> Show keyboard hints</label>
       </div>
     </div>
     <button class="btn ghost icon" id="panelBtn" aria-pressed="true" aria-controls="detail" aria-label="Details panel" title="Hide the details panel (])"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 3.5v9" stroke="currentColor" stroke-width="1.3"/><path class="pane" d="M10.6 3.6h2.6a.8.8 0 0 1 .8.8v7.2a.8.8 0 0 1-.8.8h-2.6Z" fill="currentColor"/></svg></button>
@@ -3151,6 +3153,14 @@ el('view').addEventListener('click', e => {
 el('q').addEventListener('input', () => { ui.q = el('q').value.trim(); render(); });
 el('showProject').addEventListener('change', e => { ui.showProject = e.target.checked; render(); });
 el('showStale').addEventListener('change', e => { ui.showStale = e.target.checked; render(); });
+// Hints only: the shortcuts keep working, and ? still lists them.
+function setKeyHints(on) {
+  document.body.classList.toggle('nokeys', !on);
+  el('showKeys').checked = on;
+  try { localStorage.setItem('atlas.keys', on ? '1' : '0'); } catch {}
+}
+el('showKeys').addEventListener('change', e => setKeyHints(e.target.checked));
+setKeyHints(localStorage.getItem('atlas.keys') !== '0');
 setSeg('groupBy', 'g', ui.groupBy);
 el('groupBy').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
