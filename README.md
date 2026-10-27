@@ -40,6 +40,7 @@ alias atlas='~/path/to/skill-atlas/atlas'
 | **See everything** | Personal, plugin, and project skills in one list, grouped by the repo they came from. Search covers names, descriptions, sources, and paths. |
 | **Switch skills on and off** | One switch per skill, per source, or per plugin. Changes go to `settings.json`, with a backup made first. |
 | **Update from GitHub** | Marks skills whose upstream folder changed. Update one skill, one source, or all. About 40 skills update in 3 seconds. |
+| **See changes and roll back** | **See changes** on an update shows each added, changed, and removed file, with line diffs. Before each update, the atlas saves the old folder (the last 5 per skill, in `~/.cache/skill-atlas/history`). **History** in the skill panel restores one. |
 | **Find new skills** | Lists the skills a source repo has that you have not installed, and tags the ones added since you last looked. |
 | **Read a skill** | Press `v` to open the whole SKILL.md in a large reader, formatted or as raw Markdown, with a section outline. |
 | **See where it comes from** | Each source shows its owner's GitHub avatar. A source's panel shows the repo's banner, and a skill's panel shows a picture from its own folder when it has one. |
