@@ -200,6 +200,17 @@ def str_list(req: dict, key: str) -> list[str]:
     return [str(x) for x in v]
 
 
+def install_sources(req: dict) -> dict[str, list[str]]:
+    """{repo: [SKILL.md path]} from `sources`, or from `repo` and `paths`."""
+    raw = req["sources"] if "sources" in req else {req["repo"]: req.get("paths")}
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("sources must be a map of repo to paths")
+    sources = {updates.parse_repo(str(r)): str_list(raw, r) for r in raw}
+    if not all(paths and all(map(updates.safe_skill_path, paths)) for paths in sources.values()):
+        raise ValueError("bad skill paths")
+    return sources
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code: int, body: bytes, ctype: str) -> None:
         try:
@@ -331,17 +342,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/watch":
             on = bool(req.get("on", True))
             return self._json(200, updates.watch(str(req["repo"]), on, roots()))
-        if path in ("/api/available", "/api/install", "/api/dismiss"):
+        if path == "/api/install":
+            job = updates.start_install(install_sources(req), roots())
+            return self._json(200, updates.job_view(job))
+        if path in ("/api/available", "/api/dismiss"):
             repo = updates.parse_repo(str(req["repo"]))
             paths = str_list(req, "paths")
             if not paths or not all(map(updates.safe_skill_path, paths)):
                 raise ValueError("bad skill paths")
             if path == "/api/available":
                 return self._json(200, updates.describe(repo, paths, roots()))
-            if path == "/api/dismiss":
-                return self._json(200, updates.dismiss(repo, paths, roots()))
-            job = updates.start_install({repo: paths}, roots())
-            return self._json(200, updates.job_view(job))
+            return self._json(200, updates.dismiss(repo, paths, roots()))
         if path == "/api/rollback":
             name = skill_name(str(req["name"]))
             return self._json(200, history.rollback(name, str(req["id"]), roots()))

@@ -57,6 +57,21 @@ def test_bad_paths_refused(server, paths):
     assert post(f"{server}/api/install", {"repo": "owner/repo", "paths": paths})[0] == 400
 
 
+@pytest.mark.parametrize(
+    "sources", [{}, [], {"owner/repo": []}, {"owner/repo": "SKILL.md"}, {"o/r": ["a/../SKILL.md"]}]
+)
+def test_bad_sources_refused(server, sources):
+    assert post(f"{server}/api/install", {"sources": sources})[0] == 400
+
+
+def test_install_from_many_sources(server, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(serve.updates, "start_install", lambda s, roots: seen.update(s) or {})
+    sources = {"a/one": ["x/SKILL.md"], "b/two": ["SKILL.md", "y/SKILL.md"]}
+    assert post(f"{server}/api/install", {"sources": sources})[0] == 200
+    assert seen == sources
+
+
 @pytest.fixture
 def skill_md(tmp_path, monkeypatch):
     md = tmp_path / "demo" / "SKILL.md"
