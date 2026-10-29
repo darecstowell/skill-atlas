@@ -169,6 +169,21 @@ def listing(name: str) -> dict:
     return {"name": name, "snapshots": out}
 
 
+def snapshot_diff(name: str, snap_id: str, roots: list[Path]) -> dict:
+    """What a restore would change: from the current folder to the saved one."""
+    if not SNAP_ID.match(snap_id):
+        raise ValueError("bad snapshot id")
+    saved = history_root() / name / snap_id / "skill"
+    if not (saved / "SKILL.md").is_file():
+        raise ValueError("that snapshot is gone or incomplete")
+    found = updates.tracked(roots).get(name)
+    if found is None:
+        raise ValueError(f"{name} is not linked to a GitHub repo")
+    skill_dir = found[0].parent / "skills" / name
+    current = _local_folder(skill_dir) if skill_dir.is_dir() else {}
+    return {"name": name, "id": snap_id, **diff_folders(current, _local_folder(saved))}
+
+
 def rollback(name: str, snap_id: str, roots: list[Path]) -> dict:
     """Put a snapshot and its lock entry back through a staged swap. Saves the current one first."""
     if not SNAP_ID.match(snap_id):

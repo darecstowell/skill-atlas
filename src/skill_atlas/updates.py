@@ -20,6 +20,7 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from . import history
 from .scan import (
@@ -34,6 +35,7 @@ from .scan import (
 
 CACHE_SECONDS = 600
 TREE_TIMEOUT = 20
+RAW_TIMEOUT = 20
 _cache: dict = {}
 _tarballs: dict[tuple[str, str], tuple[float, bytes]] = {}
 JOBS: dict[str, dict] = {}
@@ -157,6 +159,15 @@ def cached_tarball(repo: str, ref: str) -> bytes:
         why = getattr(_net, "reason", "")
         raise ValueError(f"could not download {repo}" + (f": {why}" if why else ""))
     return blob
+
+
+def fetch_raw(repo: str, path: str) -> str:
+    """One file from the repo's default branch. Raises OSError with the reason."""
+    url = f"https://raw.githubusercontent.com/{repo}/HEAD/{quote(path)}"
+    body = _https(url, timeout=RAW_TIMEOUT)
+    if body is None:
+        raise OSError(_net.reason or "no connection to GitHub")
+    return body.decode("utf-8", errors="replace")
 
 
 def clear_cache() -> None:

@@ -142,6 +142,36 @@ def test_rollback_restores_files_and_lock(store):
     assert [s["reason"] for s in snaps] == ["restore", "update"]
 
 
+def test_snapshot_diff_goes_from_the_current_folder_to_the_snapshot(store):
+    skill = store / "skills" / "demo"
+    history.snapshot(skill, "demo", store / ".skill-lock.json", {})
+    snap_id = history.listing("demo")["snapshots"][0]["id"]
+    (skill / "SKILL.md").write_text("---\nname: demo\n---\nline one\nline two edited\n")
+    (skill / "old.txt").unlink()
+    (skill / "mine.txt").write_text("local\n")
+    out = history.snapshot_diff("demo", snap_id, [store])
+    assert (out["name"], out["id"]) == ("demo", snap_id)
+    by_path = {f["path"]: f for f in out["files"]}
+    assert {p: f["status"] for p, f in by_path.items()} == {
+        "SKILL.md": "changed",
+        "mine.txt": "removed",
+        "old.txt": "added",
+    }
+    assert by_path["SKILL.md"]["diff"][-2:] == ["-line two edited", "+line two"]
+    assert (out["added"], out["removed"]) == (2, 2)
+
+
+def test_snapshot_diff_refuses_bad_or_missing_snapshots(store):
+    with pytest.raises(ValueError, match="bad snapshot id"):
+        history.snapshot_diff("demo", "../../etc", [store])
+    with pytest.raises(ValueError, match="gone"):
+        history.snapshot_diff("demo", "20260101T000000000Z", [store])
+    history.snapshot(store / "skills" / "demo", "demo", store / ".skill-lock.json", {})
+    snap_id = history.listing("demo")["snapshots"][0]["id"]
+    with pytest.raises(ValueError, match="not linked"):
+        history.snapshot_diff("demo", snap_id, [])
+
+
 def test_rollback_rejects_bad_ids(store):
     with pytest.raises(ValueError):
         history.rollback("demo", "../../etc", [store])

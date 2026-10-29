@@ -1,7 +1,7 @@
 # Contributing
 
-The atlas itself uses only the Python standard library. The dev tools run through
-[uv](https://docs.astral.sh/uv/):
+The web page uses only the Python standard library. The terminal client installs Textual on first
+use, after the user agrees. The dev tools run through [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv run ruff check .          # lint
@@ -13,7 +13,7 @@ uv run pytest                # tests (the template test needs Node for `node --c
 The code is in `src/skill_atlas/`, and the page is `src/skill_atlas/web/index.html`. To run it:
 
 ```bash
-./atlas                              # no install, standard library only
+./atlas                              # the web page: no install, standard library only
 uv run skill-atlas                   # the same server, from the uv environment
 uv run python -m skill_atlas.build   # write a read-only page to out/index.html
 ```
@@ -22,6 +22,30 @@ CI runs the same commands on Ubuntu and macOS with Python 3.10 and 3.13.
 
 Read `AGENTS.md` for the rules about which module writes what. Tests must never touch your real
 `~/.claude` or `~/.agents`. Use `tmp_path` for every file they write.
+
+## Terminal client
+
+The client is in `src/skill_atlas/tui/`. The uv environment has Textual, so `uv run` starts the
+client with no question.
+
+```bash
+uv run python -m skill_atlas tui --demo   # run the client on sample data
+uv run pytest tests/tui                   # run the TUI tests
+```
+
+The sample data is `DemoAtlas` in `src/skill_atlas/core/demo.py`. It keeps all its data in memory,
+so the TUI tests and the screenshots never touch `~/.claude` or `~/.agents`.
+
+To check the visuals, render the client on the sample data:
+
+```bash
+uv run python scripts/tui_shot.py --sizes 80x24,120x36 --themes atlas-dark,atlas-light
+uv run python scripts/tui_shot.py --keys "j j enter" --out out/shots/open
+```
+
+`--sizes` and `--themes` take comma lists, and the script renders each pair. `--keys` gives the
+Textual key names to press first. `--out` is the output path without a suffix. Each shot is an SVG
+and a PNG. The PNG needs `rsvg-convert` or Google Chrome. `--no-png` writes the SVG only.
 
 ## Packages
 

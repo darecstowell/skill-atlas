@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import argparse
 import errno
-import hashlib
 import json
 import os
-import re
 import secrets
-import shutil
-import subprocess
+import shutil as shutil
 import sys
 import traceback
 import webbrowser
@@ -18,46 +15,19 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from . import (
-    PACKAGE,
-    REPO,
-    WEB,
-    __version__,
-    assets,
-    harnesses,
-    history,
-    manifest,
-    overlap,
-    profiles,
-    remove,
-    security,
-    updates,
-    usage,
-)
+from . import REPO, WEB, profiles, usage
+from . import assets as assets
 from .build import render_page
-from .scan import config_path, read_json_strict, scan, settings_state, store_home, write_user_config
+from .core.atlas import SAFE_NAME, Atlas, config_roots, source_hash
+from .core.atlas import write_setting as write_setting
+from .core.atlas import write_settings as write_settings
+from .scan import config_path, scan, write_user_config
 
 TEXTURES = WEB / "bg"
 TOKEN = secrets.token_urlsafe(24)
 ROOTS: dict[str, Path] = {}
-SAFE_NAME = re.compile(r"^[A-Za-z0-9][\w.-]*$")
 MAX_BODY = 1 << 20
 RESTART = "Stop ./atlas (Ctrl-C) and start it again"
-
-
-def source_hash() -> str:
-    """A hash of the Python files, so a server can tell that its code changed on disk."""
-    if not PACKAGE.is_dir():
-        return __version__
-    h = hashlib.sha256()
-    for path in sorted(PACKAGE.glob("*.py")):
-        try:
-            h.update(path.name.encode() + b"\0" + path.read_bytes())
-        except OSError:
-            continue
-    return h.hexdigest()[:12]
-
-
 BUILD = source_hash()
 
 
@@ -66,131 +36,11 @@ def server_info() -> dict:
     return {"build": BUILD, "stale": source_hash() != BUILD}
 
 
-def write_setting(root: Path, kind: str, names: list[str], on: bool) -> None:
-    write_settings(root, {kind: dict.fromkeys(names, on)})
-
-
-def write_settings(root: Path, changes: dict[str, dict[str, bool]]) -> None:
-    """Skill and plugin switches, {kind: {name: on}}, in one write of settings.json."""
-    for kind in changes:
-        if kind not in ("skill", "plugin"):
-            raise ValueError(f"unknown kind {kind!r}")
-    path = root / "settings.json"
-    # Write through a symlink, so a settings file kept in a dotfiles repo stays linked.
-    target = path.resolve()
-    settings = read_json_strict(target)
-    if target.exists() and not os.access(target, os.W_OK):
-        raise ValueError(f"{target} is read-only, so the atlas cannot change it")
-    backup = path.with_name("settings.json.atlas-bak")
-    if target.exists() and not backup.exists():
-        shutil.copy2(target, backup)
-
-    for kind, states in changes.items():
-        key = "skillOverrides" if kind == "skill" else "enabledPlugins"
-        section = settings.get(key, {})
-        if not isinstance(section, dict):
-            raise ValueError(f"{key} in {target} is not an object. Fix the file, then try again.")
-        if kind == "skill":
-            for name, on in states.items():
-                if on:
-                    section.pop(name, None)
-                else:
-                    section[name] = "off"
-        else:
-            section.update(states)
-        if section:
-            settings[key] = section
-        else:
-            settings.pop(key, None)
-
-    tmp = target.with_name("settings.json.atlas-tmp")
-    tmp.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    if target.exists():
-        shutil.copymode(target, tmp)
-    os.replace(tmp, target)
-
-
-def reveal(path: str) -> None:
-    """Show a file in the system file manager."""
-    if sys.platform == "darwin":
-        cmd = ["open", "-R", path]
-    elif os.name == "nt":
-        cmd = ["explorer", f"/select,{path}"]
-    else:
-        cmd = ["xdg-open", str(Path(path).parent)]
-    if not shutil.which(cmd[0]):
-        raise NotImplementedError(f"cannot show files on this system: {cmd[0]} is not installed")
-    try:
-        subprocess.run(cmd, check=False, timeout=10, capture_output=True)
-    except subprocess.TimeoutExpired:
-        pass  # the file manager is open; it only did not exit
-
-
-def roots() -> list[Path]:
-    """The skill store first, where installs and deletes go, then each Claude Code root."""
-    home = store_home(dict(ROOTS))
-    if home is None:
-        raise ValueError(
-            "no skills folder found. Install a skill, or set config_roots in the config"
-        )
-    return list(dict.fromkeys([home, *ROOTS.values()]))
-
-
-def toggle(req: dict) -> dict:
-    """Turn skills or a plugin on or off in one harness, and return that harness's new state."""
-    found = {h.id: h for h in harnesses.detect(dict(ROOTS))}
-    h = found.get(str(req["root"]))
-    if h is None:
-        raise ValueError(f"unknown harness {req['root']!r}")
-    names = str_list(req, "names") if req.get("names") else [str(req["name"])]
-    if h.switch == "claude":
-        write_setting(h.home, req["kind"], names, bool(req["on"]))
-        return settings_state(h.home)
-    if req["kind"] != "skill":
-        raise ValueError(f"{h.name} has no plugin switch")
-    skills = scan(REPO)["skills"]
-    mine = [s for s in skills if s["name"] in names and h.id in s["harnesses"]]
-    if not mine:
-        raise ValueError(f"{h.name} does not load {', '.join(names)}")
-    harnesses.set_skills(h, mine, bool(req["on"]))
-    return harnesses.state(h, scan(REPO)["skills"])
-
-
-def profile_call(action: str, req: dict) -> dict:
-    return profiles.handle(
-        action,
-        req,
-        lambda: harnesses.detect(dict(ROOTS)),
-        lambda: scan(REPO)["skills"],
-        write_settings,
-    )
-
-
-LAST_SCAN: dict = {}
-
-
-def page_scan() -> dict:
-    """A fresh scan for the page, kept so per-skill routes need not scan again."""
-    LAST_SCAN["data"] = scan(REPO)
-    return LAST_SCAN["data"]
-
-
-def _find(data: dict | None, path: str) -> dict | None:
-    return next((s for s in data["skills"] if s["path"] == path), None) if data else None
-
-
-def scanned_record(path: str) -> dict:
-    """Only skills the scan itself reported, so the page cannot reach arbitrary files."""
-    rec = _find(LAST_SCAN.get("data"), path) or _find(page_scan(), path)
-    if rec is None:
-        raise ValueError("unknown skill path")
-    return rec
-
-
-def skill_name(name: str) -> str:
-    if not SAFE_NAME.match(name):
-        raise ValueError("bad skill name")
-    return name
+# The lambda reads `scan` at each call, so tests that patch serve.scan reach the Atlas.
+ATLAS = Atlas(ROOTS, REPO, scanner=lambda repo: scan(repo), info=server_info)
+LAST_SCAN = ATLAS.last_scan
+page_scan = ATLAS.page_scan
+scanned_record = ATLAS.scanned_record
 
 
 def str_list(req: dict, key: str) -> list[str]:
@@ -262,8 +112,7 @@ class Handler(BaseHTTPRequestHandler):
         path, _, query = self.path.partition("?")
         if path in ("/", "/index.html"):
             try:
-                data = {**page_scan(), "server": server_info()}
-                page = render_page(data, api_token=TOKEN)
+                page = render_page(ATLAS.data(), api_token=TOKEN)
             except Exception as e:
                 traceback.print_exc()
                 msg = f"Skill Atlas could not build the page: {e!r}\n"
@@ -283,36 +132,32 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/version":
             return self._json(200, server_info())
         if path == "/api/data":
-            return self._json(200, {**page_scan(), "server": server_info()})
+            return self._json(200, ATLAS.data())
         if path == "/api/profiles":
-            return self._json(200, profiles.listing())
+            return self._json(200, ATLAS.profiles())
         if path == "/api/usage":
-            return self._json(200, usage.snapshot(list(ROOTS.values())))
+            return self._json(200, ATLAS.usage())
         if path == "/api/updates":
-            return self._json(200, updates.check(roots(), refresh=q.get("refresh") == "1"))
+            return self._json(200, ATLAS.updates(refresh=q.get("refresh") == "1"))
         if path == "/api/skill":
-            want = scanned_record(q.get("path", ""))["path"]
-            text = Path(want).read_text(encoding="utf-8", errors="replace")
-            return self._json(200, {"text": text})
+            return self._json(200, {"text": ATLAS.skill_text(q.get("path", ""))})
         if path == "/api/diff":
-            return self._json(200, history.diff(skill_name(q.get("name", "")), roots()))
+            return self._json(200, ATLAS.diff(q.get("name", "")))
         if path == "/api/history":
-            return self._json(200, history.listing(skill_name(q.get("name", ""))))
+            return self._json(200, ATLAS.history(q.get("name", "")))
         if path == "/api/export":
-            return self._json(200, manifest.export(scan(REPO), roots()))
+            return self._json(200, ATLAS.export())
         if path == "/api/restore":
-            return self._json(200, manifest.missing(roots()))
+            return self._json(200, ATLAS.restore_plan())
         if path == "/api/compare":
-            a, b = (scanned_record(q.get(k, ""))["path"] for k in ("a", "b"))
-            return self._json(200, overlap.diff(a, b))
+            return self._json(200, ATLAS.compare(q.get("a", ""), q.get("b", "")))
         if path == "/api/security":
-            rec = scanned_record(q.get("path", ""))
-            return self._json(200, security.report(Path(rec["path"]).parent, rec["allowed_tools"]))
+            return self._json(200, ATLAS.security(q.get("path", "")))
         if path.startswith("/api/jobs/"):
-            job = updates.JOBS.get(path[10:])
+            job = ATLAS.job(path[10:])
             if job is None:
                 return self._json(404, {"error": "that job is gone. The server may have restarted"})
-            return self._json(200, updates.job_view(job))
+            return self._json(200, job)
         self._not_found(path)
 
     def do_POST(self) -> None:
@@ -321,54 +166,41 @@ class Handler(BaseHTTPRequestHandler):
     def _post(self, path: str) -> None:
         req = self._body()
         if path == "/api/toggle":
-            return self._json(200, toggle(req))
+            root = str(req["root"])
+            names = str_list(req, "names") if req.get("names") else [str(req["name"])]
+            return self._json(200, ATLAS.toggle(root, req["kind"], names, bool(req["on"])))
         if path == "/api/reveal":
-            reveal(scanned_record(str(req["path"]))["path"])
+            ATLAS.reveal(str(req["path"]))
             return self._json(200, {"ok": True})
         if path == "/api/repos":
-            repos = sorted({updates.parse_repo(r) for r in str_list(req, "repos")})[:50]
-            return self._json(200, assets.fetch(repos))
+            return self._json(200, ATLAS.repos(str_list(req, "repos")))
         if path == "/api/watch":
             on = bool(req.get("on", True))
-            return self._json(200, updates.watch(str(req["repo"]), on, roots()))
+            return self._json(200, ATLAS.watch(str(req["repo"]), on))
         if path in ("/api/available", "/api/install", "/api/dismiss"):
-            repo = updates.parse_repo(str(req["repo"]))
-            paths = str_list(req, "paths")
-            if not paths or not all(map(updates.safe_skill_path, paths)):
-                raise ValueError("bad skill paths")
+            repo, paths = str(req["repo"]), str_list(req, "paths")
             if path == "/api/available":
-                return self._json(200, updates.describe(repo, paths, roots()))
+                return self._json(200, ATLAS.available(repo, paths))
             if path == "/api/dismiss":
-                return self._json(200, updates.dismiss(repo, paths, roots()))
-            job = updates.start_install({repo: paths}, roots())
-            return self._json(200, updates.job_view(job))
+                return self._json(200, ATLAS.dismiss(repo, paths))
+            return self._json(200, ATLAS.install(repo, paths))
         if path == "/api/rollback":
-            name = skill_name(str(req["name"]))
-            return self._json(200, history.rollback(name, str(req["id"]), roots()))
+            return self._json(200, ATLAS.rollback(str(req["name"]), str(req["id"])))
         if path.startswith("/api/profiles/") and path[14:] in profiles.ACTIONS:
-            return self._json(200, profile_call(path[14:], req))
-        if path in ("/api/import/plan", "/api/import/apply"):
-            data, rs = scan(REPO), roots()
-            full = (
-                manifest.missing(rs)
-                if req.get("restore")
-                else manifest.plan(dict(req["manifest"]), data, rs)
-            )
-            if path == "/api/import/plan":
-                return self._json(200, full)
-            found = harnesses.detect(dict(ROOTS))
-            return self._json(200, manifest.apply(full, req, data, rs, found, write_setting))
+            return self._json(200, ATLAS.profile(path[14:], req))
+        if path == "/api/import/plan":
+            return self._json(200, ATLAS.import_plan(req))
+        if path == "/api/import/apply":
+            return self._json(200, ATLAS.import_apply(req))
         if path == "/api/undo-delete":
-            return self._json(200, remove.undo())
+            return self._json(200, ATLAS.undo_delete())
         if path in ("/api/update", "/api/link", "/api/delete"):
             names = str_list(req, "names")
-            if not names or not all(SAFE_NAME.match(n) for n in names):
-                raise ValueError("bad skill names")
             if path == "/api/delete":
-                return self._json(200, remove.trash(names, roots()))
+                return self._json(200, ATLAS.delete(names))
             if path == "/api/link":
-                return self._json(200, updates.link(names, str(req["repo"]), roots()))
-            return self._json(200, updates.job_view(updates.start_update(names, roots())))
+                return self._json(200, ATLAS.link(names, str(req["repo"])))
+            return self._json(200, ATLAS.update(names))
         self._not_found(path)
 
     def log_message(self, fmt, *args) -> None:
@@ -408,9 +240,8 @@ def main() -> int:
     if args.command == "init":
         return init(args.force)
 
-    data = scan(REPO)
-    ROOTS.update({label: Path(p) for label, p in data["config_roots"].items()})
-    if not data["harnesses"]:
+    ROOTS.update(config_roots(REPO))
+    if not ATLAS.page_scan()["harnesses"]:
         where = config_path(REPO)
         print(f"No agent harness found. Set config_roots in {where}.", file=sys.stderr)
     usage.start(list(ROOTS.values()))
@@ -418,6 +249,8 @@ def main() -> int:
     server = bind(args.port)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Skill Atlas on {url}  (Ctrl-C to stop)")
+    if os.environ.get("SSH_TTY"):
+        print('Over SSH? Run "atlas tui" for the terminal version.')
     if not args.no_open:
         try:
             webbrowser.open(url)
