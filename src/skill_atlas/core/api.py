@@ -5,11 +5,13 @@ Each method matches one `/api/...` route in `serve.py`, and returns the same JSO
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 
 class AtlasAPI(Protocol):
     # Reads
+    def now(self) -> datetime: ...  # no route; the clock that ages and charts read
     def data(self) -> dict: ...  # /api/data: a fresh scan plus server info
     def skill_text(self, path: str) -> str: ...  # /api/skill
     def usage(self) -> dict: ...  # /api/usage

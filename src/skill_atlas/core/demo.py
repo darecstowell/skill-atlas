@@ -1432,7 +1432,7 @@ class DemoAtlas:
 
     # ----------------------------------------------------------------- build
 
-    def _clock(self) -> datetime:
+    def now(self) -> datetime:
         return self._now if self._fixed else datetime.now().astimezone().replace(microsecond=0)
 
     def _ago(self, days: float) -> datetime:
@@ -2153,7 +2153,7 @@ class DemoAtlas:
             r["copies"] = copies.get(r["path"], [])
             skills.append(r)
         return {
-            "generated_at": self._clock().isoformat(timespec="seconds"),
+            "generated_at": self.now().isoformat(timespec="seconds"),
             "host": "demo-mbp",
             "home": HOME,
             "config_roots": {"personal": CLAUDE, "work": WORK},
@@ -2228,7 +2228,7 @@ class DemoAtlas:
         job: dict = {
             "id": _sha(self._seed, "job", self._job_count)[:12],
             "done": False,
-            "started": self._clock().timestamp(),
+            "started": self.now().timestamp(),
             "items": {n: {"state": "queued"} for n in steps},
             "_t": 0,
             "_steps": steps,
@@ -2262,7 +2262,7 @@ class DemoAtlas:
             job["seconds"] = round(0.6 * t, 1)
 
     def _snapshot(self, name: str, rec: dict, entry: dict, reason: str) -> None:
-        at = self._clock()
+        at = self.now()
         snaps = self._history.setdefault(name, [])
         base = sid = _snap_id(at)
         n = 1
@@ -2281,16 +2281,16 @@ class DemoAtlas:
             files = self._upstream(name)
             self._snapshot(name, rec, e, "update")
             self._set_files(rec, files)
-            rec["modified"] = self._clock().isoformat(timespec="seconds")
+            rec["modified"] = self.now().isoformat(timespec="seconds")
             rec["local_edits"] = False
         self._remote.pop(name, None)
-        e.update(skillFolderHash=self._latest(e), updatedAt=_z(self._clock()))
+        e.update(skillFolderHash=self._latest(e), updatedAt=_z(self.now()))
 
     def _apply_install(self, repo: str, path: str) -> None:
         c = self._catalog[repo][path]
         name = c["name"]
         siblings = [n for n, e in self._tracked().items() if e["source"] == repo]
-        stamp = _z(self._clock())
+        stamp = _z(self.now())
         self._lock[name] = {
             "source": repo,
             "sourceType": "github",
@@ -2302,7 +2302,7 @@ class DemoAtlas:
         }
         self._lockfile[name] = self._lockfile[siblings[0]] if siblings else ATLAS
         rec = self._global(STORE, name, compose(self._seed, name, c["description"], repo), 0)
-        rec["modified"] = self._clock().isoformat(timespec="seconds")
+        rec["modified"] = self.now().isoformat(timespec="seconds")
 
     def _install_steps(self, sources: dict[str, list[str]]) -> tuple[dict, Callable[[], None]]:
         steps: dict[str, tuple] = {}
@@ -2492,7 +2492,7 @@ class DemoAtlas:
     def updates(self, refresh: bool = False) -> dict:
         with self._mutex:
             if refresh:
-                self._checked_at = self._clock().strftime("%Y-%m-%dT%H:%M:%S%z")
+                self._checked_at = self.now().strftime("%Y-%m-%dT%H:%M:%S%z")
             return _copy(self._check())
 
     def diff(self, name: str) -> dict:
@@ -2591,7 +2591,7 @@ class DemoAtlas:
         return _copy(
             {
                 manifest.KEY: manifest.VERSION,
-                "exported_at": self._clock().astimezone(timezone.utc).isoformat(timespec="seconds"),
+                "exported_at": self.now().astimezone(timezone.utc).isoformat(timespec="seconds"),
                 "host": data["host"],
                 "skills": skills,
                 "watched": watched,
@@ -2719,7 +2719,7 @@ class DemoAtlas:
             self._remote[name] = self._upstream(name)
             self._snapshot(name, rec, e, "restore")
             self._set_files(rec, snap["files"])
-            rec["modified"] = self._clock().isoformat(timespec="seconds")
+            rec["modified"] = self.now().isoformat(timespec="seconds")
             rec["local_edits"] = False
             self._lock[name] = dict(snap["entry"])
             return {"name": name, "restored": snap_id, "at": snap["at"]}
@@ -2730,7 +2730,7 @@ class DemoAtlas:
 
     def _profile(self, action: str, req: dict) -> dict:
         items = self._profiles
-        now = self._clock().isoformat(timespec="seconds")
+        now = self.now().isoformat(timespec="seconds")
         if action == "save":
             name = self._profile_name(req.get("name"))
             ids, picked = req.get("harnesses"), req.get("picked")
@@ -2859,7 +2859,7 @@ class DemoAtlas:
                 if found is None or rec is None:
                     missing.append(name)
                     continue
-                stamp = _z(self._clock())
+                stamp = _z(self.now())
                 linked[name] = {
                     "source": repo,
                     "sourceType": "github",

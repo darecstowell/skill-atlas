@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -148,6 +150,7 @@ class AtlasData:
     updates: dict | None = None
     loading: set[str] = field(default_factory=set)
     errors: dict[str, str] = field(default_factory=dict)
+    clock: Callable[[], datetime] = field(default=lambda: datetime.now().astimezone(), repr=False)
     missing: int = 0  # len(restore_plan()["install"]); the side panel's "N missing" item
     _insights: views.Insights | None = field(default=None, repr=False)
     _counts: tuple[object, dict[tuple, dict[str, int]]] = field(
@@ -182,7 +185,9 @@ class AtlasData:
     def build(self, basis: Basis) -> views.Insights | None:
         """Insights for a basis. Safe on a worker thread: it only reads."""
         scan, updates, usage = basis
-        return None if scan is None else views.Insights(scan, updates, usage, missing=self.missing)
+        if scan is None:
+            return None
+        return views.Insights(scan, updates, usage, now=self.clock(), missing=self.missing)
 
     def counts(self, st: views.ViewState) -> dict[str, int]:
         """The view tab counts, once per Insights for each harness and scope."""

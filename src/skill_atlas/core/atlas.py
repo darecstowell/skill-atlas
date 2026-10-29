@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 from .. import (
@@ -199,6 +200,9 @@ class Atlas:
         return rec
 
     # Reads
+
+    def now(self) -> datetime:
+        return datetime.now().astimezone()
 
     def data(self) -> dict:
         where = str(config_path(self.repo)).replace(str(Path.home()), "~", 1)

@@ -1,4 +1,5 @@
 import threading
+from datetime import datetime
 
 import pytest
 
@@ -23,6 +24,9 @@ class StubAtlas:
     def _check(self, part):
         if part in self.fail:
             raise OSError(f"{part} broke")
+
+    def now(self):
+        return datetime.now().astimezone()
 
     def data(self):
         if self.gate is not None:

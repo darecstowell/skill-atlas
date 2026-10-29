@@ -202,7 +202,7 @@ class AtlasApp(App[int]):
         self.atlas = atlas
         self.prefs_path = prefs or state.prefs_path()
         self.state = state.load(self.prefs_path)
-        self.data = AtlasData(loading={"scan"})
+        self.data = AtlasData(loading={"scan"}, clock=atlas.now)
         self._ceiling: Level = self.animation_level
         if not os.environ.get("TEXTUAL_ANIMATIONS") and os.environ.get("SSH_TTY"):
             self._ceiling = "basic"
