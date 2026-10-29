@@ -9,7 +9,7 @@ uvx --from git+https://github.com/darecstowell/skill-atlas skill-atlas
 <p align="center">
   <a href="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml"><img src="https://github.com/darecstowell/skill-atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/dependencies-none-6CB2E8" alt="No dependencies">
+  <img src="https://img.shields.io/badge/web%20dependencies-none-6CB2E8" alt="The web page has no dependencies">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B97A3" alt="MIT license"></a>
 </p>
 
@@ -136,6 +136,77 @@ Restart the harness's sessions to load a change.
 | `⌘Z` | Undo the last change |
 | `?` | All shortcuts |
 
+## Terminal client
+
+The terminal client shows the same skills as the page and uses the same code to change them.
+
+```bash
+atlas tui           # your skills
+atlas tui --demo    # sample data, not your skills
+```
+
+Add `tui` to any start command in [Quick start](#quick-start), such as `./atlas tui` or
+`python3 skill-atlas.pyz tui`.
+
+**First run.** The client needs Textual. When Textual is not installed, the client asks before it
+installs anything. After you agree, it installs Textual and its pinned dependencies into a private
+folder, and checks the hash of each package. The folder is
+`~/.local/share/skill-atlas/tui/<hash>-py3.X`. When `XDG_DATA_HOME` is set, the folder is in
+`$XDG_DATA_HOME/skill-atlas/tui`. Add `--yes` to install without the question. To remove the
+packages, delete the `~/.local/share/skill-atlas/tui` folder.
+
+With uv, you can let uv install Textual. Then the client asks nothing:
+
+```bash
+uvx --from "git+https://github.com/darecstowell/skill-atlas[tui]" skill-atlas tui
+```
+
+**Over SSH.** Run `atlas tui` on the remote machine, in your SSH session. The client then shows the
+skills of that machine. When SSH does not send `COLORTERM`, the client uses 256 colors and prints a
+hint. If your terminal supports true color, run `atlas tui --truecolor` or set
+`COLORTERM=truecolor`.
+
+**Repos.** In the All view, each repo starts folded, in one line. Press `Enter` or the right arrow
+key on a repo to open it. Press `Enter` or the left arrow key to fold it again. Press `Shift+L` to
+open all repos. The client keeps the repos that you open. To show a description in each skill row,
+select "Show descriptions in the list" in Display (`,`).
+
+**Mouse.** The mouse works in all parts of the client. Click a row to select it. Double-click a
+skill to read it. Right-click a row to see its actions. Drag the divider to change the width of the
+details panel.
+
+**Keys.** Press `?` to see every key. This table shows the main keys.
+
+| Group | Key | Action |
+| --- | --- | --- |
+| Move and select | `j` / `k` or the arrow keys | Move between skills |
+| | `Enter` | Open the details panel, or open or fold a repo |
+| Views | `1` to `9` | All, On, Off, Updates, Issues, New, Unused, Costly, Review |
+| | `[` / `]` | Previous or next harness |
+| | `/` | Search |
+| | `s` | Sort by name, uses, recent, or cost |
+| Skill actions | `x` or `Space` | Turn the skill on or off |
+| | `u` / `Shift+U` | Update the skill, or update all except the skills you edited |
+| | `i` | Install an available skill |
+| | `d` / `h` | See changes, or open History |
+| | `Delete` | Move the skill to the Trash |
+| | `Ctrl+K` | Actions for the skill |
+| | `z` | Undo the last change |
+| Marks | `m` | Mark the skill for bulk actions, then move down |
+| | `Shift+J` / `Shift+K` | Extend the marks down or up |
+| | `Ctrl+A` | Mark all skills shown |
+| Screens and panels | `v` | Read the whole SKILL.md |
+| | `r` | Formatted or Markdown, in the reader |
+| | `\` | Show or hide the details panel |
+| | `,` | Display settings |
+| | `p` | Profiles |
+| App | `Ctrl+P` | All commands |
+| | `Esc` | Close, clear the search or marks, then go back to the All view |
+| | `?` | All shortcuts |
+| | `q` | Quit |
+
+Similar and Diverged have no digit. Find them with `Ctrl+P`.
+
 ## Configuration
 
 No setup is needed. The atlas finds each harness in its usual folder, and also reads
@@ -195,8 +266,8 @@ PYTHONPATH=src python3 -m skill_atlas.build --json > skills.json   # print the r
 
 ## Development
 
-The tool uses only the Python standard library. Dev tools run through
-[uv](https://docs.astral.sh/uv/):
+The web page uses only the Python standard library. The terminal client installs Textual on first
+use, after you agree. Dev tools run through [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest

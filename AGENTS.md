@@ -18,9 +18,9 @@ A local tool that inventories installed Claude Code skills. Read `README.md` fir
 
 ## Rules
 
-- Standard library only at run time. No runtime dependencies, and `./atlas` needs no install.
-  Dev tools (ruff, mypy, pytest) run through `uv run`; see `CONTRIBUTING.md`. Run all four checks
-  before you commit.
+- The web path is standard library only, and `./atlas` needs no install. The TUI installs its
+  pinned dependencies on first use, after the user agrees. Dev tools (ruff, mypy, pytest) run
+  through `uv run`; see `CONTRIBUTING.md`. Run all four checks before you commit.
 - `scan.py` reads the host config; it never writes to `~/.claude` or `~/.claude-work`.
 - `serve.py` is the only writer. It changes `skillOverrides` and `enabledPlugins` in a root's
   `settings.json` and nothing else, keeps a one-time `settings.json.atlas-bak`, and binds to 127.0.0.1.
@@ -37,3 +37,18 @@ A local tool that inventories installed Claude Code skills. Read `README.md` fir
   skill fails to parse, rather than adding a YAML dependency.
 - New metadata belongs in the record built by `build_record`, then in `renderDetail` in
   `web/index.html`. Keep the two in step.
+
+## TUI rules
+
+Read `docs/tui/design.md` before you change the UI. `docs/tui/plan.md` has the layout and the
+contracts.
+
+- `tui/__init__.py` and `tui/bootstrap.py` use only the standard library. Nothing that `serve.py`
+  imports may import Textual.
+- The shared core is `AtlasAPI` in `core/api.py`, with one method for each `/api` route. Both
+  clients call it. View rules come from `core/views.py`; never derive them again in the TUI.
+- Styles go in each widget's `DEFAULT_CSS`. Never use `CSS_PATH`, because it fails in a zipapp.
+- Widgets use only the `$atlas-*` theme tokens, plus the Textual tokens that `plan.md` lists.
+- `tui/keys.py` is the one table of keys. The key bar, the help, and the palette read it.
+- Check visuals with `uv run python scripts/tui_shot.py`. It renders the demo data to SVG and PNG
+  in `out/shots/`.
