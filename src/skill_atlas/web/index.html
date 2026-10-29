@@ -132,11 +132,16 @@
   /* ---------- header ---------- */
   header { position: sticky; top: 0; z-index: var(--z-header); background: var(--page); border-bottom: 1px solid var(--border); }
   .bar1, .bar2 { max-width: 1440px; margin: 0 auto; padding: 0 var(--s5); display: flex; align-items: center; gap: var(--s3); }
-  .bar1 { height: 48px; }
-  .bar2 { height: 36px; gap: var(--s4); }
-  .brand { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }
-  .brand svg { width: 18px; height: 18px; }
-  .search { position: relative; flex: 1; max-width: 520px; }
+  /* Three columns, so the search stays centered whatever sits beside it. */
+  .bar1 { height: 68px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 460px) minmax(0, 1fr); gap: var(--s4); }
+  .bar2 { height: 40px; gap: var(--s4); }
+  .title, .end { display: flex; align-items: center; min-width: 0; }
+  .title { gap: var(--s4); }
+  .end { gap: var(--s3); justify-self: end; }
+  .heading { display: grid; justify-items: start; gap: 1px; min-width: 0; }
+  .brand { display: flex; flex: none; margin: 0; }
+  .brand svg { width: 30px; height: 30px; }
+  .search { position: relative; min-width: 0; }
   .search input {
     width: 100%; height: 32px; padding: 0 40px 0 32px; border-radius: var(--r-md);
     background: var(--surface-1); border: 1px solid var(--border); color: var(--text); font-size: 13px;
@@ -173,7 +178,8 @@
     .ck-label, .ck-icon, .check-btn[data-busy] .ck-icon svg { animation: none; }
     .check-btn { transition: none; }
   }
-  .meta { margin-left: auto; display: flex; gap: var(--s3); font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
+  .meta { display: flex; max-width: 100%; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
+  .meta span + span::before { content: "·"; padding: 0 6px; color: var(--text-disabled); }
   .meta b { color: var(--text-2); font-weight: 500; font-variant-numeric: tabular-nums; }
   .meta code { font: 11.5px var(--mono); color: var(--text-2); }
   .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
@@ -187,9 +193,28 @@
     transition: color 120ms ease, background-color 120ms ease;
   }
   .seg button[hidden] { display: none; }
-  .seg button.wait { visibility: hidden; }
   .seg button:hover { color: var(--text); }
   .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); }
+  .tabs { display: flex; align-self: stretch; gap: 20px; }
+  .tabs button {
+    display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 1px; border: 0; background: none;
+    color: var(--text-3); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer;
+    box-shadow: inset 0 -2px 0 transparent; transition: color 120ms ease, box-shadow 120ms ease;
+  }
+  .tabs button[hidden] { display: none; }
+  .tabs button.wait { visibility: hidden; }
+  .tabs button:hover, .tabs button[aria-pressed="true"] { color: var(--text); }
+  .tabs button[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--text); }
+  .tabs button:focus-visible { outline-offset: -2px; }
+  .tabs .n { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tabs button[aria-pressed="true"] .n { color: var(--text-2); }
+  .tabs .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
+  .tabs [data-zero] .dot { display: none; }
+  #viewUpdates { --tone: var(--accent); }
+  #viewIssues { --tone: var(--warn); }
+  #viewReview { --tone: var(--danger); }
+  #viewNew { --tone: var(--violet); }
+  #viewUnused { --tone: var(--text-3); }
   .pop-wrap { position: relative; display: inline-flex; flex: none; }
   .pop-wrap .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
   .pop-wrap .dot[hidden] { display: none; }
@@ -227,8 +252,6 @@
   .textures button:hover { color: var(--text-2); }
   .textures button[aria-pressed="true"] { color: var(--text); }
   .textures button[aria-pressed="true"] i { box-shadow: 0 0 0 1.5px var(--text-2); }
-  .seg .n { color: var(--text-3); font-variant-numeric: tabular-nums; }
-  .seg button[aria-pressed="true"] .n { color: var(--text-2); }
 
   #bar { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; pointer-events: none; opacity: 0; transition: opacity 180ms ease-in; }
   #bar.on { opacity: 1; transition: none; }
@@ -269,14 +292,17 @@
     background: var(--page); border-bottom: 1px solid var(--border);
   }
   .group + .group { margin-top: 4px; }
-  body.big-groups .group-head { height: 52px; gap: 10px; }
+  body.big-groups .group-head { height: 60px; gap: 10px; }
   body.big-groups .group-head .ava { width: 28px; height: 28px; border-radius: var(--r-md); font-size: 13px; }
   body.big-groups .gname { font-size: 14.5px; }
-  body.big-groups .gsub { font-size: 12.5px; }
   body.big-groups .group + .group { margin-top: 6px; }
   .gname { font: 600 13px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gsub { color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .gsub .tnum { color: var(--text-2); }
+  .gtext { display: grid; gap: 3px; min-width: 0; text-align: left; }
+  .gline { font: 12.5px/1.3 var(--sans); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gline .tnum { color: var(--text-2); }
+  .gfill { flex: 1; min-width: 0; }
   .gctl { display: flex; align-items: center; gap: var(--s2); flex: none; }
   .group.collapsed .group-head { border-bottom-color: transparent; }
   .group-head[aria-current="true"] { box-shadow: inset 0 -2px 0 oklch(var(--id-line) var(--h, var(--ah))); }
@@ -367,18 +393,54 @@
   /* Sticky heads reach into the gutter, so marks scrolling under them stay hidden. */
   .sec-head::before, .group-head::before { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: inherit; }
 
-  .bulk { display: none; }
-  body.marking .bar2.filters { display: none; }
-  body.marking .bar2.bulk { display: flex; }
-  .bulk .count { display: inline-flex; align-items: center; gap: var(--s2); font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .bulk .count span { font-weight: 400; color: var(--text-3); }
+  /* The bulk dock floats over the list in the other theme's colors, so the filters stay in place. */
+  .bulk {
+    position: fixed; left: var(--dock-x, 50%); bottom: calc(24px + env(safe-area-inset-bottom)); z-index: var(--z-header); translate: -50% 0;
+    display: none; align-items: center; gap: var(--s3); width: max-content; max-width: calc(100vw - 32px); height: 58px; padding: 0 10px 0 12px;
+    border-radius: 18px; background: var(--surface-1); color: var(--text); box-shadow: var(--dock-shadow);
+  }
+  :root[data-theme="light"] .bulk {
+    --surface-1: oklch(.195 calc(.009 * var(--nk)) var(--nh)); --surface-2: oklch(.235 calc(.011 * var(--nk)) var(--nh)); --surface-3: oklch(.275 calc(.012 * var(--nk)) var(--nh));
+    --border: oklch(.3 calc(.01 * var(--nk)) var(--nh)); --border-strong: oklch(.34 calc(.012 * var(--nk)) var(--nh));
+    --text: oklch(.95 calc(.004 * var(--nk)) var(--nh)); --text-2: oklch(.80 calc(.01 * var(--nk)) var(--nh)); --text-3: oklch(.66 calc(.012 * var(--nk)) var(--nh)); --text-disabled: oklch(.48 calc(.01 * var(--nk)) var(--nh));
+    --accent: oklch(.76 calc(.11 * var(--ak)) var(--ah)); --on-accent: oklch(.17 calc(.02 * var(--ak)) var(--ah)); --danger: oklch(.76 .14 25); --warn: oklch(.82 .12 75);
+    --focus: oklch(.95 0 0 / .85);
+    --shadow-pop: 0 0 0 1px var(--border-strong), 0 2px 4px oklch(0 0 0 / .3), 0 12px 32px oklch(0 0 0 / .45);
+    --dock-shadow: 0 2px 6px oklch(0 0 0 / .14), 0 14px 36px -6px oklch(0 0 0 / .32);
+  }
+  :root:not([data-theme="light"]) .bulk {
+    --surface-1: oklch(1 0 0); --surface-2: oklch(.955 calc(.005 * var(--nk)) var(--nh)); --surface-3: oklch(.925 calc(.006 * var(--nk)) var(--nh));
+    --border: oklch(0 0 0 / .09); --border-strong: oklch(0 0 0 / .16);
+    --text: oklch(.23 calc(.012 * var(--nk)) var(--nh)); --text-2: oklch(.43 calc(.014 * var(--nk)) var(--nh)); --text-3: oklch(.52 calc(.014 * var(--nk)) var(--nh)); --text-disabled: oklch(.68 calc(.01 * var(--nk)) var(--nh));
+    --accent: oklch(.50 calc(.115 * var(--ak)) var(--ah)); --on-accent: oklch(1 0 0); --danger: oklch(.52 .17 25); --warn: oklch(.52 .11 65);
+    --focus: oklch(.25 0 0 / .8);
+    --shadow-pop: 0 0 0 1px var(--border), 0 2px 4px oklch(0 0 0 / .06), 0 12px 32px oklch(0 0 0 / .12);
+    --dock-shadow: 0 0 0 1px oklch(1 0 0 / .1), 0 12px 32px oklch(0 0 0 / .5);
+  }
+  body.marking .bulk { display: flex; animation: dock-in 380ms var(--ease-drawer); }
+  body.marking #toast { bottom: calc(94px + env(safe-area-inset-bottom)); }
+  @keyframes dock-in { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+  .bulk .count { display: inline-flex; align-items: center; align-self: stretch; gap: 10px; padding-right: var(--s4); margin-right: 2px; border-right: 1px solid var(--border); white-space: nowrap; }
+  .bulk .count .n {
+    display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 8px; border-radius: var(--r-pill);
+    background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .bulk .count .sel { display: grid; gap: 1px; font-size: 13.5px; font-weight: 500; line-height: 1.25; }
+  .bulk .count .hid { font-size: 11.5px; font-weight: 400; color: var(--warn); }
   .bulk .acts { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-  .bulk .acts .tnum { color: inherit; opacity: .7; }
-  .bulk .end { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+  /* 18px dock radius − 12px inset. */
+  .bulk .btn { height: 34px; padding: 0 12px; border-radius: 6px; font-size: 13px; }
+  .bulk .btn .tnum { color: var(--text-3); }
+  .bulk .btn.primary .tnum { color: inherit; opacity: .8; }
+  .bulk .btn .chev { width: 12px; height: 12px; margin-right: -3px; color: var(--text-3); }
+  .bulk .menu { top: auto; bottom: calc(100% + 10px); left: 0; right: auto; transform-origin: bottom left; }
+  .bulk .menu .tnum { margin-left: auto; padding-left: var(--s5); color: var(--text-3); }
+  .bulk .menu .danger .tnum { color: inherit; opacity: .7; }
+  .bulk .end { display: flex; align-items: center; margin-left: var(--s2); padding-left: var(--s3); border-left: 1px solid var(--border); }
   .bulk form { display: flex; align-items: center; gap: 6px; }
   .bulk form input {
-    width: 220px; height: 26px; padding: 0 8px; border-radius: var(--r-md); border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); font: 12.5px var(--mono);
+    width: 220px; height: 34px; padding: 0 10px; border-radius: var(--r-md); border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font: 12.5px var(--mono);
   }
   .bulk .err { color: var(--danger); font-size: 12px; white-space: nowrap; }
 
@@ -502,14 +564,6 @@
   @keyframes spin { to { rotate: 360deg; } }
 
   /* ---------- available from a source ---------- */
-  .chip {
-    position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0;
-    border-radius: var(--r-pill); background: var(--tint-accent); color: var(--accent); font: 500 12px var(--sans); white-space: nowrap; cursor: pointer;
-    transition: background-color 120ms ease, scale 150ms var(--ease-out);
-  }
-  .chip::before { content: ""; position: absolute; inset: -8px -2px; }
-  .chip:hover { background: color-mix(in oklab, var(--accent) 24%, var(--surface-1)); }
-  .chip:active { scale: .96; }
   .gnew { flex: none; }
   .avail-head {
     display: flex; align-items: center; gap: var(--s2); min-height: 36px; padding: 0 var(--s2) 0 15px; margin-top: 2px;
@@ -621,12 +675,13 @@
   .harness { position: relative; display: inline-flex; flex: none; }
   .harness[hidden] { display: none; }
   .harness select {
-    appearance: none; height: 28px; padding: 0 26px 0 10px; border-radius: var(--r-md); border: 1px solid var(--border);
-    background: var(--surface-1); color: var(--text); font: 500 12.5px var(--sans); cursor: pointer;
+    appearance: none; height: 30px; margin-left: -8px; padding: 0 30px 0 8px; border: 0; border-radius: var(--r-md);
+    background: transparent; color: var(--text); font: 600 18px/1 var(--sans); letter-spacing: -.012em; cursor: pointer;
+    transition: background-color 120ms ease;
   }
   .harness select:hover { background: var(--surface-2); }
   .harness select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .harness::after { content: ""; position: absolute; right: 10px; top: 50%; width: 6px; height: 6px; border: solid var(--text-3); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+  .harness::after { content: ""; position: absolute; right: 11px; top: 50%; width: 7px; height: 7px; border: solid var(--text-2); border-width: 0 1.5px 1.5px 0; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
   .invoke { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: var(--s3) 0 0; }
   .who {
     display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 1px;
@@ -988,15 +1043,17 @@
   @media (max-width: 1100px) {
     #panelBtn { display: none; }
     main { grid-template-columns: minmax(0, 1fr); }
+    .bar1 { grid-template-columns: auto minmax(0, 1fr) auto; }
     .bar2 { overflow-x: auto; scrollbar-width: none; }
+    /* The tabs scroll on their own, so the update buttons stay in view. */
+    .filters .tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
     /* Fade an edge only while more tabs sit past it. */
     @supports (animation-timeline: scroll()) {
-      .bar2 {
+      .filters .tabs {
         mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
         animation: edges linear both; animation-timeline: scroll(self inline);
       }
     }
-    .meta { display: none; }
     #detail {
       position: fixed; top: 0; right: 0; bottom: 0; height: auto; width: min(420px, 100vw); z-index: var(--z-drawer);
       box-shadow: var(--shadow-pop); border-left: 0; visibility: hidden; transform: translateX(100%);
@@ -1012,7 +1069,12 @@
       opacity: 0; visibility: hidden; transition: opacity 200ms var(--ease-in-cubic), visibility 0s linear 200ms;
     }
     #detail[data-open] + #scrim { opacity: 1; visibility: visible; transition: opacity 280ms var(--ease-out), visibility 0s; }
-    .brand span, .cluster > [data-k="t"], #displayBtn .lbl, .search kbd { display: none !important; }
+    .bar1 { height: 56px; }
+    .title { gap: var(--s3); }
+    .brand svg { width: 24px; height: 24px; }
+    .harness select { font-size: 16px; }
+    .meta { display: none; }
+    .cluster > [data-k="t"], #displayBtn .lbl, .search kbd { display: none !important; }
     .search { min-width: 0; }
     #displayBtn { width: 28px; padding: 0; }
     #displayBtn .dot { position: absolute; top: 4px; right: 4px; }
@@ -1021,7 +1083,13 @@
     .uslot { min-width: 0; }
     .gsub { display: none; }
     .heat-scale span { display: none; }
-    .search input, .linkform input { font-size: 16px; }
+    .search input, .linkform input, .bulk form input { font-size: 16px; }
+    .bulk { left: var(--s4); right: var(--s4); translate: none; width: auto; gap: var(--s2); padding: 0 6px 0 10px; }
+    .bulk .btn { padding: 0 10px; }
+    .bulk .count { padding-right: var(--s3); }
+    .bulk .end { margin-left: 0; padding-left: var(--s2); }
+    .bulk .count .sel, .bulk kbd { display: none; }
+    .bulk form input { width: 160px; }
     .v-head { flex-wrap: wrap; row-gap: var(--s2); }
     .v-title { flex-basis: calc(100% - 40px); }
     .v-acts { width: 100%; }
@@ -1038,8 +1106,8 @@
   }
 
   @media (max-width: 480px) {
-    .bar1 { height: auto; flex-wrap: wrap; row-gap: var(--s2); padding-block: var(--s2); }
-    .search { order: 1; flex-basis: 100%; max-width: none; }
+    .bar1 { height: auto; grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--s2); padding-block: var(--s2); }
+    .search { order: 1; grid-column: 1 / -1; }
   }
 
   /* ---------- overlap: similar skills and diverged copies ---------- */
@@ -1100,7 +1168,7 @@
     .switch, .switch::after { transition-delay: 0ms !important; }
     .spin { display: none; }
     @starting-style { .menu, .linkform, #toast, #help, #help .sheet, .row.enter { opacity: 1; transform: none; } }
-    @supports (animation-timeline: scroll()) { @media (max-width: 1100px) { .bar2 { animation: edges linear both !important; animation-timeline: scroll(self inline) !important; } } }
+    @supports (animation-timeline: scroll()) { @media (max-width: 1100px) { .filters .tabs { animation: edges linear both !important; animation-timeline: scroll(self inline) !important; } } }
   }
   /* ---------- security scan ---------- */
   .sec-g { display: grid; gap: 6px; }
@@ -1133,85 +1201,90 @@
 <body>
 <header id="head">
   <div class="bar1">
-    <h1 class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="var(--accent)"/><path d="M19.6 7.2 12.4 24.8" stroke="var(--bg)" stroke-width="3.4" stroke-linecap="round"/></svg><span>Skill Atlas</span></h1>
-    <label class="harness"><span class="vh">Harness</span><select id="harness"></select></label>
-    <div class="pop-wrap" id="profWrap" hidden>
-      <button class="btn ghost" id="profBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="profPop"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="9.5" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="10.8" cy="4.75" r=".9" fill="currentColor"/><circle cx="5.2" cy="11.25" r=".9" fill="currentColor"/></svg><span class="lbl">Profiles</span></button>
-      <div class="pop pf-pop" id="profPop" role="dialog" aria-label="Profiles" hidden></div>
+    <div class="title">
+      <h1 class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="var(--accent)"/><path d="M19.6 7.2 12.4 24.8" stroke="var(--bg)" stroke-width="3.4" stroke-linecap="round"/></svg><span class="vh">Skill Atlas</span></h1>
+      <div class="heading">
+        <label class="harness"><span class="vh">Harness</span><select id="harness"></select></label>
+        <div class="meta" id="meta"></div>
+      </div>
     </div>
     <div class="search">
       <svg class="glass" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <input type="search" id="q" placeholder="Search skills, sources, paths" aria-label="Search skills" autocomplete="off" spellcheck="false">
       <kbd class="k-slash">/</kbd><kbd class="k-esc">esc</kbd>
     </div>
-    <div class="cluster" id="cluster"></div>
-    <div class="pop-wrap" id="displayWrap">
-      <button class="btn ghost" id="displayBtn" aria-label="Display" aria-haspopup="dialog" aria-expanded="false" aria-controls="display">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="lbl">Display</span><i class="dot" id="displayDot" hidden></i>
-      </button>
-      <div class="pop" id="display" role="dialog" aria-label="Display options" hidden>
-        <div class="pop-row"><span>Layout</span>
-          <div class="seg" id="layout" role="group" aria-label="Layout">
-            <button data-l="list" aria-pressed="true"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>List</button>
-            <button data-l="cards" aria-pressed="false"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Cards</button>
-          </div>
-        </div>
-        <div class="pop-row"><span>Sort</span>
-          <div class="seg" id="sortBy" role="group" aria-label="Sort skills">
-            <button data-o="name" aria-pressed="true">Name</button>
-            <button data-o="uses" aria-pressed="false">Most used</button>
-            <button data-o="recent" aria-pressed="false">Recent</button>
-            <button data-o="cost" aria-pressed="false" title="Most tokens in every session first">Cost</button>
-          </div>
-        </div>
-        <div class="pop-row"><span>Size</span>
-          <div class="seg" id="scale" role="group" aria-label="Page size">
-            <button data-s="small" aria-pressed="false">Small</button>
-            <button data-s="default" aria-pressed="true">Default</button>
-            <button data-s="large" aria-pressed="false">Large</button>
-          </div>
-        </div>
-        <div class="pop-row"><span>Collections</span>
-          <div class="seg" id="groupSize" role="group" aria-label="Collection row size">
-            <button data-z="regular" aria-pressed="true">Regular</button>
-            <button data-z="large" aria-pressed="false">Large</button>
-          </div>
-        </div>
-        <div class="pop-row"><span>Group by</span>
-          <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
-            <button data-g="source" aria-pressed="true">Source</button>
-            <button data-g="type" aria-pressed="false">Scope</button>
-          </div>
-        </div>
-        <div class="pop-row"><span>Theme</span><div class="seg theme" id="theme" role="group" aria-label="Theme"></div></div>
-        <div class="pop-row"><span>Palette</span><div class="swatches" id="palette" role="group" aria-label="Palette"></div></div>
-        <div class="pop-col"><span>Background</span><div class="textures" id="texture" role="group" aria-label="Background"></div></div>
-        <hr>
-        <label class="check"><input type="checkbox" id="showProject"> Show project skills</label>
-        <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
-        <label class="check"><input type="checkbox" id="showKeys"> Show keyboard hints</label>
+    <div class="end">
+      <div class="pop-wrap" id="profWrap" hidden>
+        <button class="btn ghost" id="profBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="profPop"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="9.5" width="11" height="3.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="10.8" cy="4.75" r=".9" fill="currentColor"/><circle cx="5.2" cy="11.25" r=".9" fill="currentColor"/></svg><span class="lbl">Profiles</span></button>
+        <div class="pop pf-pop" id="profPop" role="dialog" aria-label="Profiles" hidden></div>
       </div>
+      <div class="pop-wrap" id="displayWrap">
+        <button class="btn ghost" id="displayBtn" aria-label="Display" aria-haspopup="dialog" aria-expanded="false" aria-controls="display">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="11.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="lbl">Display</span><i class="dot" id="displayDot" hidden></i>
+        </button>
+        <div class="pop" id="display" role="dialog" aria-label="Display options" hidden>
+          <div class="pop-row"><span>Layout</span>
+            <div class="seg" id="layout" role="group" aria-label="Layout">
+              <button data-l="list" aria-pressed="true"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>List</button>
+              <button data-l="cards" aria-pressed="false"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Cards</button>
+            </div>
+          </div>
+          <div class="pop-row"><span>Sort</span>
+            <div class="seg" id="sortBy" role="group" aria-label="Sort skills">
+              <button data-o="name" aria-pressed="true">Name</button>
+              <button data-o="uses" aria-pressed="false">Most used</button>
+              <button data-o="recent" aria-pressed="false">Recent</button>
+              <button data-o="cost" aria-pressed="false" title="Most tokens in every session first">Cost</button>
+            </div>
+          </div>
+          <div class="pop-row"><span>Size</span>
+            <div class="seg" id="scale" role="group" aria-label="Page size">
+              <button data-s="small" aria-pressed="false">Small</button>
+              <button data-s="default" aria-pressed="true">Default</button>
+              <button data-s="large" aria-pressed="false">Large</button>
+            </div>
+          </div>
+          <div class="pop-row"><span>Collections</span>
+            <div class="seg" id="groupSize" role="group" aria-label="Collection row size">
+              <button data-z="regular" aria-pressed="true">Regular</button>
+              <button data-z="large" aria-pressed="false">Large</button>
+            </div>
+          </div>
+          <div class="pop-row"><span>Group by</span>
+            <div class="seg" id="groupBy" role="group" aria-label="Group your skills">
+              <button data-g="source" aria-pressed="true">Source</button>
+              <button data-g="type" aria-pressed="false">Scope</button>
+            </div>
+          </div>
+          <div class="pop-row"><span>Theme</span><div class="seg theme" id="theme" role="group" aria-label="Theme"></div></div>
+          <div class="pop-row"><span>Palette</span><div class="swatches" id="palette" role="group" aria-label="Palette"></div></div>
+          <div class="pop-col"><span>Background</span><div class="textures" id="texture" role="group" aria-label="Background"></div></div>
+          <hr>
+          <label class="check"><input type="checkbox" id="showProject"> Show project skills</label>
+          <label class="check"><input type="checkbox" id="showStale"> Show old plugin versions</label>
+          <label class="check"><input type="checkbox" id="showKeys"> Show keyboard hints</label>
+        </div>
+      </div>
+      <button class="btn ghost icon" id="panelBtn" aria-pressed="true" aria-controls="detail" aria-label="Details panel" title="Hide the details panel (])"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 3.5v9" stroke="currentColor" stroke-width="1.3"/><path class="pane" d="M10.6 3.6h2.6a.8.8 0 0 1 .8.8v7.2a.8.8 0 0 1-.8.8h-2.6Z" fill="currentColor"/></svg></button>
     </div>
-    <button class="btn ghost icon" id="panelBtn" aria-pressed="true" aria-controls="detail" aria-label="Details panel" title="Hide the details panel (])"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 3.5v9" stroke="currentColor" stroke-width="1.3"/><path class="pane" d="M10.6 3.6h2.6a.8.8 0 0 1 .8.8v7.2a.8.8 0 0 1-.8.8h-2.6Z" fill="currentColor"/></svg></button>
   </div>
   <div class="bar2 filters">
     <span class="all-slot" id="allMark"></span>
-    <div class="seg" id="view" role="group" aria-label="Show">
+    <div class="tabs" id="view" role="group" aria-label="Show">
       <button data-v="all" aria-pressed="true">All <span class="n" data-n="all"></span></button>
       <button data-v="on" aria-pressed="false">On <span class="n" data-n="on"></span></button>
       <button data-v="off" aria-pressed="false">Off <span class="n" data-n="off"></span></button>
-      <button data-v="updates" aria-pressed="false" id="viewUpdates">Updates <span class="n" data-n="updates"></span></button>
-      <button data-v="issues" aria-pressed="false" id="viewIssues" title="Skills with SKILL.md problems" hidden>Issues <span class="n" data-n="issues"></span></button>
-      <button data-v="new" aria-pressed="false" id="viewNew" hidden>New <span class="n" data-n="new"></span></button>
-      <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days">Unused <span class="n" data-n="unused"></span></button>
+      <button data-v="updates" aria-pressed="false" id="viewUpdates"><i class="dot" aria-hidden="true"></i>Updates <span class="n" data-n="updates"></span></button>
+      <button data-v="issues" aria-pressed="false" id="viewIssues" title="Skills with SKILL.md problems" hidden><i class="dot" aria-hidden="true"></i>Issues <span class="n" data-n="issues"></span></button>
+      <button data-v="new" aria-pressed="false" id="viewNew" hidden><i class="dot" aria-hidden="true"></i>New <span class="n" data-n="new"></span></button>
+      <button data-v="unused" aria-pressed="false" id="viewUnused" class="wait" title="No recorded use in 90 days"><i class="dot" aria-hidden="true"></i>Unused <span class="n" data-n="unused"></span></button>
       <button data-v="costly" aria-pressed="false" id="viewCostly" hidden title="On, costly, and not used in 90 days">Costly <span class="n" data-n="costly"></span></button>
       <button data-v="similar" aria-pressed="false" id="view-similar" hidden>Similar</button>
       <button data-v="diverged" aria-pressed="false" id="view-diverged" hidden>Diverged</button>
-      <button data-v="review" aria-pressed="false" id="viewReview" hidden title="Skills with high-risk patterns">Review <span class="n" data-n="review"></span></button>
+      <button data-v="review" aria-pressed="false" id="viewReview" hidden title="Skills with high-risk patterns"><i class="dot" aria-hidden="true"></i>Review <span class="n" data-n="review"></span></button>
     </div>
-    <div class="meta" id="meta"></div>
+    <div class="cluster" id="cluster"></div>
   </div>
-  <div class="bar2 bulk" id="bulk" role="toolbar" aria-label="Bulk actions"></div>
   <div class="band" id="band" hidden>Read-only build. Run <code>./atlas</code> to change skills.</div>
   <div class="band" id="stale" role="alert" hidden></div>
   <div id="bar" aria-hidden="true"><i></i></div>
@@ -1222,6 +1295,7 @@
   <aside id="detail" aria-label="Skill details"></aside>
   <div id="scrim" aria-hidden="true"></div>
 </main>
+<div class="bulk" id="bulk" role="toolbar" aria-label="Bulk actions"></div>
 <div id="toast" role="status" hidden></div>
 <div id="announce" class="vh" aria-live="polite"></div>
 <dialog id="viewer" aria-label="Skill file"></dialog>
@@ -1678,9 +1752,14 @@ const saveCollapsed = () => localStorage.setItem('atlas.collapsed', JSON.stringi
 const isOpen = id => Boolean(ui.q) || !collapsed.has(id);
 
 // The group name opens its detail; the chevron beside it folds the group.
-function groupTitle(id, label, repo, nameHtml, open, list = []) {
-  return `${WRITABLE ? markGroupHtml(id, list) : ''}${fold(id, '', `Show or hide ${label}`, open)}<button class="gopen" data-k="go" data-group="${esc(id)}" aria-label="Details for ${esc(label)}">${avatar(label, repo)}<span class="gname" data-leaf>${nameHtml}</span></button>`;
+function groupTitle(id, label, repo, nameHtml, open, list = [], facts = '') {
+  const name = `<span class="gname" data-leaf>${nameHtml}</span>`;
+  const text = facts && bigGroups() ? `<span class="gtext" data-k="gt">${name}<span class="gline" data-leaf>${facts}</span></span>` : name;
+  return `${WRITABLE ? markGroupHtml(id, list) : ''}${fold(id, '', `Show or hide ${label}`, open)}<button class="gopen" data-k="go" data-group="${esc(id)}" aria-label="Details for ${esc(label)}">${avatar(label, repo)}${text}</button>`;
 }
+const bigGroups = () => document.body.classList.contains('big-groups');
+// Large rows show the facts under the name, so the inline line gives its space to the spark.
+const groupSub = html => (bigGroups() ? '<span class="gfill"></span>' : `<span class="gsub" data-leaf>${html}</span>`);
 
 function fold(id, inner, label, open = isOpen(id)) {
   return `<button class="fold" data-k="fold" data-fold="${esc(id)}" aria-expanded="${open}" aria-label="${esc(label)}">${ICON.chev}${inner}</button>`;
@@ -1836,10 +1915,10 @@ function sourceGroups(personal) {
     const counts = all.length
       ? `<span class="tnum">${onCount}</span> of <span class="tnum">${all.length}</span> on${list.length < all.length && ui.view !== 'new' ? ` · ${list.length} shown` : ''}`
       : 'watching';
-    const meta = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`;
-    const head = `${groupTitle(id, source, local ? null : source, highlight(source), ui.view === 'new' || isOpen(id), list)}
+    const facts = `${local && source !== NO_SOURCE ? 'no source · ' : ''}${counts}${avail.length ? ` · <span class="tnum">${avail.length}</span> available` : ''}`;
+    const head = `${groupTitle(id, source, local ? null : source, highlight(source), ui.view === 'new' || isOpen(id), list, facts)}
       ${fresh ? `<span class="tag update gnew tnum" data-k="nw" title="${plural(fresh, 'skill')} added since you last looked">+${fresh} new</span>` : ''}
-      <span class="gsub" data-leaf>${meta}</span>${groupSpark(all)}
+      ${groupSub(`${facts}${repoUrl ? ` · <a href="${esc(repoUrl)}" target="_blank" rel="noreferrer">repo ↗</a>` : ''}`)}${groupSpark(all)}
       <span class="gctl" data-k="c">${groupUpdateButton(all, `data-update-source="${esc(source)}"`)}${groupMenu(source, all)}
       ${all.length && switchable() ? switchHtml(checked, `All ${all.length} skills from ${source}: turn ${checked === 'true' ? 'off' : 'on'}`, `data-kind="source" data-key="${esc(source)}"`) : ''}</span>`;
     const form = local && ui.linkOpen === source ? linkForm('group:' + source, all.map(s => s.dir_name), { cancel: true }) : '';
@@ -1910,8 +1989,9 @@ function render() {
       const ctl = lv.status === 'stale' ? '' :
         switchHtml(st.on, `Plugin ${lv.plugin}: turn ${st.on ? 'off' : 'on'}`, `data-kind="plugin" data-key="${esc(ref)}"`);
       const note = st.mode === 'not set' ? ' · not in enabledPlugins' : '';
-      const head = `${groupTitle('plg:' + ref, lv.plugin, repoOf(lv), highlight(lv.plugin), isOpen('plg:' + ref), list)}
-        <span class="gsub" data-leaf>${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}</span>${groupSpark(list)}<span class="gctl" data-k="c">${ctl}</span>`;
+      const facts = `${esc(lv.marketplace)} · ${plural(list.length, 'skill')}${note}`;
+      const head = `${groupTitle('plg:' + ref, lv.plugin, repoOf(lv), highlight(lv.plugin), isOpen('plg:' + ref), list, facts)}
+        ${groupSub(facts)}${groupSpark(list)}<span class="gctl" data-k="c">${ctl}</span>`;
       return group('plg:' + ref, head, list.map(row).join(''));
     });
     out.push(section('sec:plugins', 'Plugins', refs.length, groups.join(''), refs.map(([r]) => 'plg:' + r)));
@@ -1921,7 +2001,7 @@ function render() {
   if (project.length) {
     const byProject = groupMap(project, s => s.project).sort(byGroup);
     const groups = byProject.map(([name, list]) => group('prj:' + name,
-      `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name), list)}<span class="gsub" data-leaf>loads only inside this project · ${list.length}</span>`,
+      `${groupTitle('prj:' + name, name, null, esc(name), isOpen('prj:' + name), list, `loads only inside this project · ${list.length}`)}${groupSub(`loads only inside this project · ${list.length}`)}`,
       list.map(row).join('')));
     out.push(section('sec:project', 'Project skills', project.length, groups.join(''), byProject.map(([n]) => 'prj:' + n)));
   }
@@ -1944,7 +2024,10 @@ function renderChrome() {
   patch(el('allMark'), allMarkHtml());
   el('viewUnused').classList.toggle('wait', !USE.ready);
   el('viewUnused').hidden = !WRITABLE || USE.status === 'error';
-  for (const n of document.querySelectorAll('[data-n]')) n.textContent = counts[n.dataset.n];
+  for (const n of document.querySelectorAll('[data-n]')) {
+    n.textContent = counts[n.dataset.n];
+    n.parentElement.toggleAttribute('data-zero', !counts[n.dataset.n]);
+  }
   el('viewUpdates').hidden = !WRITABLE;
   overlapChrome();
   el('viewReview').hidden = !counts.review && ui.view !== 'review';
@@ -1963,6 +2046,7 @@ function renderChrome() {
   if (WRITABLE) {
     const failed = Object.keys(upd.errors).length;
     const warn = failed ? `<span class="warn" data-k="w" title="${esc(Object.values(upd.errors).join('\n'))}">${plural(failed, 'source')} unchecked</span>` : '';
+    const action = viewAction();
     const again = `<button class="btn ghost icon" data-k="re" data-recheck aria-label="Check for updates again" title="Check again">${ICON.refresh}</button>`;
     if (upd.job && !upd.job.fade) {
       const items = Object.values(upd.job.items);
@@ -1971,18 +2055,51 @@ function renderChrome() {
       cluster = upd.job.done
         ? `<span data-k="t">${ed} <b>${items.filter(i => i.state === 'done').length}</b> of <b>${items.length}</b></span>`
         : `<span data-k="t">${ing} <b>${finished}</b> of <b>${items.length}</b>…</span>`;
+    } else if (action) {
+      cluster = `${warn}${action}${upd.checking ? checkButton() : again}`;
     } else if (upd.checking) {
       cluster = checkButton();
     } else if (upd.checkedAt) {
-      const chip = fresh && ui.view !== 'new' ? `<button class="chip" data-k="nw" data-view-new>${plural(fresh, 'new skill')}</button>` : '';
-      cluster = chip + (outdated.length
-        ? `<span data-k="t"><b>${outdated.length}</b> ${outdated.length === 1 ? 'update' : 'updates'}</span>${warn}${groupUpdateButton(lv, 'data-update-all', { label: 'Update all', cls: 'btn primary', count: false })}${again}`
-        : `${warn}${checkButton()}`);
+      cluster = outdated.length
+        ? `${warn}${groupUpdateButton(lv, 'data-update-all', { label: 'Update all', cls: 'btn primary', count: false })}${again}`
+        : `${warn}${checkButton()}`;
     }
   }
   patch(el('cluster'), cluster);
   renderBulk();
   renderBar();
+}
+
+// The filter's own action, for the rows it shows. Empty when the filter has none.
+function viewAction() {
+  if (ui.view === 'updates') {
+    return groupUpdateButton(SKILLS.filter(visible), 'data-update-shown', { label: ui.q ? 'Update' : 'Update all', cls: 'btn primary', count: Boolean(ui.q) });
+  }
+  if (ui.view === 'issues' && SKILLS.some(visible)) return `<button class="btn" data-k="va" data-fix-prompt>${ICON.copy}Copy fix prompt</button>`;
+  const n = ui.view === 'new' ? newShown().reduce((sum, [, list]) => sum + list.length, 0) : ui.view === 'unused' ? unusedOn().length : 0;
+  if (!n) return '';
+  return ui.view === 'new'
+    ? `<button class="btn primary" data-k="va" data-install-new>Install <span class="tnum">${n}</span> new</button>`
+    : `<button class="btn" data-k="va" data-off-unused>Turn off <span class="tnum">${n}</span> unused</button>`;
+}
+
+// [repo, installable new skills] for each repo that the New filter shows.
+function newShown() {
+  if (!readsStore()) return [];
+  return Object.keys(upd.available).map(repo => [repo, availShown(repo).filter(a => !a.taken)]).filter(([, list]) => list.length);
+}
+
+function unusedOn() {
+  return SKILLS.filter(s => visible(s) && s.scope === 'personal' && live(s) && state(s).on && (switchable() || ui.root === 'all'));
+}
+
+function copyFixPrompt() {
+  const list = SKILLS.filter(s => visible(s) && s.problems.length);
+  const items = list.map(s => `- ${tilde(s.path)}\n${s.problems.map(p => `  - ${p.level}: ${p.message}${p.hint ? ` ${p.hint}` : ''}`).join('\n')}`);
+  const text = `Fix the problems in these SKILL.md files. Do not change what each skill does.\n\n${items.join('\n')}\n`;
+  return navigator.clipboard.writeText(text).then(
+    () => toast(`Copied a fix prompt for <b>${plural(list.length, 'skill')}</b>. Paste it into an agent session.`),
+    () => toast('Could not copy.'));
 }
 
 // "Up to date" and its refresh arrow as one button: the arrow spins while checking, then turns into a tick.
@@ -3066,34 +3183,52 @@ function bulkPlan() {
   };
 }
 
+let bulkShown = 0;
 function renderBulk() {
   document.body.classList.toggle('marking', ui.marked.size > 0);
-  if (!ui.marked.size) return patch(el('bulk'), '');
+  if (!ui.marked.size) { bulkShown = 0; if (ui.menu === ':bulk') ui.menu = null; return patch(el('bulk'), ''); }
   const b = bulkPlan();
+  const total = b.list.length;
   const hidden = b.list.filter(s => !visible(s)).length;
   const n = x => x.skills.length + x.plugins.length;
-  const btn = (k, label, count, attrs, cls = 'btn ghost') => `<button class="${cls}" data-k="${k}" ${attrs}${count ? '' : ' disabled'}>${label}${count ? ` <span class="tnum">${count}</span>` : ''}</button>`;
+  // A count shows only when the action touches part of the selection.
+  const part = count => (count !== total ? ` <span class="tnum">${count}</span>` : '');
+  const btn = (k, label, count, attrs, cls = 'btn ghost') => (count ? `<button class="${cls}" data-k="${k}" ${attrs}>${label}${part(count)}</button>` : '');
+  const item = (k, label, count, attrs, cls = '') => (count ? `<button role="menuitem" class="${cls}" data-k="${k}" ${attrs}>${label}${part(count)}</button>` : '');
+  const open = ui.menu === ':bulk';
+  const items = [
+    item('cp', 'Copy as prompt', total, 'data-bulk="copy"'),
+    item('pf', 'Save as profile…', profilePicked().count, 'data-bulk="profile"'),
+    item('ln', 'Link to GitHub…', b.link.length, 'data-bulk="link"'),
+    b.del.length ? `<hr>${item('del', 'Delete…', b.del.length, 'data-bulk="delete"', 'danger')}` : '',
+  ].join('');
   const acts = ui.bulkLink
     ? `<form data-k="blf" data-bulk-link><input name="repo" placeholder="owner/repo" aria-label="GitHub repo to link ${plural(b.link.length, 'skill')} to" autocomplete="off" spellcheck="false" required>
         <button class="btn">Link ${b.link.length}</button><button type="button" class="btn ghost" data-bulk-link-cancel>Cancel</button>
         ${ui.bulkErr ? `<span class="err" role="alert">${esc(ui.bulkErr)}</span>` : ''}</form>`
     : [
+      btn('up', 'Update', b.update.length, 'data-bulk="update"', 'btn primary'),
       btn('on', 'Turn on', n(b.on), 'data-bulk="on"'),
       btn('off', 'Turn off', n(b.off), 'data-bulk="off"'),
-      btn('up', 'Update', b.update.length, 'data-bulk="update"', 'btn accent'),
-      btn('ln', 'Link to GitHub…', b.link.length, 'data-bulk="link"'),
-      `<button class="btn ghost" data-k="cp" data-bulk="copy">${ICON.copy}Copy as prompt</button>`,
-      btn('pf', 'Save as profile…', profilePicked().count, 'data-bulk="profile"'),
-      btn('del', 'Delete…', b.del.length, 'data-bulk="delete"', 'btn danger'),
     ].join('');
-  patch(el('bulk'), `${allMarkHtml()}<span class="count" data-k="n">${plural(b.list.length, 'skill')} selected${hidden ? ` <span>${hidden} hidden by filters</span>` : ''}</span>
-    <span class="acts" data-k="a">${acts}</span>
+  const more = ui.bulkLink ? '' : `<span class="menu-wrap" data-k="mw">
+    <button class="btn ghost" data-k="mb" data-menu=":bulk" aria-haspopup="menu" aria-expanded="${open}">More${ICON.chev}</button>
+    ${open ? `<div class="menu" data-k="m" role="menu" aria-label="More bulk actions">${items}</div>` : ''}</span>`;
+  patch(el('bulk'), `<span class="count" data-k="n"><b class="n" data-k="nn">${total}</b><span class="sel" data-k="s"><span data-k="l">selected</span>${hidden ? `<span class="hid" data-k="h">${hidden} hidden by filters</span>` : ''}</span></span>
+    <span class="acts" data-k="a">${acts}</span>${more}
     <span class="end" data-k="e"><button class="btn ghost" data-k="cl" data-bulk="clear">Clear <kbd>esc</kbd></button></span>`);
+  if (bulkShown && total !== bulkShown && !REDUCED.matches) {
+    el('bulk').querySelector('.n').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'cubic-bezier(.23, 1, .32, 1)' });
+  }
+  bulkShown = total;
 }
 
-async function bulkToggle(on) {
+function bulkToggle(on) {
   const plan = bulkPlan()[on ? 'on' : 'off'];
-  const names = plan.skills.map(s => s.name), refs = plan.plugins;
+  return switchMany(plan.skills.map(s => s.name), plan.plugins, on);
+}
+
+async function switchMany(names, refs, on) {
   cascade(rowSwitches(names), on);
   if (names.length) await post('skill', names, on);
   if (refs.length) await post('plugin', refs, on);
@@ -3308,10 +3443,10 @@ async function runJob(kind, start, names, note = '', repo = '') {
   const items = Object.entries(upd.job.items);
   const failed = items.filter(([, i]) => i.state === 'failed');
   const ok = items.length - failed.length;
-  if (kind === 'install' && upd.available[repo]) {
+  if (kind === 'install') {
     // Installed skills leave the Available list now rather than after the next check.
     const done = new Set(items.filter(([, i]) => i.state === 'done').map(([n]) => n));
-    upd.available[repo] = upd.available[repo].filter(a => !done.has(a.name));
+    for (const r of Object.keys(upd.available)) if (!repo || r === repo) upd.available[r] = upd.available[r].filter(a => !done.has(a.name));
   }
   await reloadData();
   for (const n of names) delete hist[n];
@@ -3339,11 +3474,13 @@ async function runJob(kind, start, names, note = '', repo = '') {
   rerender();
 }
 
-function installFrom(repo, list) {
+// One job for every repo in picked, {repo: [available skill]}.
+function installFrom(picked) {
   if (jobRunning()) return toast('Another job is still running.');
-  const ok = list.filter(a => !a.taken);
+  const ok = Object.entries(picked).map(([repo, list]) => [repo, list.filter(a => !a.taken)]).filter(([, list]) => list.length);
   if (!ok.length) return;
-  runJob('install', () => api('/api/install', { repo, paths: ok.map(a => a.path) }), ok.map(a => a.name), '', repo);
+  const sources = Object.fromEntries(ok.map(([repo, list]) => [repo, list.map(a => a.path)]));
+  runJob('install', () => api('/api/install', { sources }), ok.flatMap(([, list]) => list.map(a => a.name)), '', ok.length === 1 ? ok[0][0] : '');
 }
 
 async function dismissNew(repo) {
@@ -3801,7 +3938,7 @@ function closeMenu(focusButton = true) {
   const src = ui.menu;
   ui.menu = null;
   render();
-  if (focusButton) el('list').querySelector(`[data-menu="${CSS.escape(src)}"]`)?.focus();
+  if (focusButton) document.querySelector(`[data-menu="${CSS.escape(src)}"]`)?.focus();
 }
 
 function select(s) {
@@ -3834,7 +3971,10 @@ document.addEventListener('click', async e => {
   const mg = t.closest('[data-mark-group]');
   if (mg) return setMarks(mg.dataset.markGroup.split('\n'), mg.getAttribute('aria-checked') !== 'true');
   const bk = t.closest('[data-bulk]');
-  if (bk) return bulk(bk.dataset.bulk);
+  if (bk) {
+    if (ui.menu === ':bulk') closeMenu();
+    return bulk(bk.dataset.bulk);
+  }
   if (t.closest('[data-bulk-link-cancel]')) { ui.bulkLink = false; ui.bulkErr = null; return renderBulk(); }
   const sw = t.closest('.switch');
   if (sw) {
@@ -3856,20 +3996,23 @@ document.addEventListener('click', async e => {
   const u = t.closest('[data-update]');
   if (u) return updateOne(u.dataset.update, Boolean(u.dataset.confirmed));
   if (t.closest('[data-update-all]')) return updateBatch(SKILLS.filter(live));
+  if (t.closest('[data-update-shown]')) return updateBatch(SKILLS.filter(visible));
   const us = t.closest('[data-update-source]');
   if (us) return updateBatch(SKILLS.filter(s => live(s) && sourceOf(s) === us.dataset.updateSource));
   if (t.closest('[data-recheck]')) return upd.checking ? undefined : checkUpdates(true);
-  if (t.closest('[data-view-new]')) return showView('new');
   const io = t.closest('[data-install-one]');
   if (io) {
     const a = (upd.available[io.dataset.installOne] || []).find(x => x.path === io.dataset.path);
-    return a && installFrom(io.dataset.installOne, [a]);
+    return a && installFrom({ [io.dataset.installOne]: [a] });
   }
   const ia = t.closest('[data-install]');
   if (ia) {
     const all = upd.available[ia.dataset.install] || [];
-    return installFrom(ia.dataset.install, ia.dataset.which === 'new' ? all.filter(a => a.new) : all);
+    return installFrom({ [ia.dataset.install]: ia.dataset.which === 'new' ? all.filter(a => a.new) : all });
   }
+  if (t.closest('[data-install-new]')) return installFrom(Object.fromEntries(newShown()));
+  if (t.closest('[data-fix-prompt]')) return copyFixPrompt();
+  if (t.closest('[data-off-unused]')) return switchMany(unusedOn().map(s => s.name), [], false).catch(err => { rerender(); toast(`Could not save: ${esc(err.message)}`); });
   const dm = t.closest('[data-dismiss]');
   if (dm) return dismissNew(dm.dataset.dismiss);
   if (t.closest('[data-watch-open]')) {
@@ -3887,7 +4030,7 @@ document.addEventListener('click', async e => {
   if (mb) {
     if (ui.menu === mb.dataset.menu) return closeMenu();
     ui.menu = mb.dataset.menu; render();
-    el('list').querySelector('.menu [role="menuitem"]')?.focus();
+    document.querySelector('.menu-wrap .menu [role="menuitem"]')?.focus();
     return;
   }
   const f = t.closest('[data-fold]');
@@ -4050,7 +4193,7 @@ function setGroupSize(size) {
   setSeg('groupSize', 'z', size);
 }
 el('groupSize').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (b) setGroupSize(b.dataset.z);
+  const b = e.target.closest('button'); if (b) { setGroupSize(b.dataset.z); render(); }
 });
 setGroupSize(localStorage.getItem('atlas.groupSize') === 'large' ? 'large' : 'regular');
 
@@ -4306,7 +4449,7 @@ function moveCursor(dir) {
 }
 
 function menuKeys(e) {
-  const items = [...el('list').querySelectorAll('.menu [role="menuitem"]')];
+  const items = [...document.querySelectorAll('.menu-wrap .menu [role="menuitem"]')];
   const i = items.indexOf(document.activeElement);
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
@@ -4504,6 +4647,11 @@ async function openCompare(s, otherPath) {
 }
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--head-h', el('head').offsetHeight + 'px')).observe(el('head'));
+// Center the dock over the list, which narrows when the panel opens. Rects are zoomed; left is not.
+new ResizeObserver(() => {
+  const r = el('list').getBoundingClientRect();
+  el('bulk').style.setProperty('--dock-x', `${(r.left + r.width / 2) / (parseFloat(getComputedStyle(document.documentElement).zoom) || 1)}px`);
+}).observe(el('list'));
 el('band').hidden = WRITABLE;
 if (WRITABLE && DATA.server?.stale) staleBand('changed');
 document.body.classList.toggle('ro', !WRITABLE);
