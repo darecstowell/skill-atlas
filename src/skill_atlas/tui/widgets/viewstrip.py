@@ -1,7 +1,8 @@
-"""The view tabs with their counts, the notes on where switches write, and the search box."""
+"""The view chip with its count and menu, and the search box."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.cells import cell_len
@@ -15,15 +16,17 @@ from textual.widgets import Input, OptionList, Static
 from textual.widgets.option_list import Option
 
 from ...core import views
-from ..messages import DataChanged, StateChanged
+from .. import keys
+from ..messages import DataChanged, JobChanged, StateChanged
 from ..screens import AtlasModal
 from . import app_of
+from .header import Cell
 
 if TYPE_CHECKING:
+    from ..app import AtlasApp
     from .skill_list import SkillList
 
-GAP = 1
-EDGE = 3
+ICON = 3  # the `/` and `✕` cells
 SPACE = 2
 SEARCH, SEARCH_WIDE, WIDE = 28, 34, 160
 COMPACT_BELOW = 100
@@ -31,8 +34,11 @@ CHIP = 16
 QUERY_ROOM = 12
 PLACEHOLDER = "Search skills, sources, paths"
 WAIT = "Reading your agent sessions…"
-NO_COUNT = frozenset({"similar", "diverged"})
-# Counts that move with each toggle, or that arrive late, keep the width of the All count.
+MENU = (" ▾", "$atlas-muted")
+MORE = ("costly", "similar", "diverged")  # views the menu offers only when they have skills
+UPDATE_ALL = "run('jobs:update_all')"
+# Counts that move with each toggle, or that arrive late, keep the width of the All count,
+# so the chip's ▾ holds still.
 BOUND = frozenset({"all", "on", "off", "unused"})
 FIRST = ("all", "on", "off", "updates", "unused")
 
@@ -42,6 +48,21 @@ def digit(view: str) -> str:
     from ..app import DIGIT_VIEWS
 
     return str(DIGIT_VIEWS.index(view) + 1) if view in DIGIT_VIEWS else ""
+
+
+def update_plan(app: AtlasApp) -> tuple[int, int]:
+    """(skills Update all updates, outdated skills it skips for local edits), as jobs.update_all."""
+    ins = app.data.insights
+    if ins is None or not ins.writable:
+        return 0, 0
+    safe, edited = views.update_targets(
+        ins, [s for s in ins.skills if views.live(app.state.harness, s)]
+    )
+    return len(safe), len(edited)
+
+
+def _key(action: str) -> str:
+    return next((k.show for k in keys.KEYS if k.action == action and k.show), "")
 
 
 def _tab(view: str) -> views.Tab:
@@ -57,83 +78,70 @@ def fit_placeholder(cells: int) -> str:
     return text if cell_len(text) <= cells else ""
 
 
-def window(widths: list[int], active: int, room: int) -> tuple[int, int]:
-    """The tabs [i, j) that hold the active one, leftmost first, with room for edge cells."""
-    n = len(widths)
-    for i in range(active + 1):
-        used = EDGE + GAP if i else 0
-        j = i
-        while j < n and used + widths[j] + (EDGE if j + 1 < n else 0) <= room:
-            used += widths[j]
-            j += 1
-        if j > active:
-            return i, j
-    return active, active + 1
+class ViewChip(Static):
+    """The active view and its count. A click, or enter while it has focus, opens the view menu.
 
-
-class ViewTab(Static):
-    """One view: label and count. A click shows the view; the Unused tab waits for usage.
-
-    A tab takes focus only when the strip gives it, so it is never a tab-key stop.
+    It takes focus only when the strip gives it, so it is never a tab-key stop.
     """
 
     ALLOW_SELECT = False
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("left", "step(-1)", "Show the previous view", show=False),
         Binding("right", "step(1)", "Show the next view", show=False),
-        Binding("enter,space,down,escape", "leave", "Go to the list", show=False),
+        Binding("enter,space", "open", "Show every view", show=False),
+        Binding("down,escape", "leave", "Go to the list", show=False),
     ]
     DEFAULT_CSS = """
-    ViewTab {
-        width: auto; height: 1; padding: 0 1; margin-right: 1;
-        color: $atlas-muted; pointer: pointer;
+    ViewChip {
+        width: auto; height: 1; padding: 0 1;
+        background: $atlas-surface-3; color: $atlas-text; pointer: pointer;
     }
-    ViewTab:hover { color: $atlas-text; }
-    ViewTab.-pressed { background: $atlas-surface-2; }
-    ViewTab.-waiting, ViewTab.-waiting:hover { color: $atlas-faint; pointer: default; }
-    ViewTab.-active { background: $atlas-surface-3; color: $atlas-text; }
-    ViewTab:focus { background: $atlas-selection; color: $atlas-text; }
+    ViewChip:hover { background-tint: $atlas-text 8%; }
+    ViewChip.-pressed { background-tint: $atlas-text 16%; }
+    ViewChip:focus { background: $atlas-selection; }
     """
 
-    def __init__(self, view: str) -> None:
-        super().__init__(id=f"tab-{view}")
-        self.view = view
+    def __init__(self) -> None:
+        super().__init__(id="view")
         self.given = False
 
     def allow_focus(self) -> bool:
         return self.given
 
     def on_blur(self, event: events.Blur) -> None:
-        self.given = False
+        if not isinstance(self.app.screen, ViewMenu):
+            self.given = False
 
     def action_step(self, step: int) -> None:
-        next(a for a in self.ancestors if isinstance(a, ViewStrip)).step_view(step)
+        self.strip.step_view(step)
+
+    def action_open(self) -> None:
+        self.strip.open_menu()
 
     def action_leave(self) -> None:
         app_of(self).main.query_one("#list").focus()
 
-    def show(self, tab: views.Tab, digits: int, active: bool, loading: bool) -> int:
-        """Draw the tab; return the cells it takes, with its margin."""
-        self.set_class(active, "-active")
-        self.set_class((tab["waiting"] or loading) and not active, "-waiting")
-        if self.view in NO_COUNT and not loading:
-            body = Content(tab["label"])
-        else:
-            count = tab["count"]
-            shown = "–" if loading or tab["waiting"] or count is None else str(count)
-            tone = "$atlas-muted" if active and shown != "–" else "$atlas-faint"
-            body = Content.assemble(tab["label"], " ", (f"{shown:>{digits}}", tone))
+    @property
+    def strip(self) -> ViewStrip:
+        return next(a for a in self.ancestors if isinstance(a, ViewStrip))
+
+    def show(self, tab: views.Tab, digits: int, loading: bool) -> int:
+        """Draw the chip; return the cells it takes."""
+        count = tab["count"]
+        shown = "–" if loading or tab["waiting"] or count is None else str(count)
+        tone = "$atlas-faint" if shown == "–" else "$atlas-muted"
+        body = Content.assemble(tab["label"], " ", (f"{shown:<{digits}}", tone), MENU)
         self.update(body)
         tip = [tab["title"]] if tab["title"] else []
         if tab["waiting"]:
             tip.append(WAIT)
-        if digit(self.view):
-            tip.append(f"Press {digit(self.view)}")
-        self.tooltip = "\n".join(tip) or None
-        return body.cell_length + 2 + GAP
+        key = _key("view(1)")
+        tip.append(f"Show another view · {key}" if key else "Show another view")
+        self.tooltip = "\n".join(tip)
+        return body.cell_length + 2
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
-        if not self.has_class("-waiting"):
+        if event.button == 1:
             self.add_class("-pressed")
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
@@ -144,44 +152,12 @@ class ViewTab(Static):
 
     def on_click(self, event: events.Click) -> None:
         event.stop()
-        if not self.has_class("-waiting"):
-            app_of(self).set_state(view=self.view)
-
-
-class ViewEdge(Static):
-    """An edge cell: more tabs sit past this edge. A click lists every view."""
-
-    ALLOW_SELECT = False
-    DEFAULT_CSS = """
-    ViewEdge {
-        width: 3; height: 1; content-align: center middle;
-        color: $atlas-faint; pointer: pointer;
-    }
-    ViewEdge#edge-left { margin-right: 1; }
-    ViewEdge:hover { background: $atlas-surface-2; color: $atlas-text; }
-    ViewEdge.-pressed { background: $atlas-surface-3; }
-    """
-
-    def on_mount(self) -> None:
-        self.tooltip = "Show every view"
-
-    def on_mouse_down(self, event: events.MouseDown) -> None:
-        self.add_class("-pressed")
-
-    def on_mouse_up(self, event: events.MouseUp) -> None:
-        self.remove_class("-pressed")
-
-    def on_leave(self, event: events.Leave) -> None:
-        self.remove_class("-pressed")
-
-    def on_click(self, event: events.Click) -> None:
-        event.stop()
-        strip = next(a for a in self.ancestors if isinstance(a, ViewStrip))
-        strip.open_menu(self.region, right=self.id == "edge-right")
+        if event.button == 1:
+            self.strip.open_menu()
 
 
 class ViewMenu(AtlasModal[str]):
-    """Every view the strip shows, with counts and keys. Opens from the edge cells."""
+    """Every view the strip offers, with counts and keys. Opens under the view chip."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding(str(n), f"pick({n})", show=False) for n in range(1, 10)
@@ -196,21 +172,18 @@ class ViewMenu(AtlasModal[str]):
     ViewMenu > OptionList > .option-list--option { padding: 0 1; }
     """
 
-    def __init__(
-        self, tabs: list[views.Tab], active: str, digits: int, at: Region, right: bool
-    ) -> None:
+    def __init__(self, tabs: list[views.Tab], active: str, digits: int, at: Region) -> None:
         super().__init__()
         self.tabs = tabs
         self.active = active
         self.digits = digits
         self.at = at
-        self.right = right
         self.label_w = max(cell_len(t["label"]) for t in tabs)
 
     def compose(self) -> ComposeResult:
         options = []
         for t in self.tabs:
-            shown = "" if t["id"] in NO_COUNT else "–" if t["waiting"] else str(t["count"] or 0)
+            shown = "–" if t["waiting"] else str(t["count"] or 0)
             mine = t["id"] == self.active
             body = Content.assemble(
                 (f"{t['label']:<{self.label_w}}", "$atlas-text" if mine else "$atlas-muted"),
@@ -226,9 +199,7 @@ class ViewMenu(AtlasModal[str]):
         menu = self.query_one(OptionList)
         ids = [t["id"] for t in self.tabs]
         menu.highlighted = ids.index(self.active) if self.active in ids else 0
-        width = self.label_w + self.digits + 9
-        x = self.at.right - width if self.right else self.at.x
-        menu.styles.offset = (max(0, x), self.at.bottom)
+        menu.styles.offset = (max(0, self.at.x), self.at.bottom)
         menu.focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -319,7 +290,10 @@ class SearchBox(Horizontal):
 
 
 class ViewStrip(Horizontal):
-    """The view tabs at the left, then the notes and the search box. focus_search() is the API."""
+    """The view chip, Update all in the Updates view, and the search box.
+
+    focus_search() is the API.
+    """
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "search_escape", "Clear the search or go to the list", show=False),
@@ -327,9 +301,12 @@ class ViewStrip(Horizontal):
     ]
     DEFAULT_CSS = """
     ViewStrip { height: 1; padding: 0 1; background: $background; color: $atlas-muted; }
-    ViewStrip > #tabs { width: 1fr; height: 1; overflow: hidden; }
-    ViewStrip > #meta { width: auto; height: 1; margin-left: 2; color: $atlas-muted; }
-    ViewStrip.-open > #tabs, ViewStrip.-open > #meta { display: none; }
+    ViewStrip > #views { width: 1fr; height: 1; }
+    ViewStrip #update-all { margin-left: 2; background: $atlas-accent; color: $atlas-on-accent; }
+    ViewStrip #update-all:hover { background-tint: $atlas-text 12%; }
+    ViewStrip #update-all.-pressed { background-tint: $atlas-text 22%; }
+    ViewStrip #update-note { width: auto; margin-left: 1; color: $atlas-faint; }
+    ViewStrip.-open > #views { display: none; }
     ViewStrip.-open > SearchBox { width: 1fr; margin-left: 0; }
     """
 
@@ -338,24 +315,28 @@ class ViewStrip(Horizontal):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         self._tabs: list[views.Tab] = []
-        self._cells: dict[str, int] = {}
+        self._chip_w = 0
         self._digits = 2
-        self._meta = Content("")
         self._results: int | None = None
         self._last: views.ViewState | None = None
+        self._job: dict | None = None
+        self._button_w = self._note_w = 0
+        self._overlap: tuple[object, str, dict[str, int]] = (None, "", {})
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="tabs"):
-            yield ViewEdge("‹", id="edge-left")
-            for view, _, _ in views.VIEWS:
-                yield ViewTab(view)
-            yield ViewEdge("›", id="edge-right")
-        yield Static(id="meta")
+        with Horizontal(id="views"):
+            yield ViewChip()
+            yield Cell(run=self._update_all, id="update-all")
+            yield Static(id="update-note", markup=False)
         yield SearchBox()
 
     @property
     def search(self) -> SearchInput:
         return self.query_one(SearchInput)
+
+    @property
+    def chip(self) -> ViewChip:
+        return self.query_one(ViewChip)
 
     # API
 
@@ -375,8 +356,8 @@ class ViewStrip(Horizontal):
     def clear_search(self) -> None:
         self.search.value = ""
 
-    def open_menu(self, at: Region, right: bool) -> None:
-        """Show every view in a menu under `at`; the pick becomes the view."""
+    def open_menu(self) -> None:
+        """Show every view in a menu under the chip; the pick becomes the view."""
         app = app_of(self)
         if not self._tabs:
             return
@@ -385,13 +366,14 @@ class ViewStrip(Horizontal):
             if view:
                 app.set_state(view=view)
 
-        app.push_screen(ViewMenu(self._tabs, app.state.view, self._digits, at, right), picked)
+        at = self.chip.region or self.region
+        app.push_screen(ViewMenu(self._tabs, app.state.view, self._digits, at), picked)
 
-    def focus_tab(self, view: str) -> None:
-        """Give focus to a view's tab, as the web does after a "Show all skills" link."""
-        tab = self.query_one(f"#tab-{view}", ViewTab)
-        tab.given = True
-        tab.focus(scroll_visible=False)
+    def focus_chip(self) -> None:
+        """Give focus to the view chip, as the web does after a "Show all skills" link."""
+        chip = self.chip
+        chip.given = True
+        chip.focus(scroll_visible=False)
 
     def step_view(self, step: int) -> None:
         """Show the previous or next view that can be shown; focus follows it."""
@@ -404,8 +386,11 @@ class ViewStrip(Horizontal):
     # Events
 
     def on_mount(self) -> None:
+        from .. import jobs
+
         self.search.cursor_blink = self.app.animation_level == "full"
         self._last = app_of(self).state.view_state()
+        self._job = jobs.current(app_of(self))
         self._draw()
 
     def on_resize(self, event: events.Resize) -> None:
@@ -414,6 +399,13 @@ class ViewStrip(Horizontal):
     def on_data_changed(self, event: DataChanged) -> None:
         self._draw()
 
+    def on_job_changed(self, event: JobChanged) -> None:
+        changed = (self._job is None) != (event.view is None)
+        self._job = event.view
+        if changed:
+            self._sync_update()
+            self._fit()
+
     def on_state_changed(self, event: StateChanged) -> None:
         fields = event.fields
         app = app_of(self)
@@ -421,8 +413,8 @@ class ViewStrip(Horizontal):
         last, self._last = self._last, state.view_state()
         if fields & {"harness", "view", "show_project", "show_stale"}:
             self._draw()
-        if "view" in fields and (isinstance(app.focused, ViewTab) or self._left_empty_list(last)):
-            self.focus_tab(state.view)
+        if "view" in fields and (app.focused is self.chip or self._left_empty_list(last)):
+            self.focus_chip()
         if "query" in fields:
             if self.search.value.strip() != state.query.strip():
                 self.search.value = state.query
@@ -477,7 +469,7 @@ class ViewStrip(Horizontal):
             return False
         if app.focused is not app.main.query_one("#list"):
             return False
-        return not views.sections(ins, last, app.state.collapsed)
+        return not views.sections(ins, last)
 
     def _tab_list(self) -> tuple[list[views.Tab], bool]:
         app = app_of(self)
@@ -485,73 +477,88 @@ class ViewStrip(Horizontal):
         if ins is None:
             ids = FIRST if st.view in FIRST else (*FIRST, st.view)
             return [_tab(v) for v in ids], True
-        return views.view_tabs(ins, st, app.data.counts(st)), False
+        n = {**app.data.counts(st), **self._overlap_counts(ins, st)}
+        tabs = views.view_tabs(ins, st, n)
+        have = {t["id"] for t in tabs}
+        for v, label, title in views.VIEWS:
+            if v in MORE and v not in have and n[v]:
+                tabs.append(views.Tab(id=v, label=label, title=title, count=n[v], waiting=False))
+        order = [v for v, _, _ in views.VIEWS]
+        return sorted(tabs, key=lambda t: order.index(t["id"])), False
+
+    def _overlap_counts(self, ins: views.Insights, st: views.ViewState) -> dict[str, int]:
+        """Skills the Similar and Diverged views list, as the other counts: once per Insights."""
+        owner, harness, n = self._overlap
+        if owner is not ins or harness != st.harness:
+            lv = views.loaded_skills(ins, st.harness)
+            n = {
+                v: sum(1 for s in lv if views.overlap_view(ins, replace(st, view=v), s))
+                for v in ("similar", "diverged")
+            }
+            self._overlap = (ins, st.harness, n)
+        return n
 
     def _draw(self) -> None:
-        app = app_of(self)
+        view = app_of(self).state.view
         tabs, loading = self._tab_list()
         self._tabs = tabs
         n_all = next((t["count"] for t in tabs if t["id"] == "all"), None)
         bound = len(str(n_all)) if n_all is not None else 3
         self._digits = max([2, bound, *(len(str(t["count"] or 0)) for t in tabs)])
-        shown = {t["id"]: t for t in tabs}
-        self._cells = {}
-        for tab in self.query(ViewTab):
-            t = shown.get(tab.view)
-            tab.display = t is not None
-            if t is None:
-                continue
-            need = len(str(t["count"])) if t["count"] is not None else 1
-            digits = max(need, bound) if tab.view in BOUND else need
-            self._cells[tab.view] = tab.show(t, digits, tab.view == app.state.view, loading)
-        ins = app.data.insights
-        notes = views.header_meta(ins, app.state.view_state().harness) if ins else []
-        parts: list[str | tuple[str, str]] = []
-        for note in notes:
-            parts += [(" · ", "$atlas-faint"), note] if parts else [note]
-        self._meta = Content.assemble(*parts)
-        self.query_one("#meta", Static).update(self._meta)
+        tab = next((t for t in tabs if t["id"] == view), None) or _tab(view)
+        need = len(str(tab["count"])) if tab["count"] is not None else 1
+        digits = max(need, bound) if view in BOUND else need
+        self._chip_w = self.chip.show(tab, digits, loading)
+        self._sync_update()
         self._fit()
 
+    def _sync_update(self) -> None:
+        """Show Update all in the Updates view, and a note when it skips skills you edited."""
+        app = app_of(self)
+        shown = app.state.view == "updates" and self._job is None
+        n, edited = update_plan(app) if shown else (0, 0)
+        button = self.query_one("#update-all", Cell)
+        note = self.query_one("#update-note", Static)
+        button.display = bool(n)
+        label = text = ""
+        if n:
+            label = f"Update {n}" if edited else "Update all"
+            button.update(label)
+            tip = "Update each skill you did not edit" if edited else "Update each skill"
+            key = _key(UPDATE_ALL)
+            button.tooltip = f"{tip} · {key}" if key else tip
+        if edited:
+            text = f"Skips {edited} you edited" if n else "Skills you edited update one at a time"
+            note.update(text)
+            note.tooltip = "An update replaces your edits, so update those skills one at a time."
+        self._button_w = cell_len(label) + 4 if label else 0
+        self._note_w = cell_len(text) + 1 if text else 0
+
     def _fit(self) -> None:
-        """Lay out the row for its width: a window of tabs, the notes if they fit, the search."""
+        """Lay out the row for its width: the chip, then the search box or its `/` cell."""
         width = self.content_size.width
         if not width:
             return
         app = app_of(self)
         box = self.query_one(SearchBox)
         query = self.search.value
-        ids = [t["id"] for t in self._tabs if t["id"] in self._cells]
-        cells = [self._cells[v] for v in ids]
-        natural = sum(cells)
         search_w = SEARCH_WIDE if app.size.width >= WIDE else SEARCH
-        compact = app.size.width < COMPACT_BELOW or natural + SPACE + search_w > width
+        lead = self._chip_w + self._button_w
+        compact = app.size.width < COMPACT_BELOW or lead + self._note_w + SPACE + search_w > width
         is_open = compact and (self.has_class("-open") or self.search.has_focus)
         self.set_class(is_open, "-open")
         box.set_class(compact and not is_open, "-folded")
         box.set_class(bool(query), "-filled")
+        box.styles.width = None if compact else search_w
         if compact and not is_open:
             cut = query if cell_len(query) <= CHIP else query[: CHIP - 1] + "…"
             self.query_one("#search-chip", Static).update(Content(cut))
-            search_w = EDGE + (cell_len(cut) + EDGE if query else 0)
-        else:
-            box.styles.width = None if is_open else search_w
-            room = (width if is_open else search_w) - EDGE - 1
-            self.search.placeholder = fit_placeholder(room)
-        if is_open:
+            folded = ICON + (cell_len(cut) + ICON if query else 0)
+            fits = lead + self._note_w + SPACE + folded <= width
+            self.query_one("#update-note").display = bool(self._note_w) and fits
             return
-        room = width - search_w - SPACE
-        meta = self.query_one("#meta", Static)
-        meta_w = self._meta.cell_length + SPACE
-        meta.display = bool(self._meta) and natural + meta_w <= room
-        if meta.display:
-            room -= meta_w
-        active = ids.index(app.state.view) if app.state.view in ids else 0
-        i, j = (0, len(ids)) if natural <= room else window(cells, active, room)
-        for k, view in enumerate(ids):
-            self.query_one(f"#tab-{view}").display = i <= k < j
-        self.query_one("#edge-left").display = i > 0
-        self.query_one("#edge-right").display = j < len(ids)
+        self.query_one("#update-note").display = bool(self._note_w)
+        self.search.placeholder = fit_placeholder((width if is_open else search_w) - ICON - 1)
 
     # Search results
 
@@ -568,7 +575,7 @@ class ViewStrip(Horizontal):
             out.update("")
             return
         words = views.plural(n, "result")
-        room = self.query_one(SearchBox).size.width - 2 * EDGE - 1 - len(words)
+        room = self.query_one(SearchBox).size.width - 2 * ICON - 1 - len(words)
         out.update(words if room >= QUERY_ROOM else str(n))
         out.tooltip = words
 
@@ -578,7 +585,7 @@ class ViewStrip(Horizontal):
         ins = app.data.insights
         if ins is None:
             return None
-        for sec in views.sections(ins, app.state.view_state(), app.state.collapsed):
+        for sec in views.sections(ins, app.state.view_state(), app.state.folds()):
             if not sec["open"]:
                 continue
             for g in sec["groups"]:
@@ -589,3 +596,11 @@ class ViewStrip(Horizontal):
             if sec["rows"]:
                 return sec["rows"][0]["path"], None
         return None
+
+    async def _update_all(self) -> None:
+        await app_of(self).action_run("jobs:update_all")
+
+
+def open_view_menu(app: AtlasApp) -> None:
+    """Show every view in a menu under the view chip. Picking one shows it."""
+    app.main.query_one(ViewStrip).open_menu()

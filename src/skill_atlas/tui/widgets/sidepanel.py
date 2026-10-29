@@ -1,7 +1,7 @@
 """The panel that shows in the detail area when no skill is selected.
 
-The inventory stats, then foldable sections. Every control works with the mouse alone, and with
-tab, up and down, and enter or space.
+Two lines of counts, the items that need you, then the other sections behind one row. Every
+control works with the mouse alone, and with tab, up and down, and enter or space.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import importlib
 import inspect
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from rich.cells import cell_len
@@ -20,7 +21,7 @@ from textual import events, work
 from textual.actions import SkipAction
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.geometry import Size
 from textual.screen import Screen
 from textual.widget import Widget
@@ -38,10 +39,12 @@ Cue = tuple[str, str] | None
 
 SHORT = 30
 OPEN = ":open"
+ATTN = "inv.attn"
+MORE = "inv.more"
 DISPLAY = "inv.disp"
-DEFAULT_OPEN = frozenset({"inv.attn", "inv.use"})
+DEFAULT_OPEN = frozenset({ATTN})
 PANES = (
-    ("inv.attn", "Needs attention"),
+    (ATTN, "Needs attention"),
     ("inv.use", "Usage"),
     ("inv.cost", "Context cost"),
     ("inv.ovl", "Overlap"),
@@ -50,6 +53,10 @@ PANES = (
     ("inv.set", "Skill set"),
     (DISPLAY, "Display"),
 )
+# The sections that hide while the skill folders are read-only.
+WRITE_ONLY = frozenset({"inv.use", "inv.prof", "inv.set"})
+# Shorter names for the More row, so the default panel width shows every section.
+MORE_NAMES = {"inv.cost": "cost"}
 LABEL_W = 12
 TONES = ("text", "muted", "faint", "accent", "on", "warn", "danger", "strong", "bar", "active")
 # Tokens that the chart renderers read, and the tone that holds each one.
@@ -65,15 +72,32 @@ CHART_TONES = {
 }
 NBSP, GLUE = "\u00a0", "\ue000"
 GLYPHS = {"danger": "✗", "warn": "!", "ok": "✓"}
+COUNTS = (
+    ("on", "on", "on", "on"),
+    ("off", "off", "off", "text"),
+    ("updates", "update", "updates", "accent"),
+)
+COUNT_TIPS = {
+    "on": "Show the skills that are on",
+    "off": "Show the skills that are off",
+    "updates": "Show the skills that have updates",
+}
+FACTS = (
+    ("untracked", "untracked", "untracked"),
+    ("duplicates", "duplicate", "duplicates"),
+    ("edited", "edited", "edited"),
+)
 MODE_LABELS = {"system": "System", "light": "Light", "dark": "Dark"}
 SORT_LABELS = {"name": "Name", "uses": "Most used", "recent": "Recent", "cost": "Cost"}
 GROUP_LABELS = {"source": "Source", "type": "Scope"}
 CHECKS = (
+    ("row_detail", "Show descriptions in the list"),
     ("compact", "Compact rows"),
     ("show_project", "Show project skills"),
     ("show_stale", "Show old plugin versions"),
     ("key_hints", "Show keyboard hints"),
 )
+CHECK_TIPS = {"row_detail": "Rows also show the sparkline and every tag."}
 SIZE_LABELS = {"regular": "Regular", "large": "Large"}
 MOTION_LABELS = {"full": "Full", "reduced": "Reduced", "off": "Off"}
 DISPLAY_FIELDS = frozenset(
@@ -106,6 +130,17 @@ def section_open(folded: frozenset[str], key: str, default: bool) -> bool:
 def with_section(folded: frozenset[str], key: str, open: bool) -> frozenset[str]:
     """`folded` with the user's choice for one section: `key` folded, `key:open` open."""
     return (folded - {key, key + OPEN}) | {key + OPEN if open else key}
+
+
+def facts(inv: dict[str, int]) -> list[str]:
+    """The faint second line: untracked, duplicate, and edited counts that are not zero."""
+    return [f"{n:,} {one if n == 1 else many}" for key, one, many in FACTS if (n := inv.get(key))]
+
+
+def more_names(writable: bool) -> list[str]:
+    """The sections behind More, as the More row names them."""
+    names = [MORE_NAMES.get(k, t) for k, t in PANES[1:] if writable or k not in WRITE_ONLY]
+    return [n[:1].upper() + n[1:] if i == 0 else n.lower() for i, n in enumerate(names)]
 
 
 def _cut(text: Text, width: int) -> Text:
@@ -366,31 +401,160 @@ class Tile(Act):
         return self.paint(self.segs)
 
 
-class Stat(Toned):
-    """One inventory number above its label, or a faint dash until the number is known."""
+class Entry(Act):
+    """An action on one line: the glyph, the text cut to fit, and `right` at the right edge."""
 
-    DEFAULT_CSS = """
-    Stat { height: 2; width: 1fr; }
-    """
+    def lines(self, width: int) -> list[Text]:
+        row = self.bar()
+        if self.glyph:
+            row.append(self.glyph[0] + " ", self.tone(self.glyph[1]))
+        right = self.paint(self.right)
+        room = max(1, width - 2 - row.cell_len - right.cell_len)
+        text = _cut(self.paint(self.segs), room - (2 if right else 0))
+        row.append_text(text).append(" " * max(0, room - text.cell_len)).append_text(right)
+        return [row.append(" " * max(0, width - row.cell_len))]
 
-    def __init__(self, label: str, tint: str = "", *, id: str | None = None) -> None:
+
+class Brief(Line):
+    """Faint phrases on one line. Phrases that do not fit become `…`; the tooltip has them all."""
+
+    def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
-        self.label = label
-        self.tint = tint
-        self.value: int | None = None
+        self.parts: list[str] = []
 
-    def show(self, value: int | None) -> None:
-        if value != self.value:
-            self.value = value
+    def show(self, parts: list[str]) -> None:
+        self.display = bool(parts)
+        if parts != self.parts:
+            self.parts = parts
+            self._tip(self.size.width)
             self.refresh()
 
-    def render(self) -> Text:
-        if self.value is None:
-            number = Text("–", self.tone("faint"), end="")
-        else:
-            tint = self.tint if self.value and self.tint else "text"
-            number = Text(f"{self.value:,}", self.tone(tint), end="")
-        return number.append("\n").append(self.label, self.tone("muted"))
+    def fit(self, width: int) -> str:
+        room = width - 4
+        for n in range(len(self.parts), 0, -1):
+            text = ", ".join(self.parts[:n]) + ("" if n == len(self.parts) else ", …")
+            if cell_len(text) <= room:
+                return text
+        return _cut(Text(", ".join(self.parts)), max(1, room)).plain
+
+    def lines(self, width: int) -> list[Text]:
+        row = self.bar().append(self.fit(width), self.tone("faint"))
+        return [row.append(" " * max(0, width - row.cell_len))]
+
+    def _tip(self, width: int) -> None:
+        full = ", ".join(self.parts)
+        self.tooltip = full if width and self.fit(width) != full else None
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._tip(event.size.width)
+
+
+class Counts(Line):
+    """On, off, and updates. A count that is not zero is a link to its view."""
+
+    DEFAULT_CSS = """
+    Counts.-link { pointer: pointer; }
+    """
+
+    def __init__(self, *, id: str | None = None) -> None:
+        super().__init__(id=id)
+        self.parts: list[tuple[str, str, str, str]] = []
+        self._hits: list[tuple[int, int, int, str]] = []
+        self._hover: str | None = None
+
+    def show(self, parts: list[tuple[str, str, str, str]]) -> None:
+        """Each part is (view or "", number, tint, word)."""
+        if parts != self.parts:
+            self.parts = parts
+            self.refresh(layout=True)
+
+    def lines(self, width: int) -> list[Text]:
+        rows, self._hits = [self.bar()], []
+        for view, number, tint, word in self.parts:
+            hot = bool(view) and view == self._hover
+            text = Text(number, self.tone(tint), end="")
+            text.append(" " + word, self.tone("accent" if hot else "muted"))
+            row = rows[-1]
+            if row.cell_len > 2 and row.cell_len + 3 + text.cell_len > width - 2:
+                row = self.bar()
+                rows.append(row)
+            elif row.cell_len > 2:
+                row.append("   ")
+            if view:
+                self._hits.append((len(rows) - 1, row.cell_len, row.cell_len + text.cell_len, view))
+            row.append_text(text)
+        return [r.append(" " * max(0, width - r.cell_len)) for r in rows]
+
+    def _hit(self, event: events.MouseEvent) -> str | None:
+        offset = event.get_content_offset(self)
+        if offset is None:
+            return None
+        return next(
+            (v for y, x0, x1, v in self._hits if offset.y == y and x0 <= offset.x < x1), None
+        )
+
+    def _set_hover(self, view: str | None) -> None:
+        if view != self._hover:
+            self._hover = view
+            self.tooltip = COUNT_TIPS.get(view or "")
+            self.set_class(view is not None, "-link")
+            self.refresh()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        self._set_hover(self._hit(event))
+
+    def on_leave(self, event: events.Leave) -> None:
+        self._set_hover(None)
+
+    def on_click(self, event: events.Click) -> None:
+        if (view := self._hit(event)) is not None:
+            event.stop()
+            app_of(self).set_state(view=view)
+
+
+class More(Act):
+    """Shows or hides the other sections. Folded, it names them in two lines at most."""
+
+    def __init__(self, **kw: Any) -> None:
+        super().__init__(**kw)
+        self.open = False
+        self.names: list[str] = []
+
+    def show(self, open: bool, names: list[str]) -> None:
+        if (open, names) != (self.open, self.names):
+            self.open, self.names = open, names
+            self._tip(self.size.width)
+            self.refresh(layout=True)
+
+    def fit(self, width: int) -> list[str]:
+        """The names on two lines at most. Names that do not fit become `…`."""
+        room = max(1, width - 7)
+        glued = [n.replace(" ", GLUE) for n in self.names]
+        for n in range(len(glued), 0, -1):
+            text = ", ".join(glued[:n]) + ("" if n == len(glued) else ", …")
+            rows = [r.plain.replace(GLUE, " ") for r in Text(text).wrap(self.app.console, room)]
+            if len(rows) <= 2:
+                return rows
+        return [_cut(Text(", ".join(self.names)), room).plain]
+
+    def lines(self, width: int) -> list[Text]:
+        if self.open:
+            row = self.bar().append("Show less", self.tone("muted"))
+            return [row.append(" " * max(0, width - row.cell_len))]
+        out = []
+        for i, line in enumerate(self.fit(width) or ["More"]):
+            row = self.bar().append(line, self.tone("faint"))
+            if i == 0:
+                row.append(" " * max(1, width - 3 - row.cell_len)).append("›", self.tone("faint"))
+            out.append(row.append(" " * max(0, width - row.cell_len)))
+        return out
+
+    def _tip(self, width: int) -> None:
+        cut = not self.open and width and any("…" in line for line in self.fit(width))
+        self.tooltip = ", ".join(self.names) if cut else None
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._tip(event.size.width)
 
 
 class PaneHead(Act):
@@ -514,8 +678,10 @@ class Swatches(Choice):
 class Check(Act):
     """A setting that is on or off: its label at the left, its switch at the right."""
 
-    def __init__(self, label: str, setting: str, *, id: str | None = None) -> None:
-        super().__init__((), id=id)
+    def __init__(
+        self, label: str, setting: str, *, tip: str | None = None, id: str | None = None
+    ) -> None:
+        super().__init__((), tip=tip, id=id)
         self.label = label
         self.setting = setting
 
@@ -766,7 +932,7 @@ class Pane(Vertical):
 
 
 class SidePanel(VerticalScroll, can_focus=False):
-    """The inventory: stats, things that need you, usage, cost, profiles, skill set, display."""
+    """The inventory: counts, things that need you, and a row that shows the other sections."""
 
     # Unscoped, so `.-narrow SidePanel` can match the app's class. Each rule names SidePanel.
     SCOPED_CSS = False
@@ -786,14 +952,10 @@ class SidePanel(VerticalScroll, can_focus=False):
         scrollbar-corner-color: $atlas-surface-1;
     }
     SidePanel > #side-title { margin-bottom: 1; }
-    SidePanel > #side-stats {
-        grid-size: 3;
-        grid-gutter: 1 2;
-        grid-rows: 2;
-        height: auto;
-        padding: 0 2;
-        margin-bottom: 1;
-    }
+    SidePanel > #side-stats { height: auto; margin-bottom: 1; }
+    SidePanel > #side-more { margin: 1 0; }
+    SidePanel.-less > #side-more { margin: 1 0 0 0; }
+    SidePanel.-less > .side-rest { display: none; }
     SidePanel .side-chips { height: 1; padding: 0 2; margin-top: 1; }
     SidePanel .side-tiles { height: 2; padding: 0 1; }
     SidePanel .side-heat { margin: 0 2; }
@@ -825,19 +987,18 @@ class SidePanel(VerticalScroll, can_focus=False):
 
     def compose(self) -> ComposeResult:
         yield Line(id="side-title")
-        with Grid(id="side-stats"):
-            yield Stat("on", "on", id="side-stat-on")
-            yield Stat("off", id="side-stat-off")
-            yield Stat("updates", "accent", id="side-stat-updates")
-            yield Stat("untracked", id="side-stat-untracked")
-            yield Stat("duplicates", id="side-stat-duplicates")
-            yield Stat("edited", "warn", id="side-stat-edited")
-        for key, title in PANES:
-            yield Pane(key, title)
+        with Vertical(id="side-stats"):
+            yield Counts(id="side-counts")
+            yield Brief(id="side-facts")
+        yield Pane(*PANES[0])
+        yield More(do=self._toggle_more, id="side-more")
+        for key, title in PANES[1:]:
+            yield Pane(key, title).add_class("side-rest")
         yield Act(
             [("?", "accent"), ("  All keyboard shortcuts", "text")],
             do=lambda: self.app.run_action("help"),
             id="side-keys",
+            classes="side-rest",
         )
 
     async def on_mount(self) -> None:
@@ -917,26 +1078,42 @@ class SidePanel(VerticalScroll, can_focus=False):
             app = app_of(self)
             ins = app.data.insights
             st = app.state.view_state()
+            more = section_open(app.state.folded, MORE, False)
             if only is None:
                 self._draw_top(ins, st)
+                self._draw_more(more, ins)
             tall = app.size.height >= SHORT
             for pane in self.query(Pane):
-                if only in (None, pane.key):
+                if only in (None, pane.key) and (more or pane.key == ATTN):
                     body = self._body(pane.key, ins, st)
                     default = tall and pane.key in DEFAULT_OPEN
                     await pane.fill(body, section_open(app.state.folded, pane.key, default))
+            # After the fill, so the sections show with their bodies in place.
+            self.set_class(not more, "-less")
 
     def _draw_top(self, ins: views.Insights | None, st: views.ViewState) -> None:
         app = app_of(self)
-        where = "All harnesses"
-        if st.harness != "all":
-            where = app.data.harnesses.get(st.harness, {}).get("label", st.harness)
-        self.query_one("#side-title", Line).set([("Inventory", "strong")], [(where, "muted")])
+        self.query_one("#side-title", Line).set([("Inventory", "strong")])
         inv = views.inventory(ins, st.harness) if ins else {}
         known = app.data.updates is not None and ins is not None and ins.writable
-        for name in ("on", "off", "updates", "untracked", "duplicates", "edited"):
-            value = inv.get(name) if name != "updates" or known else None
-            self.query_one(f"#side-stat-{name}", Stat).show(value)
+        parts = []
+        for key, one, many, tint in COUNTS:
+            value = inv.get(key) if key != "updates" or known else None
+            if value is None:
+                parts.append(("", "–", "faint", many))
+            else:
+                word = one if value == 1 else many
+                parts.append((key if value else "", f"{value:,}", tint if value else "text", word))
+        self.query_one("#side-counts", Counts).show(parts)
+        self.query_one("#side-facts", Brief).show(facts(inv))
+
+    def _draw_more(self, more: bool, ins: views.Insights | None) -> None:
+        self.query_one("#side-more", More).show(more, more_names(ins is None or ins.writable))
+
+    def _toggle_more(self) -> None:
+        app = app_of(self)
+        more = section_open(app.state.folded, MORE, False)
+        app.set_state(folded=with_section(app.state.folded, MORE, not more))
 
     def _body(self, key: str, ins: views.Insights | None, st: views.ViewState) -> Body:
         if ins is None:
@@ -944,7 +1121,7 @@ class SidePanel(VerticalScroll, can_focus=False):
             text = "Could not scan the skills." if failed else "Reading your skills…"
             return Body(("wait", text), lambda: [Line([(text, "muted")])], summary="–")
         make = {
-            "inv.attn": self._attention,
+            ATTN: self._attention,
             "inv.use": self._usage,
             "inv.cost": self._cost,
             "inv.ovl": self._overlap,
@@ -969,7 +1146,7 @@ class SidePanel(VerticalScroll, can_focus=False):
                 return [Line([(ALL_CLEAR, "text")], glyph=("✓", "on"), id="side-a-ok")]
             out: list[Widget] = []
             for item in items:
-                out.append(self._attn_row(item, ins.missing))
+                out.append(self._attn_row(item))
                 if item["key"] == "a-store" and self._health_open:
                     out.extend(self._health_rows(problems, home))
             return out
@@ -977,19 +1154,18 @@ class SidePanel(VerticalScroll, can_focus=False):
         flag = (cue["tone"], cue["text"]) if cue else None
         return Body(spec, build, summary="Nothing to do", cue=flag)
 
-    def _attn_row(self, item: views.Item, missing: int) -> Act:
+    def _attn_row(self, item: views.Item) -> Entry:
         action = item["action"]
-        press: Callable[[], object]
+        press: Callable[[], object] = partial(self._show_view, action)
         if action == "restore":
-            link, press = f"Restore {'it' if missing == 1 else 'them'}", self._restore
-        elif action:
-            link, press = "Show them", lambda: self._show_view(action)
-        else:
-            link = "Hide details" if self._health_open else "Show details"
+            press = self._restore
+        elif not action:
             press = self._toggle_health
-        return Act(
-            [(item["detail"], "text"), (" " + link.replace(" ", NBSP), "link")],
+        return Entry(
+            [(item["text"], "text")],
             glyph=(GLYPHS[item["tone"]], item["tone"]),
+            right=[("›", "faint")],
+            tip=item["detail"],
             do=press,
             id=f"side-{item['key']}",
         )
@@ -1008,7 +1184,7 @@ class SidePanel(VerticalScroll, can_focus=False):
 
     async def _toggle_health(self) -> None:
         self._health_open = not self._health_open
-        await self.draw(only="inv.attn")
+        await self.draw(only=ATTN)
 
     # Usage
 
@@ -1345,7 +1521,8 @@ class SidePanel(VerticalScroll, can_focus=False):
             motions = [(m, MOTION_LABELS[m]) for m in state.MOTIONS]
             rows.append(Choice("Motion", "motion", motions, id="side-disp-motion"))
             for i, (setting, label) in enumerate(CHECKS):
-                check = Check(label, setting, id="side-disp-" + setting.replace("_", "-"))
+                tip = CHECK_TIPS.get(setting)
+                check = Check(label, setting, tip=tip, id="side-disp-" + setting.replace("_", "-"))
                 rows.append(check.add_class("side-gap") if i == 0 else check)
             return [*rows, PanelCheck(id="side-disp-panel")]
 
@@ -1397,9 +1574,10 @@ class SidePanel(VerticalScroll, can_focus=False):
         target.scroll_visible(animate=False)
 
     async def reveal(self, key: str) -> None:
-        """Open a section, focus its head, and scroll it to the top."""
+        """Open a section and the rows it sits behind, focus its head, and scroll it to the top."""
         app = app_of(self)
-        app.set_state(folded=with_section(app.state.folded, key, True))
+        folded = with_section(app.state.folded, key, True)
+        app.set_state(folded=with_section(folded, MORE, True) if key != ATTN else folded)
         await self.draw()
         pane = self.query_one("#side-" + key.replace(".", "-"), Pane)
 

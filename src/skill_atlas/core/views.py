@@ -63,7 +63,8 @@ class ViewState:
 
     @property
     def q(self) -> str:
-        return self.query.strip()
+        """The search text. Rows show `/name`, so a leading `/` is not part of it."""
+        return self.query.strip().lstrip("/").strip()
 
 
 @dataclass
@@ -589,6 +590,12 @@ def is_outdated(ins: Insights, s: dict) -> bool:
     return update_status(ins, s) == "outdated"
 
 
+def update_targets(ins: Insights, skills: list[dict]) -> tuple[list[dict], list[dict]]:
+    """The outdated skills that Update all updates, and the ones it skips for local edits."""
+    out = [s for s in skills if is_outdated(ins, s)]
+    return [s for s in out if not s.get("local_edits")], [s for s in out if s.get("local_edits")]
+
+
 def new_in(ins: Insights, repo: str) -> list[dict]:
     return [a for a in _available(ins).get(repo) or [] if a.get("new")]
 
@@ -1031,9 +1038,9 @@ def _source_group(
             tally += f" · {len(shown)} shown"
     else:
         tally = "watching"
-    meta = ("no source · " if local and source != NO_SOURCE else "") + tally
+    meta = ("local · " if local and source != NO_SOURCE else "") + tally
     if avail:
-        meta += f" · {len(avail)} available"
+        meta += f" · {len(avail)} not installed"
     block = not local and reads_store(ins, st.harness)
     offer = avail_shown(ins, st, source) if block and avail else []
     installable = [a for a in avail if not a.get("taken")]
@@ -1191,7 +1198,7 @@ def sections(ins: Insights, st: ViewState, collapsed: Collection[str] = ()) -> l
         groups = [_plugin_group(ins, st, ref, lst, collapsed) for ref, lst in refs]
         ids = [f"plg:{r}" for r, _ in refs]
         out.append(
-            _section("sec:plugins", "Plugins", str(len(refs)), st, collapsed, groups, [], ids)
+            _section("sec:plugins", "Plugins", str(len(plugins)), st, collapsed, groups, [], ids)
         )
 
     project = [s for s in shown if s.get("scope") == "project"]
@@ -1425,6 +1432,7 @@ def attention(ins: Insights, st: ViewState) -> list[Item]:
     if costly:
         text = plural(costly, "costly skill")
         detail = f"{text} not used in {UNUSED_DAYS} days."
+        text += " not used"
         items.append(Item(key="a-cost", tone="warn", text=text, detail=detail, action="costly"))
     return sorted(items, key=lambda i: i["tone"] != "danger")
 

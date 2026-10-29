@@ -1,4 +1,4 @@
-"""The top row: the brand, one tab per harness, and the update status."""
+"""The top row: the brand, the harness chip, and the update status."""
 
 from __future__ import annotations
 
@@ -30,29 +30,22 @@ from .charts import SPINNER
 if TYPE_CHECKING:
     from ..app import AtlasApp
 
-NARROW, WIDE = 100, 160
+NARROW = 100
 GAP = 2
-SLOT = (44, 60)  # cells kept for the update cluster, below and from WIDE columns
-TAB_GUESS = 24  # the widest tab before the scan names the harnesses
+CHIP_MIN = 12  # cells the harness chip keeps; the cluster gets the rest
+MENU_W = 72
 LOGO, BRAND = " ╱ ", " Skill Atlas"
 ALL = "All harnesses"
+MENU = (" ▾", "$atlas-muted")
 SPIN = 0.08
 SHOW_AFTER, SHOW_FOR, JUST_CHECKED = 0.3, 0.5, 1.4
 # How the cluster gets shorter: (piece, form). Each step picks a shorter form or drops the piece.
-STEPS = (
-    ("new", 1),
-    ("warn", 1),
-    ("new", 2),
-    ("check", 1),
-    ("warn", 2),
-    ("count", 1),
-    ("warn", 3),
-    ("count", 2),
-)
-PIECES = ("new", "count", "warn", "all", "check", "job")
+STEPS = (("check", 1), ("warn", 1), ("updates", 1))
+PIECES = ("check", "warn", "updates", "job")
 TEXT, ACCENT = "$atlas-text", "$atlas-accent"
 TICK = ("✓ ", "$atlas-on")
 DIGITS = re.compile(r"\d+")
+CHECK_AGAIN = "run('jobs:check_again')"
 
 Forms = list[Content | None]
 
@@ -78,10 +71,10 @@ def _digits(text: str) -> Content:
     return out
 
 
-def _hint(tip: str, job: str) -> str:
-    """The tooltip plus the key that does the same, from keys.KEYS: `Check again (ctrl+r)`."""
-    key = next((k.show for k in keys.KEYS if k.action == f"run('jobs:{job}')"), "")
-    return f"{tip} ({key})" if key else tip
+def _hint(tip: str, action: str) -> str:
+    """The tooltip plus the key that does the same, from keys.KEYS: `Check again · ctrl+r`."""
+    key = next((k.show for k in keys.KEYS if k.action == action and k.show), "")
+    return f"{tip} · {key}" if key else tip
 
 
 def _cells(c: Content | None) -> int:
@@ -89,9 +82,9 @@ def _cells(c: Content | None) -> int:
 
 
 def _width(pieces: dict[str, Forms], pick: dict[str, int]) -> int:
-    """Cells the cluster takes with these forms, with one cell between pieces."""
+    """Cells the cluster takes with these forms, with one cell before each piece."""
     cells = [_cells(pieces[p][pick[p]]) for p in pieces if pieces[p][pick[p]] is not None]
-    return sum(cells) + max(0, len(cells) - 1)
+    return sum(cells) + len(cells)
 
 
 class Cell(Static):
@@ -141,36 +134,22 @@ class Brand(Static):
     ALLOW_SELECT = False
 
 
-class HarnessTab(Cell):
-    """One harness. A click switches to it."""
-
-    def __init__(self, harness: str) -> None:
-        super().__init__(run=lambda: app_of(self).set_state(harness=harness), classes="tab")
-        self.harness = harness
-
-
 class AtlasHeader(Vertical):
-    """The brand, the harness tabs, and the update cluster in one row; a band when stale."""
+    """The brand, the harness chip, and the update cluster in one row; a band when stale."""
 
     DEFAULT_CSS = """
     AtlasHeader { height: auto; }
     AtlasHeader > #bar { height: 1; padding: 0 1; background: $atlas-surface-1; }
     AtlasHeader #brand { width: auto; margin-right: 2; }
-    AtlasHeader #tabs { width: 1fr; height: 1; }
+    AtlasHeader #left { width: 1fr; height: 1; }
     AtlasHeader #skeleton { width: 22; height: 1; background: $atlas-surface-2; }
-    AtlasHeader .tab:hover { color: $atlas-text; }
-    AtlasHeader .tab.-active, AtlasHeader .tab.-active:hover, AtlasHeader .tab.-active.-pressed {
-        background: $atlas-surface-3; color: $atlas-text;
-    }
-    AtlasHeader #cluster { width: 44; height: 1; margin-left: 2; align-horizontal: right; }
+    AtlasHeader #harness { background: $atlas-surface-3; color: $atlas-text; }
+    AtlasHeader #harness:hover { background-tint: $atlas-text 8%; }
+    AtlasHeader #harness.-pressed { background-tint: $atlas-text 16%; }
+    AtlasHeader #harness.-idle { background: transparent; background-tint: $foreground 0%; }
+    AtlasHeader #cluster { height: 1; margin-left: 1; align-horizontal: right; }
     AtlasHeader #cluster > Cell { margin-left: 1; }
-    AtlasHeader #new { background: $atlas-accent-tint; color: $atlas-accent; }
-    AtlasHeader #new:hover { background-tint: $atlas-text 8%; }
-    AtlasHeader #new.-pressed { background-tint: $atlas-text 16%; }
     AtlasHeader #warn { color: $atlas-warn; }
-    AtlasHeader #all { background: $atlas-accent; color: $atlas-on-accent; }
-    AtlasHeader #all:hover { background-tint: $atlas-text 12%; }
-    AtlasHeader #all.-pressed { background-tint: $atlas-text 22%; }
     AtlasHeader > #stale {
         display: none; height: 1; padding: 0 1; text-align: center;
         background: $atlas-warn-tint; color: $atlas-warn;
@@ -181,8 +160,6 @@ class AtlasHeader(Vertical):
         self, *, name: str | None = None, id: str | None = None, classes: str | None = None
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._tabs: list[HarnessTab] = []
-        self._choices: tuple[tuple[str, str], ...] = ()
         self._job: dict | None = None
         self._frame = 0
         self._spinner: Timer | None = None
@@ -198,22 +175,19 @@ class AtlasHeader(Vertical):
     def compose(self) -> ComposeResult:
         with Horizontal(id="bar"):
             yield Brand(id="brand", markup=False)
-            with Horizontal(id="tabs"):
+            with Horizontal(id="left"):
                 yield Static(id="skeleton")
-                yield Cell(run=self._open_menu, id="more")
+                yield Cell(run=self._open_menu, id="harness")
             with Horizontal(id="cluster"):
-                yield Cell(run=lambda: app_of(self).set_state(view="new"), id="new")
-                yield Cell(run=lambda: app_of(self).set_state(view="updates"), id="count")
-                yield Cell(run=self._show_errors, id="warn")
-                yield Cell(Content("Update all"), run=self._update_all, id="all")
                 yield Cell(run=self._check_again, id="check")
+                yield Cell(run=self._show_errors, id="warn")
+                yield Cell(run=lambda: app_of(self).set_state(view="updates"), id="updates")
                 yield Cell(id="job", classes="-idle")
         yield Static(id="stale", markup=False)
 
     def on_mount(self) -> None:
         from .. import jobs
 
-        self.piece("all").tooltip = _hint("Update each skill that has an update", "update_all")
         self._spinner = self.set_interval(SPIN, self._spin, pause=True)
         self._job = jobs.current(app_of(self))
         self.draw()
@@ -232,7 +206,7 @@ class AtlasHeader(Vertical):
         self.draw()
 
     def on_state_changed(self, event: StateChanged) -> None:
-        if event.fields & {"harness", "view"}:
+        if event.fields & {"harness", "view", "marked"}:
             self.draw()
 
     def on_job_changed(self, event: JobChanged) -> None:
@@ -248,37 +222,30 @@ class AtlasHeader(Vertical):
         return "updates" in app_of(self).data.loading or self._checking
 
     def menu_anchor(self) -> Widget:
-        """Where the harness menu opens: under the `+N` cell, else under the active tab."""
-        more = self.piece("more")
-        if more.display:
-            return more
-        return next((t for t in self._tabs if t.has_class("-active")), more)
+        """Where the harness menu opens: under the harness chip."""
+        return self.piece("harness")
 
     # Drawing
 
     def draw(self) -> None:
         app = app_of(self)
         cols = app.size.width
-        inner = max(0, cols - 2)
-        self._sync_tabs()
         brand = Content.styled(LOGO, f"$atlas-on-accent on {ACCENT}")
         if cols >= NARROW:
             brand += Content.styled(BRAND, f"bold {TEXT}")
         self.query_one("#brand", Static).update(brand)
-        widest = max((cell_len(label) + 2 for _, label in self._choices), default=TAB_GUESS)
-        n = len(self._choices)
-        more_w = _cells(self._more_text(n, n, cols)) if n > 1 else 0
-        fixed = brand.cell_length + GAP + GAP
+        room = max(0, cols - 2 - brand.cell_length - GAP - 1)
+        name, tail = self._sync_chip()
+        chip_w = 0 if name is None else cell_len(name) + tail.cell_length + 2
         pieces = self._cluster()
-        natural = _width(pieces, dict.fromkeys(pieces, 0))
+        width = self._fit_cluster(pieces, room - chip_w)
         if self._settled:
-            self._held = natural
-        cap = SLOT[cols >= WIDE]
-        need = cap if self._held is None else max(natural, self._held)
-        slot = max(0, min(cap, need, inner - fixed - widest - more_w))
+            self._held = width
+        slot = max(0, min(max(width, self._held or 0), room - min(chip_w, CHIP_MIN)))
         self.query_one("#cluster").styles.width = slot
-        self._fit_tabs(inner - fixed - slot, cols)
-        self._fit_cluster(pieces, slot)
+        if name is not None:
+            fit = max(1, room - slot - tail.cell_length - 2)
+            self.piece("harness").update(Content(name).truncate(fit, ellipsis=True) + tail)
         stale = bool(((app.data.scan or {}).get("server") or {}).get("stale"))
         band = self.query_one("#stale", Static)
         band.display = stale
@@ -286,76 +253,32 @@ class AtlasHeader(Vertical):
             band.update("! Skill Atlas changed on disk. Quit and start it again.")
         self._sync_spinner()
 
-    def _sync_tabs(self) -> None:
+    def _sync_chip(self) -> tuple[str | None, Content]:
+        """The active harness's name (None hides the chip) and the menu glyph when it has one."""
         app = app_of(self)
         ins = app.data.insights
         ids = views.harness_choices(ins) if ins else []
-        choices = tuple((h, label_of(app, h)) for h in ids)
         loading = app.data.scan is None and "scan" not in app.data.errors
         self.query_one("#skeleton").display = loading
-        if choices != self._choices:
-            self._choices = choices
-            for tab in self._tabs:
-                tab.remove()
-            self._tabs = [HarnessTab(h) for h, _ in choices]
-            if self._tabs:
-                self.query_one("#tabs").mount(*self._tabs, before=self.piece("more"))
-        for tab, (h, label) in zip(self._tabs, choices, strict=True):
-            tab.set_class(h == app.state.harness, "-active")
-            tab.update(label)
-            tip = meta_of(app, h)
-            tab.tooltip = tip[:1].upper() + tip[1:] if tip else None
+        chip = self.piece("harness")
+        chip.display = bool(ids)
+        if not ids:
+            return None, Content("")
+        h = app.state.harness
+        many = len(ids) > 1
+        chip.set_class(not many, "-idle")
+        meta = meta_of(app, h)
+        tip = [meta[:1].upper() + meta[1:]] if meta else []
+        if many:
+            tip.append(_hint("Switch harness", "harness(-1)"))
+        chip.tooltip = "\n".join(tip) or None
+        return label_of(app, h), Content.assemble(MENU) if many else Content("")
 
-    @staticmethod
-    def _more_text(n: int, of: int, cols: int, at: int | None = None) -> Content:
-        """`7 more` and a faint chevron; below NARROW columns, `3 of 9` (the active tab's place)."""
-        words = f"{n} more " if cols >= NARROW else f"{of if at is None else at} of {of} "
-        return Content.assemble(words, ("›", "$atlas-faint"))
-
-    def _fit_tabs(self, room: int, cols: int) -> None:
-        """Show the tabs that fit, in order, plus the active one; the rest go behind `7 more`.
-
-        Below NARROW columns only the active tab shows, then `3 of 9`, as design.md §11 says.
-        """
-        more, tabs = self.piece("more"), self._tabs
-        labels = [label for _, label in self._choices]
-        widths = [cell_len(label) + 2 for label in labels]
-        if sum(widths) <= room:
-            for tab in tabs:
-                tab.display = True
-            more.display = False
-            return
-        avail = room
-        if cols < NARROW:
-            room = 0
-        more_w = _cells(self._more_text(len(tabs), len(tabs), cols))
-        shown: list[int] = []
-        used = 0
-        for i, w in enumerate(widths):
-            if used + w + more_w > room:
-                break
-            shown.append(i)
-            used += w
-        active = next((i for i, t in enumerate(tabs) if t.has_class("-active")), None)
-        if active is not None and active not in shown:
-            while shown and used + widths[active] + more_w > room:
-                used -= widths[shown.pop()]
-            shown.append(active)
-            used += widths[active]
-        if active is not None and used + more_w > avail:
-            cut = max(1, avail - more_w - 2)
-            tabs[active].update(Content(labels[active]).truncate(cut, ellipsis=True))
-        for i, tab in enumerate(tabs):
-            tab.display = i in shown
-        at = None if active is None else active + 1
-        more.update(self._more_text(len(tabs) - len(shown), len(tabs), cols, at))
-        more.tooltip = f"Show all {len(tabs)} harnesses"
-        more.display = True
-
-    def _fit_cluster(self, pieces: dict[str, Forms], slot: int) -> None:
+    def _fit_cluster(self, pieces: dict[str, Forms], room: int) -> int:
+        """Pick the longest forms that fit in room, show them, and return their width."""
         pick = dict.fromkeys(pieces, 0)
         for name, form in STEPS:
-            if _width(pieces, pick) <= slot:
+            if _width(pieces, pick) <= room:
                 break
             if name in pieces and form < len(pieces[name]):
                 pick[name] = form
@@ -365,6 +288,7 @@ class AtlasHeader(Vertical):
             cell.display = content is not None
             if content is not None:
                 cell.update(content)
+        return _width(pieces, pick)
 
     def _cluster(self) -> dict[str, Forms]:
         """The cluster pieces for the current state, each with its forms from long to short."""
@@ -385,42 +309,29 @@ class AtlasHeader(Vertical):
             return {}
         self._settled = True
         out: dict[str, Forms] = {}
-        fresh = views.new_total(ins)
-        if fresh and app.state.view != "new":
-            out["new"] = [
-                Content(f"+ {views.plural(fresh, 'new skill')}"),
-                Content(f"+ {fresh} new"),
-                None,
-            ]
-            self.piece("new").tooltip = f"Show the {views.plural(fresh, 'new skill')}"
-        st = app.state.view_state()
-        outdated = app.data.counts(st)["updates"]
-        if outdated:
-            up = Content.styled("↑ ", ACCENT)
-            out["count"] = [
-                up + _digits(views.plural(outdated, "update")),
-                up + _digits(str(outdated)),
-                None,
-            ]
-            self.piece("count").tooltip = f"Show the {views.plural(outdated, 'update')}"
+        outdated = app.data.counts(app.state.view_state())["updates"]
+        done = Content.assemble(TICK, "Up to date")
+        if time.monotonic() < self._just_until:
+            out["check"] = [Content.assemble(TICK, "Checked just now"), None if outdated else done]
+        elif not outdated:
+            out["check"] = [done]
+        check.tooltip = _hint("Check again", CHECK_AGAIN)
         errors = upd.get("errors") or {}
         if errors:
             n = len(errors)
-            unchecked = f"{views.plural(n, 'source')} unchecked"
-            out["warn"] = [Content(f"! {x}") for x in (unchecked, f"{n} unchecked", str(n))] + [
-                None
+            out["warn"] = [Content(f"! {n} not checked"), Content(f"! {n}")]
+            lines = [f"Could not check {views.plural(n, 'source')}", *errors.values()]
+            self.piece("warn").tooltip = "\n".join(lines)
+        if outdated and app.state.view != "updates" and not app.state.marked:
+            from .viewstrip import digit
+
+            arrow = ("↑ ", ACCENT)
+            out["updates"] = [
+                Content.assemble(arrow, _digits(views.plural(outdated, "update"))),
+                Content.assemble(arrow, _digits(str(outdated))),
             ]
-            self.piece("warn").tooltip = "\n".join(errors.values())
-        just = Content.assemble(TICK, "Checked just now")
-        recent = time.monotonic() < self._just_until
-        if outdated:
-            out["all"] = [Content("Update all")]
-            out["check"] = [just if recent else Content("Check again"), None]
-            check.tooltip = None
-        else:
-            done = Content.assemble(TICK, "Up to date")
-            out["check"] = [just, done] if recent else [done]
-            check.tooltip = _hint("Check again", "check_again")
+            tip, key = f"Show the {views.plural(outdated, 'skill')} with updates", digit("updates")
+            self.piece("updates").tooltip = f"{tip} · {key}" if key else tip
         return out
 
     def _job_text(self) -> Content:
@@ -507,14 +418,11 @@ class AtlasHeader(Vertical):
         show_source_errors(app_of(self), self.piece("warn"))
 
     def _open_menu(self) -> None:
-        open_harness_menu(app_of(self), self.piece("more"))
+        open_harness_menu(app_of(self), self.piece("harness"))
 
     async def _check_again(self) -> None:
         if not self.checking:
             await app_of(self).action_run("jobs:check_again")
-
-    async def _update_all(self) -> None:
-        await app_of(self).action_run("jobs:update_all")
 
 
 def _below(app: AtlasApp, anchor: Widget | None, width: int) -> Offset:
@@ -572,10 +480,11 @@ def open_harness_menu(app: AtlasApp, anchor: Widget | None = None) -> None:
         return
     labels = {h: label_of(app, h) for h in ids}
     pad = max(cell_len(label) for label in labels.values()) + 2
-    cap = min(64, app.size.width - 2)
+    cap = min(MENU_W, app.size.width - 2)
     prompts = []
     for h in ids:
-        prompt = Content.assemble((labels[h].ljust(pad), TEXT), meta_of(app, h))
+        note = (views.header_meta(ins, h) or [""])[-1] if ins else ""
+        prompt = Content.assemble((labels[h].ljust(pad), TEXT), (note, "$atlas-muted"))
         prompts.append((h, prompt.truncate(cap - 4, ellipsis=True)))
     width = min(cap, max(p.cell_length for _, p in prompts) + 4)
     if anchor is None:

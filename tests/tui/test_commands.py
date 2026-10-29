@@ -18,6 +18,7 @@ from skill_atlas.tui.commands import ActionMenu, AtlasCommands, AtlasPalette, Ch
 from skill_atlas.tui.screens import AtlasModal
 from skill_atlas.tui.screens.help import HelpScreen, listed_keys
 from skill_atlas.tui.widgets.keybar import Hint, KeyBar
+from skill_atlas.tui.widgets.skill_list import SkillList
 
 NOW = datetime(2026, 10, 1, 12, tzinfo=timezone.utc)
 WIDE, MID, NARROW = (180, 50), (120, 36), (80, 24)
@@ -170,44 +171,112 @@ def test_help_rows_and_bindings_read_the_table():
 
 # The key bar
 
+# The keys that left the list bar for the Sources screen. Help and the palette still list them.
+OFF_THE_BAR = ("j", "x", "u", "i", "slash", "m", "v", "q")
 
-def test_hints_drop_from_the_right_but_help_and_quit_stay():
+
+def test_hints_drop_from_the_right_but_help_stays():
     hints = [Hint(k, label) for k, label in keys.bar_labels("list")]
+    assert [h.key.name for h in hints] == ["enter", "ctrl+k", "question_mark"]
     full = sum(h.width + 1 for h in hints) - 1
     assert KeyBar.fit(hints, full) == hints
-    short = KeyBar.fit(hints, 30)
-    assert [h.key.name for h in short[-2:]] == ["question_mark", "q"]
-    assert short[0].key.name == "j" and sum(h.width + 1 for h in short) - 1 <= 30
-    assert [h.key.name for h in KeyBar.fit(hints, 5)] == ["question_mark", "q"]
+    assert [h.key.name for h in KeyBar.fit(hints, full - 1)] == ["enter", "question_mark"]
+    assert [h.key.name for h in KeyBar.fit(hints, 5)] == ["question_mark"]
+    marks = [Hint(k, label) for k, label in keys.bar_labels("marks")]
+    assert [h.key.name for h in KeyBar.fit(marks, 5)] == ["question_mark", "q"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("size", [NARROW, MID, WIDE])
-async def test_the_bar_fits_one_line_and_totals_show_from_160_columns(app, size):
+@pytest.mark.parametrize("size", [(60, 24), NARROW, MID, WIDE])
+async def test_the_bar_fits_one_line_and_the_cost_shows_from_160_columns(app, size):
     async with app.run_test(size=size) as pilot:
         await start(pilot, selected=COPY)
         bar = app.query_one(KeyBar)
         line = text_of(app).splitlines()[-1]
-        assert bar.region.height == 1 and "? help" in line and "q quit" in line
-        assert ("in context" in line) == (size[0] >= 160)
+        first, label = ("enter", "enter open") if app.narrow else ("x", "x turn off")
+        assert bar.region.height == 1
+        assert [h.key.name for h in bar._shown] == [first, "ctrl+k", "question_mark"]
+        assert label in line and "ctrl+k actions" in line and "? help" in line
+        assert ("tokens in context" in line) == (size[0] >= 160) and "skills" not in line
 
 
 @pytest.mark.asyncio
-async def test_the_bar_follows_the_selection_the_marks_and_the_search(app):
+async def test_a_repo_that_cannot_fold_reads_open_and_its_menu_keeps_enter_on_details(app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, selected=None, selected_key=MARKETING)
+        app.set_state(query="market")
+        await settle(pilot)
+        app.query_one(SkillList).focus()
+        await settle(pilot)
+        assert app.query_one(KeyBar).cursor_row().key == MARKETING
+        assert "enter open" in text_of(app).splitlines()[-1]
+        commands.open_actions(app, MARKETING)
+        await settle(pilot)
+        assert row_ids(app.screen)[0] == "open"
+
+
+@pytest.mark.asyncio
+async def test_enter_reads_expand_or_collapse_on_a_repo_row_and_holds_its_width(app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, selected=None, selected_key=MARKETING)
+        bar = app.query_one(KeyBar)
+        y = MID[1] - 1
+        await pilot.press("left")
+        await settle(pilot)
+        assert bar.cursor_row().key == MARKETING and not bar.cursor_row().item["open"]
+        assert "enter expand" in text_of(app).splitlines()[-1]
+        actions_x = find(app, "ctrl+k actions", row=y)[0]
+        await pilot.press("right")
+        await settle(pilot)
+        assert bar.cursor_row().item["open"] and "enter collapse" in text_of(app).splitlines()[-1]
+        assert find(app, "ctrl+k actions", row=y)[0] == actions_x
+        app.set_state(selected=COPY, selected_key=None)
+        await settle(pilot)
+        assert "x turn off" in text_of(app).splitlines()[-1]
+        assert find(app, "ctrl+k actions", row=y)[0] == actions_x
+        app.set_state(detail_open=False)
+        await settle(pilot)
+        assert "enter open" in text_of(app).splitlines()[-1]
+        assert find(app, "ctrl+k actions", row=y)[0] == actions_x
+
+
+@pytest.mark.asyncio
+async def test_the_bar_follows_the_marks_and_the_search(app):
     async with app.run_test(size=MID) as pilot:
         await start(pilot, selected=COPY)
         bar = app.query_one(KeyBar)
-        names = [h.key.name for h in bar.hints()]
-        assert names[:4] == ["j", "enter", "x", "u"] and "i" not in names
+        assert [h.key.name for h in bar.hints()] == ["x", "ctrl+k", "question_mark"]
         app.set_state(selected=None, selected_key=f"a:mattpocock/skills:{_avail_path(app)}")
         await settle(pilot)
-        assert "i" in [h.key.name for h in bar.hints()]
+        assert [h.label for h in bar.hints()] == ["open", "actions", "help"]
         app.set_state(marked={COPY})
         await settle(pilot)
         assert "esc clear" in text_of(app).splitlines()[-1]
         app.set_state(marked=frozenset())
         await pilot.press("slash")
         assert "esc leave search" in text_of(app).splitlines()[-1]
+        question_x = find(app, "? help", row=MID[1] - 1)[0]
+        await pilot.press("c")
+        await settle(pilot)
+        assert "esc clear" in text_of(app).splitlines()[-1]
+        assert find(app, "? help", row=MID[1] - 1)[0] == question_x
+        await pilot.press("escape")
+        await settle(pilot)
+        assert "esc leave search" in text_of(app).splitlines()[-1]
+
+
+@pytest.mark.asyncio
+async def test_help_and_the_palette_still_list_the_keys_off_the_bar(app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, selected=COPY)
+        assert not set(OFF_THE_BAR) & {k.name for k in keys.bar("list")}
+        helped = {row[3] for row in listed_keys()}
+        assert {keys.key(n).help for n in OFF_THE_BAR} <= helped
+        titles = {e.title for e in AtlasCommands(app.screen).commands()}
+        app.set_state(selected=None, selected_key=f"a:mattpocock/skills:{_avail_path(app)}")
+        await settle(pilot)
+        titles |= {e.title for e in AtlasCommands(app.screen).commands()}
+        assert {keys.key(n).help for n in OFF_THE_BAR if keys.key(n).palette} <= titles
 
 
 def _avail_path(app) -> str:
@@ -220,14 +289,14 @@ async def test_hover_and_press_mark_a_hint_and_it_runs_on_mouse_up(app):
         await start(pilot)
         bar = app.query_one(KeyBar)
         y = MID[1] - 1
-        x, _ = find(app, "c compact" if False else "/ search", row=y)
+        x, _ = find(app, "? help", row=y)
         await pilot.hover(offset=(x, y))
-        assert bar._shown[bar._hover].key.name == "slash"
+        assert bar._shown[bar._hover].key.name == "question_mark"
         await pilot.mouse_down(offset=(x, y))
         assert bar._pressed == bar._hover
         await pilot.mouse_up(offset=(x, y))
         await pilot.pause()
-        assert isinstance(app.focused, Input) and bar._pressed is None
+        assert isinstance(app.screen, HelpScreen) and bar._pressed is None
 
 
 @pytest.mark.asyncio
@@ -235,12 +304,12 @@ async def test_a_press_that_moves_to_another_hint_does_not_run(app):
     async with app.run_test(size=MID) as pilot:
         await start(pilot)
         y = MID[1] - 1
-        search, _ = find(app, "/ search", row=y)
-        quit_x, _ = find(app, "q quit", row=y)
-        await pilot.mouse_down(offset=(quit_x, y))
-        await pilot.mouse_up(offset=(search, y))
+        help_x, _ = find(app, "? help", row=y)
+        menu_x, _ = find(app, "ctrl+k actions", row=y)
+        await pilot.mouse_down(offset=(menu_x, y))
+        await pilot.mouse_up(offset=(help_x, y))
         await pilot.pause()
-        assert app.is_running and not isinstance(app.focused, Input)
+        assert app.screen is app.main
 
 
 @pytest.mark.asyncio
@@ -257,7 +326,7 @@ async def test_a_running_update_shows_on_its_hint(app):
     from skill_atlas.tui.messages import JobChanged
 
     async with app.run_test(size=MID) as pilot:
-        await start(pilot, selected=COPY)
+        await start(pilot, selected=COPY, marked={COPY})
         bar = app.query_one(KeyBar)
         bar.post_message(JobChanged({"kind": "update", "done": False, "items": {}}))
         await pilot.pause()
@@ -294,6 +363,12 @@ async def test_help_lists_every_row_and_filters(app):
         await pilot.press("question_mark")
         help_screen = app.screen
         assert len(row_ids(help_screen)) == len(listed_keys())
+        top = keys.KEYS.index(keys.key("ctrl+p"))
+        assert row_ids(help_screen)[0] == str(top) and listed_keys()[0][2:] == (
+            "ctrl+p",
+            "All commands",
+        )
+        assert [row[3] for row in listed_keys()].count("All commands") == 1
         assert ("9", "Show skills to review") in [row[2:] for row in listed_keys()]
         await pilot.press(*"github")
         listed = [keys.KEYS[int(i)].help for i in row_ids(help_screen)]
@@ -548,11 +623,77 @@ async def test_group_menu_has_group_actions(app, calls):
         await settle(pilot)
         assert app.state.selected_key == MARKETING
         ids = row_ids(app.screen)
-        assert ids[0] == "open" and {"switch", "update", "github", "delete"} <= set(ids)
+        assert ids[:2] == ["fold", "details"] and {"switch", "update", "github"} <= set(ids)
+        assert "Collapse" in text_of(app) and "delete" in ids
         assert re.search(r"Turn (on|off) all 37 in Claude Code · personal", text_of(app))
         await pilot.click(offset=find(app, "Open on GitHub"))
         await settle(pilot)
         assert ("open_github", "https://github.com/coreyhaines31/marketingskills") in calls
+
+
+@pytest.mark.asyncio
+async def test_the_repo_menu_names_the_fold_that_enter_does(new_defaults, app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, selected=None, selected_key=MARKETING)
+        assert MARKETING in app.state.folds()
+        commands.open_actions(app, MARKETING)
+        await settle(pilot)
+        assert [(a.id, a.label) for a in app.screen.acts[:2]] == [
+            ("fold", "Expand"),
+            ("details", "Open details"),
+        ]
+        await pilot.press("enter")
+        await settle(pilot)
+        assert MARKETING not in app.state.folds()
+        commands.open_actions(app, MARKETING)
+        await settle(pilot)
+        assert app.screen.acts[0].label == "Collapse"
+
+
+@pytest.mark.asyncio
+async def test_a_mixed_repo_offers_turn_on_all_and_turn_off_the_ones_on(app, calls):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot)
+        g = commands.groups(app)[MARKETING]
+        lit = [views.switch_state(app.data.insights, HARNESS, s) for s in g["members"]]
+        on = [sw["key"] for sw in lit if sw["on"]]
+        assert g["checked"] == "mixed" and 0 < len(on) < len(lit)
+        commands.open_actions(app, MARKETING)
+        await settle(pilot)
+        labels = {a.id: a.label for a in app.screen.acts}
+        assert labels["switch"] == f"Turn on all {len(lit)} in Claude Code · personal"
+        assert labels["switch_off"] == f"Turn off all {len(on)} in Claude Code · personal"
+        await pilot.press(*"turn off", "enter")
+        await settle(pilot)
+        assert ("set_switch", HARNESS, on, False, ("kind", "skill")) in calls
+
+
+@pytest.mark.asyncio
+async def test_mark_in_the_skill_menu_marks_and_then_unmarks(app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, selected=COPY)
+        commands.open_actions(app, COPY)
+        await settle(pilot)
+        mark = next(a for a in app.screen.acts if a.id == "mark")
+        assert (mark.key, mark.label) == ("m", "Mark") and re.search(r"m +Mark", text_of(app))
+        await pilot.press(*"mark", "enter")
+        await settle(pilot)
+        assert app.state.marked == {COPY}
+        commands.open_actions(app, COPY)
+        await settle(pilot)
+        assert next(a for a in app.screen.acts if a.id == "mark").label == "Unmark"
+
+
+@pytest.mark.asyncio
+async def test_the_palette_shows_or_hides_the_descriptions(app):
+    async with app.run_test(size=MID) as pilot:
+        await start(pilot, row_detail=True)
+        titles = {e.title: e for e in AtlasCommands(app.screen).commands()}
+        assert "Show descriptions in the list" not in titles
+        titles["Hide descriptions in the list"].run()
+        assert not app.state.row_detail
+        titles = {e.title: e for e in AtlasCommands(app.screen).commands()}
+        assert "Show descriptions in the list" in titles
 
 
 @pytest.mark.asyncio

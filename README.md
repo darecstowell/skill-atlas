@@ -166,6 +166,11 @@ skills of that machine. When SSH does not send `COLORTERM`, the client uses 256 
 hint. If your terminal supports true color, run `atlas tui --truecolor` or set
 `COLORTERM=truecolor`.
 
+**Repos.** In the All view, each repo starts folded, in one line. Press `Enter` or the right arrow
+key on a repo to open it. Press `Enter` or the left arrow key to fold it again. Press `Shift+L` to
+open all repos. The client keeps the repos that you open. To show a description in each skill row,
+select "Show descriptions in the list" in Display (`,`).
+
 **Mouse.** The mouse works in all parts of the client. Click a row to select it. Double-click a
 skill to read it. Right-click a row to see its actions. Drag the divider to change the width of the
 details panel.
@@ -175,19 +180,19 @@ details panel.
 | Group | Key | Action |
 | --- | --- | --- |
 | Move and select | `j` / `k` or the arrow keys | Move between skills |
-| | `Enter` | Open the details panel |
+| | `Enter` | Open the details panel, or open or fold a repo |
 | Views | `1` to `9` | All, On, Off, Updates, Issues, New, Unused, Costly, Review |
 | | `[` / `]` | Previous or next harness |
 | | `/` | Search |
 | | `s` | Sort by name, uses, recent, or cost |
 | Skill actions | `x` or `Space` | Turn the skill on or off |
-| | `u` / `Shift+U` | Update the skill, or update all |
+| | `u` / `Shift+U` | Update the skill, or update all except the skills you edited |
 | | `i` | Install an available skill |
 | | `d` / `h` | See changes, or open History |
 | | `Delete` | Move the skill to the Trash |
 | | `Ctrl+K` | Actions for the skill |
 | | `z` | Undo the last change |
-| Marks | `m` | Mark the skill for bulk actions |
+| Marks | `m` | Mark the skill for bulk actions, then move down |
 | | `Shift+J` / `Shift+K` | Extend the marks down or up |
 | | `Ctrl+A` | Mark all skills shown |
 | Screens and panels | `v` | Read the whole SKILL.md |
@@ -196,7 +201,7 @@ details panel.
 | | `,` | Display settings |
 | | `p` | Profiles |
 | App | `Ctrl+P` | All commands |
-| | `Esc` | Close or clear |
+| | `Esc` | Close, clear the search or marks, then go back to the All view |
 | | `?` | All shortcuts |
 | | `q` | Quit |
 

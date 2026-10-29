@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 KEY_COLS = 12
 WIDTH = 64
 FOOT = "Right-click a row to see its actions.\nFor a screen reader, run atlas to use the web page."
+TOP = ("ctrl+p",)  # keys listed above the groups, with no heading
 
 
 class HelpScreen(FilterModal):
@@ -76,7 +77,7 @@ class HelpScreen(FilterModal):
         last = ""
         for i, group, show, text in listed:
             if group != last:
-                if last:
+                if out:
                     out.append(Option(Content(" "), disabled=True))
                 last = group
                 out.append(Option(Content.styled(group.upper(), "$atlas-muted"), disabled=True))
@@ -92,18 +93,24 @@ class HelpScreen(FilterModal):
 
 
 def listed_keys() -> list[tuple[int, str, str, str]]:
-    """(index in KEYS, group, key text, help) per row. Each digit gets a row for its view."""
+    """(index in KEYS, group, key text, help) per row. Each digit gets a row for its view.
+
+    The TOP keys come first, in the group "".
+    """
     from ..app import DIGIT_VIEWS
 
-    out = []
+    top: list[tuple[int, str, str, str]] = []
+    out: list[tuple[int, str, str, str]] = []
     for i, k in enumerate(keys.KEYS):
         if k.action.startswith("view("):
             n = int(k.action[5:-1])
             if n <= len(DIGIT_VIEWS):
                 out.append((i, k.group, k.name, VIEW_TITLES[DIGIT_VIEWS[n - 1]]))
+        elif k.help and k.name in TOP:
+            top.append((i, "", k.show, k.help))
         elif k.help:
             out.append((i, k.group, k.show, k.help))
-    return out
+    return top + out
 
 
 def open_help(app: AtlasApp) -> None:

@@ -54,7 +54,8 @@ KEYS: tuple[Key, ...] = (
     Key("home", "first", "", "Go to the top or the end", "Move", "list", "home/end",
         palette=False),
     Key("end", "last", "", "", "Move", "list"),
-    Key("enter", "select", "open", "Open details", "Move", "list", "enter", needs="open"),
+    Key("enter", "select", "open", "Open details, or expand or collapse a repo", "Move", "list",
+        "enter", needs="open"),
     Key("left", "fold", "", "Fold the group", "Move", "list", "left", needs="open"),
     Key("right", "unfold", "", "Unfold the group", "Move", "list", "right", needs="open"),
     Key("H,shift+h", "fold_all", "", "Fold all groups", "Move", "list", "shift+h"),
@@ -157,14 +158,14 @@ KEYS: tuple[Key, ...] = (
 )  # fmt: skip
 
 # The key bar for each context, most important first. Hints drop from the right as the bar
-# narrows, except the last STICKY ones. "name=label" gives a hint its own label in that context.
+# narrows, except the STICKY ones. "name=label" gives a hint its own label in that context.
 BAR: dict[str, tuple[str, ...]] = {
-    "list": ("j", "enter", "x", "u", "i", "slash", "m", "v", "ctrl+k", "question_mark", "q"),
+    "list": ("enter", "ctrl+k", "question_mark"),
     "marks": ("x", "u", "y", "l", "delete=trash", "escape", "question_mark", "q"),
     "search": ("escape=leave search", "question_mark", "q"),
     "panel": ("enter=run", "tab=next", "escape=back to list", "question_mark", "q"),
 }
-STICKY = 2
+STICKY = frozenset({"question_mark", "q"})
 _BY_NAME = {k.name: k for k in reversed(KEYS)}
 
 

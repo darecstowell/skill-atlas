@@ -58,7 +58,7 @@ DESC_LINES, DESC_LINES_SHORT = 6, 3
 DESC_W = 64  # DetailText.desc max-width 68 less its padding
 SEC_HOLD = 2
 # Sections open until the user folds them; the rest start folded, as on the web.
-OPEN = frozenset({"skill.lb", "skill.use", "group.use", "group.members", "group.facts"})
+OPEN = frozenset({"skill.lb", "skill.use", "group.use", "group.facts"})
 # Open by default in a short window too (design §11).
 ALWAYS = frozenset({"skill.lb"})
 # Dark and light (lightness, chroma) of the source badge: the web's --id-bg and --id-fg.
@@ -1099,7 +1099,6 @@ def _group_blocks(ctx: Ctx, gid: str) -> list[BoxEl]:
     blocks.append(BoxEl("acts", (HintsEl("acts", tuple(acts)),), "acts"))
     blocks.append(_group_stats(ctx, members))
     blocks.append(_group_usage(ctx, members))
-    blocks.append(_members(ctx, members))
     blocks.append(section(ctx, "group.facts", "Details", "", lambda: [_facts(ctx, facts)]))
     blocks.append(danger)
     return [b for b in blocks if b is not None]
@@ -1171,44 +1170,6 @@ def _group_usage(ctx: Ctx, members: list[dict]) -> BoxEl | None:
 
     label = f"Usage · {_weeks(ctx)} weeks"
     return section(ctx, "group.use", label, summary, body, _usage_cue(ctx))
-
-
-def _status(ctx: Ctx, s: dict) -> Text:
-    ins = ctx.ins
-    probs = _problems(s)
-    if views.is_outdated(ins, s):
-        return charts.tag("update", ctx.colors)
-    if s.get("local_edits"):
-        return charts.tag("edited", ctx.colors)
-    if probs:
-        label = views.plural(len(probs), "issue")
-        if views.worst(probs) == "error":
-            return charts.tag("error", ctx.colors, label=label)
-        return charts.tag("issues", ctx.colors, label=label)
-    if not views.switch_state(ins, ctx.harness, s)["on"]:
-        return ctx.t("off", "atlas-faint")
-    return Text(end="")
-
-
-def _members(ctx: Ctx, members: list[dict]) -> BoxEl | None:
-    if not members:
-        return None
-    ordered = views.sort_skills(ctx.ins, members, "name")
-
-    def body() -> list[El]:
-        rows: list[El] = []
-        for s in ordered:
-            on = views.switch_state(ctx.ins, ctx.harness, s)["on"]
-            name = Text.assemble(
-                ctx.t("/", "atlas-faint"),
-                ctx.t(s.get("invoke") or s["name"], "atlas-text" if on else "atlas-muted"),
-            )
-            act = Act("select", (s["path"],))
-            rows.append(RowEl(f"m:{s['path']}", name, _status(ctx, s), act, f"Open /{s['name']}"))
-        return rows
-
-    summary = views.plural(len(members), "skill")
-    return section(ctx, "group.members", "Skills", summary, body)
 
 
 # --------------------------------------------------------------------------

@@ -621,6 +621,8 @@ class AtlasApp(App[int]):
             self.show_detail(False)
         elif self.state.marked:
             self.set_state(marked=frozenset())
+        elif self.state.view != "all" and self.main.query_one(SkillList).has_focus:
+            self.set_state(view="all")
         else:
             self.main.query_one(SkillList).focus()
 

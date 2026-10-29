@@ -1,3 +1,4 @@
+import json
 import sys
 import types
 from datetime import datetime, timezone
@@ -12,12 +13,19 @@ from skill_atlas.tui.messages import DataChanged
 from skill_atlas.tui.widgets import sidepanel
 from skill_atlas.tui.widgets.sidepanel import (
     ALL_CLEAR,
+    MORE,
+    WRITE_ONLY,
+    Brief,
     Check,
     Choice,
+    Counts,
+    Entry,
+    More,
     Pane,
     SideChart,
     SidePanel,
-    Stat,
+    facts,
+    more_names,
     open_display,
     section_open,
     with_section,
@@ -77,11 +85,23 @@ async def click(pilot, selector: str, offset=(3, 0)) -> None:
     await settle(pilot)
 
 
-async def open_section(pilot, key: str) -> Pane:
+async def open_more(pilot) -> None:
     app = pilot.app
-    app.set_state(folded=with_section(app.state.folded, key, True))
+    app.set_state(folded=with_section(app.state.folded, MORE, True))
+    await settle(pilot)
+
+
+async def open_section(pilot, key: str) -> Pane:
+    """Open the rows behind More, then one section."""
+    app = pilot.app
+    app.set_state(folded=with_section(with_section(app.state.folded, MORE, True), key, True))
     await settle(pilot)
     return app.query_one("#side-" + key.replace(".", "-"), Pane)
+
+
+def rest(app) -> list:
+    """The sections and rows that sit behind More."""
+    return list(app.query(".side-rest"))
 
 
 def test_a_saved_choice_wins_over_the_default():
@@ -95,15 +115,110 @@ def test_a_saved_choice_wins_over_the_default():
 
 
 @pytest.mark.asyncio
-async def test_the_stats_and_title_come_from_views(app):
+async def test_the_counts_and_title_come_from_views(app):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
         ins, harness = app.data.insights, app.state.harness
         inv = views.inventory(ins, harness)
-        for name in ("on", "off", "updates", "untracked", "duplicates", "edited"):
-            assert app.query_one(f"#side-stat-{name}", Stat).value == inv[name]
-        title = text_of(app.query_one("#side-title"))
-        assert "Inventory" in title and app.data.harnesses[harness]["label"] in title
+        counts = app.query_one("#side-counts")
+        want = f"{inv['on']:,} on   {inv['off']:,} off   {inv['updates']:,} updates"
+        assert text_of(counts).strip() == want
+        line = counts.lines(48)[0]
+        tints = {span.style for span in line.spans if line.plain[span.start].isdigit()}
+        assert tints == {counts.tone("on"), counts.tone("text"), counts.tone("accent")}
+        brief = app.query_one("#side-facts", Brief)
+        assert brief.parts == facts(inv) and brief.display
+        assert text_of(brief).strip() == ", ".join(facts(inv))
+        assert brief.lines(48)[0].spans[-1].style == brief.tone("faint")
+        assert text_of(app.query_one("#side-title")).strip() == "Inventory"
+
+
+@pytest.mark.asyncio
+async def test_a_count_is_a_link_to_its_view(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        counts = app.query_one("#side-counts", Counts)
+        assert [v for *_, v in counts._hits] == ["on", "off", "updates"]
+        for view in ("off", "updates", "on"):
+            y, x0, _, _ = next(h for h in counts._hits if h[3] == view)
+            await pilot.hover("#side-counts", offset=(x0, y))
+            assert counts.tooltip == sidepanel.COUNT_TIPS[view] and counts.has_class("-link")
+            line = counts.lines(counts.size.width)[y]
+            word = line.plain.index(" ", x0) + 1
+            hot = [sp for sp in line.spans if sp.start <= word < sp.end]
+            assert hot and hot[-1].style == counts.tone("accent")
+            await pilot.click("#side-counts", offset=(x0, y))
+            await settle(pilot)
+            assert app.state.view == view
+        await pilot.hover("#side-title")
+        assert counts.tooltip is None and not counts.has_class("-link")
+
+
+@pytest.mark.asyncio
+async def test_a_zero_or_unknown_count_is_not_a_link(app, monkeypatch):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        side, counts = app.query_one(SidePanel), app.query_one("#side-counts", Counts)
+        inv = views.inventory(app.data.insights, app.state.harness)
+        monkeypatch.setattr(views, "inventory", lambda ins, h: {**inv, "off": 0})
+        app.data.updates = None
+        await side.draw()
+        await pilot.pause()
+        assert [v for *_, v in counts._hits] == ["on"]
+        await pilot.click("#side-counts", offset=(counts.size.width - 4, 0))
+        await settle(pilot)
+        assert app.state.view == "all"
+
+
+def test_facts_name_the_counts_that_are_not_zero_with_the_right_plural():
+    inv = {"untracked": 66, "duplicates": 1, "edited": 1, "on": 5}
+    assert facts(inv) == ["66 untracked", "1 duplicate", "1 edited"]
+    assert facts({"untracked": 0, "duplicates": 2, "edited": 0}) == ["2 duplicates"]
+    assert facts({"untracked": 1200, "duplicates": 0, "edited": 3}) == [
+        "1,200 untracked",
+        "3 edited",
+    ]
+    assert facts({"untracked": 0, "duplicates": 0, "edited": 0}) == facts({}) == []
+
+
+@pytest.mark.asyncio
+async def test_the_counts_say_one_update_and_a_dash_until_updates_are_known(app, monkeypatch):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        side, counts = app.query_one(SidePanel), app.query_one("#side-counts")
+        inv = views.inventory(app.data.insights, app.state.harness)
+        monkeypatch.setattr(views, "inventory", lambda ins, h: {**inv, "updates": 1})
+        await side.draw()
+        assert text_of(counts).strip().endswith("   1 update")
+        app.data.updates = None
+        await side.draw()
+        line = counts.lines(48)[0]
+        assert line.plain.strip().endswith("   – updates")
+        dash = line.plain.index("–")
+        assert any(s.start == dash and s.style == counts.tone("faint") for s in line.spans)
+
+
+@pytest.mark.asyncio
+async def test_the_facts_line_hides_at_zero_and_cuts_whole_phrases(app, monkeypatch):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        brief = app.query_one("#side-facts", Brief)
+        full = "66 untracked, 1 duplicate, 1 edited"
+        brief.show(["66 untracked", "1 duplicate", "1 edited"])
+        await pilot.pause()
+        assert brief.fit(len(full) + 4) == full and brief.tooltip is None
+        assert brief.fit(len(full) + 3) == "66 untracked, 1 duplicate, …"
+        assert brief.fit(20) == "66 untracked, …"
+        assert brief.fit(12) == "66 untr…"
+        for width in range(8, 60):
+            assert [line.cell_len for line in brief.lines(width)] == [width]
+        app.set_state(panel_width=30)
+        await settle(pilot)
+        assert brief.size.width < len(full) + 4
+        assert brief.tooltip == full and "…" in text_of(brief)
+        brief.show([])
+        await pilot.pause()
+        assert not brief.display
 
 
 @pytest.mark.asyncio
@@ -115,11 +230,25 @@ async def test_needs_attention_lists_each_item_with_its_glyph(app):
         items = views.attention(ins, app.state.view_state())
         assert {i["key"] for i in items} >= {"a-store", "a-sec", "a-miss"}
         for item in items:
-            row = app.query_one(f"#side-{item['key']}")
-            text = text_of(row)
+            row = app.query_one(f"#side-{item['key']}", Entry)
+            lines = row.lines(48)
             glyph = "✗" if item["tone"] == "danger" else "!"
-            assert text.lstrip().startswith(glyph)
-            assert item["detail"].split()[0] in text
+            assert len(lines) == 1 and lines[0].cell_len == 48
+            assert lines[0].plain.split() == [glyph, *item["text"].split(), "›"]
+            assert lines[0].plain.rstrip().endswith("›") and lines[0].plain.endswith("›  ")
+            assert row.tooltip == item["detail"]
+
+
+@pytest.mark.asyncio
+async def test_an_attention_item_stays_on_one_line_when_narrow(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        row = app.query_one("#side-a-prob", Entry)
+        for width in range(12, 64):
+            lines = row.lines(width)
+            assert len(lines) == 1 and lines[0].cell_len == width, width
+            assert lines[0].plain.rstrip().endswith("›"), width
+        assert "…" in row.lines(16)[0].plain
 
 
 @pytest.mark.asyncio
@@ -130,6 +259,8 @@ async def test_show_them_opens_the_view_with_the_mouse(app):
         assert app.state.view == "review"
         await click(pilot, "#side-a-prob")
         assert app.state.view == "issues"
+        await click(pilot, "#side-a-cost")
+        assert app.state.view == "costly"
 
 
 @pytest.mark.asyncio
@@ -150,7 +281,9 @@ async def test_the_keyboard_tabs_in_and_moves_with_up_and_down(app):
         await settle(pilot)
         assert app.state.view == "issues"
         await pilot.press("escape")
-        assert app.focused is app.query_one("#list")
+        assert app.focused is app.query_one("#list") and app.state.view == "issues"
+        await pilot.press("escape")
+        assert app.state.view == "all"
 
 
 @pytest.mark.asyncio
@@ -174,27 +307,147 @@ async def test_store_problems_fold_open_under_their_row(app):
 async def test_restore_runs_from_the_row_and_the_skill_set(app, calls):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
-        assert "Restore it" in text_of(app.query_one("#side-a-miss"))
         await click(pilot, "#side-a-miss")
+        app.query_one("#side-a-miss").focus()
+        await pilot.press("enter")
+        await settle(pilot)
         await open_section(pilot, "inv.set")
         await click(pilot, "#side-set-restore", offset=(1, 0))
-        assert calls == [("open_restore",), ("open_restore",)]
+        assert calls == [("open_restore",)] * 3
 
 
 @pytest.mark.asyncio
 async def test_a_section_folds_and_the_app_remembers_it(app):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
+        await open_more(pilot)
         use = app.query_one("#side-inv-use", Pane)
-        assert use.open and app.query("#side-top")
-        await click(pilot, "#side-inv-use-head")
-        assert "inv.use" in app.state.folded and not use.open
+        assert not use.open and not app.query("#side-top")
         uses = views.inventory(app.data.insights, app.state.harness)["uses"]
         assert views.uses_text(uses) in text_of(use.head)
+        await click(pilot, "#side-inv-use-head")
+        assert "inv.use:open" in app.state.folded and use.open and app.query("#side-top")
         app.query_one("#side-inv-use-head").focus()
         await pilot.press("enter")
         await settle(pilot)
-        assert "inv.use:open" in app.state.folded and use.open
+        assert "inv.use" in app.state.folded and not use.open
+
+
+@pytest.mark.asyncio
+async def test_more_opens_the_other_sections_in_place_with_the_mouse(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        more = app.query_one("#side-more", More)
+        assert rest(app) and not any(w.display for w in rest(app))
+        assert not section_open(app.state.folded, MORE, False)
+        lines = more.lines(48)
+        assert len(lines) == 2 and lines[0].plain.rstrip().endswith("›")
+        names = ", ".join(more_names(True))
+        assert " ".join(line.plain.strip(" ›") for line in lines) == names
+        assert all(sp.style == more.tone("faint") for line in lines for sp in line.spans)
+        y = more.virtual_region.y
+        await click(pilot, "#side-more")
+        assert "inv.more:open" in app.state.folded
+        assert all(w.display for w in rest(app))
+        assert text_of(more).strip(" ▌") == "Show less" and more.virtual_region.y == y
+        assert [p.key for p in app.query(Pane) if p.display][1:] == [
+            "inv.use",
+            "inv.cost",
+            "inv.ovl",
+            "inv.sec",
+            "inv.prof",
+            "inv.set",
+            "inv.disp",
+        ]
+        assert not any(p.open for p in app.query(Pane) if p.key != "inv.attn")
+        await click(pilot, "#side-more")
+        assert "inv.more" in app.state.folded
+        assert not any(w.display for w in rest(app))
+        assert "Usage, cost, overlap," in words(more)
+
+
+def test_more_names_every_section_it_hides():
+    assert more_names(True) == [
+        "Usage",
+        "cost",
+        "overlap",
+        "security",
+        "profiles",
+        "skill set",
+        "display",
+    ]
+    assert more_names(False) == ["Cost", "overlap", "security", "display"]
+    assert {key for key, _ in sidepanel.PANES} > WRITE_ONLY
+
+
+@pytest.mark.asyncio
+async def test_the_more_label_keeps_to_two_lines_and_cuts_whole_names(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        more = app.query_one("#side-more", More)
+        for width in range(12, 90):
+            lines = more.lines(width)
+            assert 1 <= len(lines) <= 2 and all(line.cell_len == width for line in lines)
+            assert lines[0].plain[width - 3] == "›"
+            shown = " ".join(line.plain.strip(" ›") for line in lines)
+            assert "skill set" in shown or "skill" not in shown, width
+        assert more.fit(30)[-1].endswith(", …") and len(more.fit(40)) == 2
+        assert not any("…" in line for line in more.fit(40))
+        more.show(False, more.names)
+        await pilot.pause()
+        assert more.tooltip is None
+        more._tip(30)
+        assert more.tooltip == ", ".join(more_names(True))
+
+
+@pytest.mark.asyncio
+async def test_a_read_only_folder_leaves_its_sections_out_of_the_more_label(prefs):
+    app = AtlasApp(DemoAtlas(now=NOW))
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        app.data.insights.writable = False
+        await app.query_one(SidePanel).draw()
+        more = app.query_one("#side-more", More)
+        assert more.names == more_names(False)
+        await open_more(pilot)
+        shown = [p.key for p in app.query(Pane) if p.display][1:]
+        assert len(shown) == len(more_names(False)) and not WRITE_ONLY & set(shown)
+
+
+@pytest.mark.asyncio
+async def test_more_works_with_tab_j_k_and_enter(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        await pilot.press("tab")
+        while app.focused.id != "side-more":
+            await pilot.press("j")
+        await pilot.press("j")
+        assert app.focused.id == "side-more"
+        await pilot.press("enter")
+        await settle(pilot)
+        assert section_open(app.state.folded, MORE, False)
+        assert app.focused.id == "side-more"
+        await pilot.press("j")
+        assert app.focused.id == "side-inv-use-head"
+        await pilot.press("k", "space")
+        await settle(pilot)
+        assert not section_open(app.state.folded, MORE, False)
+        assert app.focused.id == "side-more"
+        await pilot.press("k")
+        assert app.focused.id == "side-a-cost"
+
+
+@pytest.mark.asyncio
+async def test_the_app_remembers_more(prefs):
+    async with AtlasApp(DemoAtlas(now=NOW)).run_test(size=TALL) as pilot:
+        await settle(pilot)
+        await click(pilot, "#side-more")
+    assert "inv.more:open" in json.loads(prefs.read_text(encoding="utf-8"))["folded"]
+    app = AtlasApp(DemoAtlas(now=NOW))
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        assert all(w.display for w in rest(app))
+        assert text_of(app.query_one("#side-more")).strip(" ▌") == "Show less"
 
 
 @pytest.mark.asyncio
@@ -206,6 +459,7 @@ async def test_a_folded_section_that_needs_you_shows_a_flag(app):
         await click(pilot, "#side-inv-attn-head")
         head = text_of(attn.head)
         assert "✗" in head and "things to check" in head
+        await open_more(pilot)
         assert "!" in text_of(app.query_one("#side-inv-ovl-head"))
 
 
@@ -213,6 +467,10 @@ async def test_a_folded_section_that_needs_you_shows_a_flag(app):
 async def test_a_short_window_starts_every_section_folded(app):
     async with app.run_test(size=SHORT) as pilot:
         await settle(pilot)
+        assert not any(p.open for p in app.query(Pane))
+        attn, more = app.query_one("#side-inv-attn"), app.query_one("#side-more")
+        assert more.virtual_region.y - attn.virtual_region.bottom == 1
+        await open_more(pilot)
         assert not any(p.open for p in app.query(Pane))
         await click(pilot, "#side-inv-use-head")
         assert app.query_one("#side-inv-use", Pane).open
@@ -224,6 +482,7 @@ async def test_a_short_window_starts_every_section_folded(app):
 async def test_a_top_used_row_selects_its_skill(app):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
+        await open_section(pilot, "inv.use")
         ins = app.data.insights
         top = views.top_used(ins, views.loaded_skills(ins, app.state.harness))
         chart = app.query_one("#side-top", SideChart)
@@ -239,7 +498,7 @@ async def test_a_top_used_row_selects_its_skill(app):
 @pytest.mark.asyncio
 async def test_the_keyboard_moves_through_a_chart_and_picks_a_row(app):
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         chart = app.query_one("#side-top", SideChart)
         app.query_one("#side-inv-use-head").focus()
         # The heatmap takes the keys between the head and the chart; it moves by day.
@@ -276,7 +535,7 @@ class Broken(DemoAtlas):
 async def test_usage_shows_its_progress_while_it_reads(prefs):
     app = AtlasApp(Indexing(now=NOW))
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         body = app.query_one("#side-inv-use-body")
         assert "Reading your agent sessions… 40 of 120" in words(body.children[0])
         await click(pilot, "#side-inv-use-head")
@@ -287,7 +546,7 @@ async def test_usage_shows_its_progress_while_it_reads(prefs):
 async def test_usage_and_profiles_show_their_failures(prefs):
     app = AtlasApp(Broken(now=NOW))
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         body = app.query_one("#side-inv-use-body")
         assert words(body.children[0]) == "✗ Could not read usage: the sessions folder is locked."
         await click(pilot, "#side-inv-use-head")
@@ -394,7 +653,7 @@ async def test_display_changes_apply_at_once_with_the_mouse(app):
         y, x0, _, _ = next(h for h in sort._hits if h[3] == "cost")
         await click(pilot, "#side-disp-sort", offset=(x0 + 1, y))
         assert app.state.sort == "cost"
-        for setting in ("compact", "show_project", "show_stale", "key_hints"):
+        for setting in ("row_detail", "compact", "show_project", "show_stale", "key_hints"):
             before = getattr(app.state, setting)
             await click(pilot, "#side-disp-" + setting.replace("_", "-"))
             assert getattr(app.state, setting) is not before
@@ -421,9 +680,30 @@ async def test_display_changes_apply_at_once_with_the_keys(app):
         assert app.state.group_size == "large"
         await pilot.press("down", "right")
         assert app.state.motion == "reduced"
+        detail = app.state.row_detail
+        await pilot.press("down", "space")
+        assert app.state.row_detail is not detail
         await pilot.press("down", "space")
         assert app.state.compact
         assert isinstance(app.focused, Check)
+
+
+@pytest.mark.asyncio
+async def test_show_descriptions_turns_row_detail_on_and_off(app):
+    async with app.run_test(size=TALL) as pilot:
+        await settle(pilot)
+        app.set_state(row_detail=False)
+        await open_section(pilot, "inv.disp")
+        check = app.query_one("#side-disp-row-detail", Check)
+        assert check.label == "Show descriptions in the list" and not check.on
+        assert check.tooltip == "Rows also show the sparkline and every tag."
+        assert check.has_class("side-gap")
+        off = text_of(check).split()[-1]
+        await click(pilot, "#side-disp-row-detail")
+        assert app.state.row_detail and check.on and text_of(check).split()[-1] != off
+        app.set_state(row_detail=False)
+        await settle(pilot)
+        assert not check.on and text_of(check).split()[-1] == off
 
 
 @pytest.mark.asyncio
@@ -439,6 +719,8 @@ async def test_open_display_shows_the_panel_and_focuses_display(app):
         assert app.query_one("#side-inv-disp", Pane).open
         assert app.focused.id == "side-inv-disp-head"
         assert section_open(app.state.folded, "inv.disp", False)
+        assert section_open(app.state.folded, MORE, False)
+        assert all(w.display for w in rest(app))
 
 
 @pytest.mark.asyncio
@@ -452,9 +734,11 @@ async def test_open_display_opens_the_drawer_when_narrow(app):
 
 
 @pytest.mark.asyncio
-async def test_the_keys_hint_opens_help(app, calls):
+async def test_the_keys_hint_hides_at_rest_and_opens_help_from_more(app, calls):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
+        assert not app.query_one("#side-keys").display
+        await open_more(pilot)
         await click(pilot, "#side-keys")
         assert calls == [("open_help",)]
 
@@ -472,21 +756,22 @@ async def test_the_panel_waits_while_a_skill_is_selected(app):
         app.set_state(selected=None)
         await settle(pilot)
         assert not panel._dirty
-        assert "All harnesses" in text_of(app.query_one("#side-title"))
+        inv = views.inventory(app.data.insights, "all")
+        assert text_of(app.query_one("#side-counts")).split()[0] == f"{inv['on']:,}"
 
 
 def test_every_panel_glyph_is_one_cell():
     from rich.cells import cell_len
 
-    for glyph in (*sidepanel.GLYPHS.values(), "▌", "▾", "▸", "●", "–"):
+    for glyph in (*sidepanel.GLYPHS.values(), "▌", "▾", "▸", "●", "–", "›", "…"):
         assert cell_len(glyph) == 1
 
 
 @pytest.mark.asyncio
 async def test_links_are_muted_until_their_row_has_focus(app):
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
-        row = app.query_one("#side-a-prob")
+        await open_section(pilot, "inv.use")
+        row = app.query_one("#side-use-unused")
         assert row.tone("link").color == row.tone("muted").color
         row.focus()
         await pilot.pause()
@@ -496,7 +781,7 @@ async def test_links_are_muted_until_their_row_has_focus(app):
 @pytest.mark.asyncio
 async def test_a_link_never_breaks_across_lines(app):
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         row = app.query_one("#side-use-unused")
         for width in range(30, 60):
             lines = [line.plain.strip() for line in row.lines(width)]
@@ -520,11 +805,18 @@ async def test_choice_options_wrap_inside_the_value_column(app):
 async def test_each_open_section_has_one_blank_row_around_it(app):
     async with app.run_test(size=TALL) as pilot:
         await settle(pilot)
+        stats, attn = app.query_one("#side-stats"), app.query_one("#side-inv-attn")
+        more = app.query_one("#side-more")
+        assert attn.virtual_region.y - stats.virtual_region.bottom == 1
+        assert more.virtual_region.y - attn.virtual_region.bottom == 1
+        await open_section(pilot, "inv.use")
         await open_section(pilot, "inv.disp")
-        attn, use = app.query_one("#side-inv-attn"), app.query_one("#side-inv-use")
+        use, cost = app.query_one("#side-inv-use"), app.query_one("#side-inv-cost")
         folded, disp = app.query_one("#side-inv-set"), app.query_one("#side-inv-disp")
         keys = app.query_one("#side-keys")
-        assert use.virtual_region.y - attn.virtual_region.bottom == 1
+        assert more.virtual_region.y - attn.virtual_region.bottom == 1
+        assert use.virtual_region.y - more.virtual_region.bottom == 1
+        assert cost.virtual_region.y - use.virtual_region.bottom == 1
         assert disp.virtual_region.y - folded.virtual_region.bottom == 1
         assert keys.virtual_region.y - disp.virtual_region.bottom == 1
 
@@ -556,7 +848,7 @@ async def test_switches_follow_the_theme(app):
 @pytest.mark.asyncio
 async def test_display_marks_when_hidden_skills_show(app):
     async with app.run_test(size=TALL) as pilot:
-        await settle(pilot)
+        await open_more(pilot)
         head = app.query_one("#side-inv-disp-head")
         assert "Atlas · Dark" in text_of(head)
         app.set_state(show_project=True)
@@ -625,7 +917,7 @@ async def test_a_click_on_collections_sets_the_group_size(app):
 @pytest.mark.asyncio
 async def test_a_click_on_a_folded_head_scrolls_the_section_into_view(app):
     async with app.run_test(size=(120, 36)) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         side = app.query_one(SidePanel)
         head = app.query_one("#side-inv-disp-head")
         side.scroll_to_widget(head, animate=False, top=False)
@@ -661,7 +953,7 @@ async def test_data_changes_redraw_once_after_a_short_wait(app):
 @pytest.mark.asyncio
 async def test_focus_from_tab_scrolls_the_panel_without_animation(app):
     async with app.run_test(size=(120, 36)) as pilot:
-        await settle(pilot)
+        await open_section(pilot, "inv.use")
         app.animation_level = "basic"
         side = app.query_one(SidePanel)
         keys = app.query_one("#side-keys")

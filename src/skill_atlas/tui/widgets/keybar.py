@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from rich.cells import cell_len
@@ -17,28 +18,35 @@ from ...core import views
 from .. import commands, keys, theme
 from ..messages import DataChanged, JobChanged, StateChanged
 from . import app_of
+from .skill_list import Row, SkillList
 
 SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 TOTALS_FROM = 160
 BUSY = {"update": ("u", "U", "Updating…"), "install": ("i", "I", "Installing…")}
+FOLD = ("expand", "collapse")  # the enter label on a folded or an open repo row
+TURN = ("turn on", "turn off")  # the x label on a skill that is off or on
+ENTER_ROOM = max(map(cell_len, (keys.key("enter").label, *FOLD)))
+ENTER_SLOT = cell_len(keys.key("enter").short) + ENTER_ROOM  # key and label room of that slot
 
 
 @dataclass
 class Hint:
+    """room: the label width to keep, so the hints after it hold still as the label changes."""
+
     key: keys.Key
     label: str
     busy: bool = False
+    room: int = 0
 
     @property
     def width(self) -> int:
         """The key, a space, the label, and 1 cell of hover padding on each side."""
-        return 1 + cell_len(self.key.short) + 1 + cell_len(self.label) + 1
+        return 1 + cell_len(self.key.short) + 1 + max(cell_len(self.label), self.room) + 1
 
 
 class KeyBar(Widget):
-    """Hints for the focus and the selection at the left; totals at the right from 160 columns.
-
-    Hints drop from the right as the bar narrows; help and quit stay. Click a hint to run it.
+    """Hints for the focus and the selection at the left; the context cost at the right from 160
+    columns. Hints drop from the right as the bar narrows; help stays. Click a hint to run it.
     """
 
     DEFAULT_CSS = """
@@ -116,34 +124,72 @@ class KeyBar(Widget):
             self._flags = commands.flags(app_of(self))
         return self._flags
 
+    def cursor_row(self) -> Row | None:
+        lists = app_of(self).main.query(SkillList)
+        return lists.first().cursor_row() if lists else None
+
+    def fold_label(self) -> str:
+        """The enter label when the list cursor is on a repo row that can fold, else ""."""
+        row = self.cursor_row()
+        if row is None or row.kind != "group":
+            return ""
+        lst = app_of(self).main.query_one(SkillList)
+        return FOLD[bool(row.item.get("open"))] if lst.foldable(row) else ""
+
+    def turn_hint(self) -> Hint | None:
+        """x in the enter slot when the docked panel already shows the selected skill."""
+        app = app_of(self)
+        ins = app.data.insights
+        if ins is None or app.narrow or not app.detail_visible or "switch" not in self.flags():
+            return None
+        s = app.data.skill(app.state.selected)
+        if s is None:
+            return None
+        x = keys.key("x")
+        on = views.switch_state(ins, app.state.harness, s)["on"]
+        return Hint(x, TURN[on], room=ENTER_SLOT - cell_len(x.short))
+
+    def typed(self) -> bool:
+        focused = app_of(self).main.focused
+        return isinstance(focused, Input) and bool(focused.value)
+
     def hints(self) -> list[Hint]:
         """The context's hints that apply now, before any drop for width."""
         have = self.flags()
         busy = BUSY.get(self.busy_kind() or "")
+        context = self.context()
+        fold = self.fold_label() if context == "list" else ""
+        turn = self.turn_hint() if context == "list" and not fold else None
         out = []
-        for k, label in keys.bar_labels(self.context()):
+        for k, label in keys.bar_labels(context):
             if busy and k.name in busy[:2]:
                 out.append(Hint(k, busy[2], busy=True))
+            elif context == "list" and k.name == "enter" and turn is not None:
+                out.append(turn)
+            elif context == "search" and k.name == "escape" and self.typed():
+                out.append(Hint(k, "clear", room=cell_len(label)))
             elif not k.needs or k.needs in have:
-                out.append(Hint(k, label))
+                enter = context == "list" and k.name == "enter"
+                out.append(Hint(k, fold or label, room=ENTER_ROOM) if enter else Hint(k, label))
         return out
 
     @staticmethod
-    def fit(hints: list[Hint], room: int, sticky: int = keys.STICKY) -> list[Hint]:
-        """Drop hints from the right, but never the last `sticky`, until they fit in room."""
+    def fit(hints: list[Hint], room: int, sticky: Collection[str] = keys.STICKY) -> list[Hint]:
+        """Drop the rightmost hint that is not sticky until the hints fit in room."""
         keep = list(hints)
-        sticky = min(sticky, len(keep))
-        while len(keep) > sticky and sum(h.width + 1 for h in keep) - 1 > room:
-            keep.pop(len(keep) - sticky - 1)
+        while sum(h.width + 1 for h in keep) - 1 > room:
+            loose = [i for i, h in enumerate(keep) if h.key.name not in sticky]
+            if not loose:
+                break
+            keep.pop(loose[-1])
         return keep
 
     def totals(self) -> str:
+        """The harness's context cost. The view chip and the panel already count the skills."""
         app = app_of(self)
         if app.data.insights is None:
             return ""
-        n = commands.counts(app).get("all", 0)
-        summary = commands.cost(app).get("summary") or "No tokens"
-        return f"{views.plural(n, 'skill')} · {summary} in context"
+        return f"{commands.cost(app).get('summary') or 'No tokens'} in context"
 
     def render(self) -> RenderableType:
         if self._colors is None:
@@ -170,13 +216,10 @@ class KeyBar(Widget):
             line.append(" ", cell)
             line.append(key, cell + look)
             line.append(f" {h.label} ", cell + muted)
-            line.append(" ")
+            line.append(" " * (1 + max(0, h.room - cell_len(h.label))))
         if totals:
             line.pad_right(max(0, width - line.cell_len - cell_len(totals) - 1))
-            words, _, cost = totals.partition(" · ")
-            line.append(words, muted)
-            line.append(" · ", faint)
-            line.append(cost, muted)
+            line.append(totals, muted)
         return line
 
     def _hint_at(self, event: events.MouseEvent) -> int | None:

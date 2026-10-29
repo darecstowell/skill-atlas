@@ -1,16 +1,40 @@
 import threading
+from dataclasses import dataclass
 from datetime import datetime
 
 import pytest
 
 from skill_atlas.core.demo import DemoAtlas
+from skill_atlas.tui import state
 from skill_atlas.tui.app import AtlasApp
+
+UIState = state.UIState
+
+
+@dataclass
+class OpenDetailState(UIState):
+    """The defaults the older tests assume: every repo open, rows with all their detail."""
+
+    opened: frozenset[str] = frozenset({state.ALL_OPEN})
+    row_detail: bool = True
 
 
 @pytest.fixture(autouse=True)
 def truecolor(monkeypatch):
     """Rich picks 256 colors when COLORTERM is unset (as in CI); pin true color for stable tests."""
     monkeypatch.setenv("COLORTERM", "truecolor")
+
+
+@pytest.fixture(autouse=True)
+def open_detail(monkeypatch):
+    """Apps start with every repo open and detail rows. Ask for `new_defaults` for the real ones."""
+    monkeypatch.setattr(state, "UIState", OpenDetailState)
+
+
+@pytest.fixture
+def new_defaults(monkeypatch):
+    """The real UIState defaults: repos fold in the All view, and rows are short."""
+    monkeypatch.setattr(state, "UIState", UIState)
 
 
 class StubAtlas:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
@@ -31,10 +31,14 @@ SAVED = (
     "detail_open",
     "panel_width",
     "collapsed",
+    "opened",
     "folded",
     "reader_raw",
+    "row_detail",
 )
-SETS = ("marked", "collapsed", "folded")
+SETS = ("marked", "collapsed", "opened", "folded")
+REPO_IDS = ("src:", "plg:", "prj:")
+ALL_OPEN = "*"
 CHOICES: dict[str, tuple[str, ...]] = {
     "view": tuple(v[0] for v in views.VIEWS),
     "group_by": GROUPS,
@@ -67,6 +71,7 @@ class UIState:
     selected_key: str | None = None  # a group id or `a:<repo>:<path>`; only when selected is None
     marked: frozenset[str] = frozenset()
     collapsed: frozenset[str] = frozenset()  # folded list groups, with the web's keys
+    opened: frozenset[str] = frozenset()  # repos opened in the All view; "*" opens every repo
     # Panel sections the user changed: `key` when folded, `key:open` when opened by default.
     folded: frozenset[str] = frozenset()
     palette: str = "atlas"
@@ -75,6 +80,11 @@ class UIState:
     motion: str = "full"  # full, reduced (Textual "basic"), or off ("none")
     reader_raw: bool = False  # the reader opens in its Markdown view
     panel_width: int = 0  # cells; 0 picks the width from the window size
+    row_detail: bool = False  # rows show the description, sparkline, and every tag
+
+    def folds(self) -> Folds:
+        """The folded list ids, as core.views reads `collapsed`."""
+        return Folds(self.collapsed, self.opened, self.view)
 
     def prefs(self) -> dict[str, Any]:
         return {k: sorted(v) if k in SETS else v for k in SAVED for v in [getattr(self, k)]}
@@ -90,6 +100,26 @@ class UIState:
             show_project=self.show_project,
             show_stale=self.show_stale,
         )
+
+
+class Folds(Collection[str]):
+    """The user's folds, plus each repo not opened yet: repos start folded in the All view."""
+
+    def __init__(self, collapsed: frozenset[str], opened: frozenset[str], view: str) -> None:
+        self.collapsed, self.opened, self.view = collapsed, opened, view
+
+    def __contains__(self, gid: object) -> bool:
+        if gid in self.collapsed:
+            return True
+        if self.view != "all" or not (isinstance(gid, str) and gid.startswith(REPO_IDS)):
+            return False
+        return ALL_OPEN not in self.opened and gid not in self.opened
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.collapsed)
+
+    def __len__(self) -> int:
+        return len(self.collapsed)
 
 
 FIELDS = frozenset(f.name for f in fields(UIState))

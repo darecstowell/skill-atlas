@@ -1,4 +1,5 @@
 import importlib
+import json
 import statistics
 import sys
 import threading
@@ -15,6 +16,7 @@ from skill_atlas.tui.app import AtlasApp, settle
 from skill_atlas.tui.messages import JobChanged
 from skill_atlas.tui.widgets.skill_list import (
     FLASH_STEPS,
+    MINI_MAX,
     STATUS_W,
     STATUS_WIDE,
     SkillList,
@@ -202,14 +204,16 @@ async def test_marks_with_keys(app):
         lst = app.query_one(SkillList)
         group = lst.rows[lst.cursor]
         assert group.kind == "group"
+        g = lst.cursor
         await pilot.press("m")
         assert app.state.marked == {s["path"] for s in group.item["skills"]}
-        await pilot.press("m")
+        assert lst.cursor == lst._stops[lst._stops.index(g) + 1]
+        await pilot.press("k", "m")
         assert not app.state.marked
-        await pilot.press("j", "m")
         a = lst.rows[lst.cursor].key
-        assert app.state.marked == {a}
-        await pilot.press("shift+j")
+        await pilot.press("m")
+        assert app.state.marked == {a} and lst.rows[lst.cursor].key != a
+        await pilot.press("k", "shift+j")
         assert app.state.marked == {a, lst.rows[lst.cursor].key}
         await pilot.press("ctrl+a")
         assert app.state.marked == {r.key for r in lst.rows if r.kind == "skill"}
@@ -824,3 +828,231 @@ async def test_rebuild_counts_the_search_results(app, monkeypatch):
         n = sum(1 for s in ins.skills if views.visible(ins, st, s, None))
         assert lst.results == n > 0
         assert [m.n for m in seen if isinstance(m, SkillList.ResultsChanged)] == [n]
+
+
+@pytest.fixture
+def fresh(new_defaults, prefs, panels):
+    """An app with no saved prefs: repos fold in the All view, and rows are short."""
+    return AtlasApp(DemoAtlas(now=NOW))
+
+
+def heads(lst):
+    return [r for r in lst.rows if r.kind == "group"]
+
+
+@pytest.mark.asyncio
+async def test_repos_start_folded_and_a_search_or_a_filter_view_opens_them(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        assert heads(lst) and not any(r.item["open"] for r in heads(lst))
+        assert not any(r.kind == "skill" for r in lst.rows) and on_screen(fresh, "Expand all")
+        kinds = [r.kind for r in lst.rows]
+        assert ["group", "blank", "group"] not in [kinds[k : k + 3] for k in range(len(kinds))]
+        fresh.set_state(query="market")
+        await pilot.pause(0.3)
+        assert all(r.item["open"] for r in heads(lst)) and first(lst, "skill") >= 0
+        fresh.set_state(query="", view="updates")
+        await pilot.pause()
+        assert all(r.item["open"] for r in heads(lst)) and first(lst, "skill") >= 0
+
+
+@pytest.mark.asyncio
+async def test_an_open_repo_has_a_blank_line_below_it_and_does_not_move(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        await pilot.press("j")
+        g = lst.cursor
+        await pilot.press("enter")
+        await pilot.pause()
+        assert lst.cursor == g and lst.rows[g].item["open"]
+        kinds = [r.kind for r in lst.rows]
+        end = first(lst, "group", lambda r: lst.rows.index(r) > g)
+        assert kinds[g - 1] == "group" and kinds[end - 1] == "blank"
+        assert kinds[end + 1] == "group"
+
+
+@pytest.mark.asyncio
+async def test_opened_repos_are_saved_and_restored(fresh, prefs):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        gid = lst.rows[lst.cursor].key
+        await pilot.press("enter")
+        await pilot.pause()
+        assert fresh.state.opened == {gid}
+    assert json.loads(prefs.read_text())["opened"] == [gid]
+    again = AtlasApp(DemoAtlas(now=NOW))
+    async with again.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = again.query_one(SkillList)
+        assert [r.key for r in heads(lst) if r.item["open"]] == [gid]
+
+
+@pytest.mark.asyncio
+async def test_expand_all_and_collapse_all_read_the_real_folds(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        ids = set(lst.rows[first(lst, "section")].item["group_ids"])
+        await pilot.click(offset=find(fresh, "Expand all"))
+        await pilot.pause()
+        assert ids <= fresh.state.opened and on_screen(fresh, "Collapse all")
+        assert all(r.item["open"] for r in heads(lst) if r.key in ids)
+        await pilot.click(offset=find(fresh, "Collapse all"))
+        await pilot.pause()
+        assert not ids & fresh.state.opened and ids <= fresh.state.collapsed
+        assert not any(r.item["open"] for r in heads(lst)) and on_screen(fresh, "Expand all")
+        await pilot.press("shift+l")
+        await pilot.pause()
+        assert fresh.state.opened == {"*"} and not ids & fresh.state.collapsed
+        assert all(r.item["open"] for r in heads(lst)) and not on_screen(fresh, "Expand all")
+        await pilot.press("shift+h")
+        await pilot.pause()
+        assert not fresh.state.opened and not any(r.item["open"] for r in heads(lst))
+
+
+@pytest.mark.asyncio
+async def test_enter_and_a_click_fold_a_repo_and_keep_it_selected(fresh, calls):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        g = lst.cursor
+        gid = lst.rows[g].key
+        await pilot.press("enter")
+        await pilot.pause()
+        assert lst.rows[g].item["open"] and fresh.state.selected_key == gid
+        assert lst.cursor_row() is lst.rows[g]
+        await pilot.press("j", "left")
+        await pilot.pause()
+        assert lst.cursor == g
+        await pilot.press("enter")
+        await pilot.pause()
+        assert not lst.rows[g].item["open"] and lst.cursor == g
+        hid = lst.rows[first(lst, "group", lambda r: lst.rows.index(r) > g)].key
+
+        def click(x, times=1):
+            return pilot.click(offset=cell(lst, lst._index[hid], x), times=times)
+
+        def is_open():
+            return lst.rows[lst._index[hid]].item["open"]
+
+        await click(cols(lst).name + 2)
+        await pilot.pause()
+        assert is_open() and fresh.state.selected_key == hid
+        await click(cols(lst).count + cols(lst).count_w - 1)
+        await pilot.pause()
+        assert not is_open()
+        await click(cols(lst).name + 2, times=2)
+        await pilot.pause()
+        assert is_open()
+        await click(cols(lst).menu)
+        await pilot.pause()
+        assert calls.seen[-1] == ("open_actions", hid) and is_open()
+
+
+@pytest.mark.asyncio
+async def test_a_skill_selected_elsewhere_opens_its_repo(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        g = heads(lst)[1]
+        path = g.item["skills"][2]["path"]
+        fresh.set_state(selected=path)
+        await pilot.pause()
+        assert g.key in fresh.state.opened and lst.rows[lst.cursor].key == path
+
+
+@pytest.mark.asyncio
+async def test_the_status_word_shows_on_the_cursor_and_the_hovered_row(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        fresh.set_state(opened=frozenset({"*"}))
+        await pilot.pause()
+        lst = fresh.query_one(SkillList)
+        width = lst.scrollable_content_region.width
+        a, b = [i for i, r in enumerate(lst.rows) if outdated(lst)(r)][:2]
+        g = lst.rows[a].head
+        n = lst._memo(lst.rows[g]).word.split()[1]
+        rest = lst._line(a, width).text
+        assert "↑" in rest and "update" not in rest
+        assert f"↑ {n}" in lst._line(g, width).text and "Update" not in lst._line(g, width).text
+        fresh.set_state(selected=lst.rows[a].key)
+        await pilot.pause()
+        assert lst.cursor == a and "↑ update" in lst._line(a, width).text
+        await pilot.hover(offset=cell(lst, b, cols(lst).name + 2))
+        await pilot.pause()
+        assert lst._hover == (b, "") and "↑ update" in lst._line(b, width).text
+        fresh.set_state(selected=None, selected_key=lst.rows[g].key)
+        await pilot.pause()
+        assert f"u Update {n}" in lst._line(g, width).text
+        assert "update" not in lst._line(a, width).text
+
+
+@pytest.mark.asyncio
+async def test_short_rows_leave_the_detail_to_the_panel(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        fresh.set_state(opened=frozenset({"*"}))
+        await pilot.pause()
+        lst = fresh.query_one(SkillList)
+        width = lst.scrollable_content_region.width
+        ins, h = lst._ins, lst._harness
+
+        def info(r):
+            tags = [t["text"] for t in views.tags(ins, h, r.item)]
+            return tags in (["runs code"], ["you only"]) and not views.is_outdated(ins, r.item)
+
+        row = lst.rows[first(lst, "skill", info)]
+        tag = views.tags(ins, h, row.item)[0]["text"]
+        desc = views.clean_desc(row.item["description"])[:12]
+        text = lst._line(lst._index[row.key], width).text
+        assert desc not in text and tag not in text and not set("▁▂▃▄▅▆▇█") & set(text)
+        assert lst._memo(row).status.word == ""
+        fresh.set_state(row_detail=True)
+        await pilot.pause()
+        text = lst._line(lst._index[row.key], width).text
+        assert desc in text and tag in text
+
+
+@pytest.mark.asyncio
+async def test_a_click_on_the_dot_toggles(fresh, calls):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        g = first(lst, "group", lambda r: lst._group_switch(r.item) is not None)
+        await pilot.click(offset=cell(lst, g, cols(lst).sw))
+        await pilot.pause()
+        assert calls.seen[-1] == ("toggle",) and fresh.state.selected_key == lst.rows[g].key
+        assert not lst.rows[g].item["open"]
+        fresh.set_state(opened=frozenset({"*"}))
+        await pilot.pause()
+        i = first(lst, "skill", lambda r: lst._memo(r).switch)
+        assert lst._line(i, lst.scrollable_content_region.width).text[cols(lst).sw] in "●○"
+        await pilot.click(offset=cell(lst, i, cols(lst).sw))
+        await pilot.pause()
+        assert calls.seen[-1] == ("toggle",) and fresh.state.selected == lst.rows[i].key
+
+
+@pytest.mark.asyncio
+async def test_available_rows_line_up_with_the_short_columns(fresh):
+    async with fresh.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        lst = fresh.query_one(SkillList)
+        width = lst.scrollable_content_region.width
+        c = cols(lst)
+        end = c.status + c.status_w
+        assert c.name_w <= MINI_MAX and c.menu + 2 < width
+        fresh.set_state(opened=frozenset({"*"}))
+        await pilot.pause()
+        i = first(lst, "skill", lambda r: outdated(lst)(r) and lst.rows.index(r) != lst.cursor)
+        assert lst._line(i, width).text[end - 1] == "↑"
+        await pilot.press("6")
+        await settle(pilot)
+        head = lst._line(first(lst, "avail-head"), width).text.rstrip()
+        row = lst._line(first(lst, "avail"), width).text.rstrip()
+        c = cols(lst)
+        end = c.status + c.status_w
+        assert head.index("Available") == row.index("/") == c.name
+        assert len(head) == len(row) == end and row.endswith("i Install")

@@ -450,19 +450,16 @@ async def test_a_group_shows_its_source_and_actions(app, calls):
             "30 of 37 on",
             "★ 9.8k",
             "Update 8",
-            "SKILLS",
             "you only",
         ):
             assert want in text, want
+        assert "SKILLS" not in text
         await click_hint(pilot, "acts", "Update 8")
         names = calls.of("update")[0][0]
         assert len(names) == 8 and "copywriting" in names
         assert [h.label for h in by_id(app, "acts").hints][-2:] == ["GitHub ↗", "⋯"]
         await click_hint(pilot, "acts", "GitHub ↗")
         assert calls.of("open_github") == [("https://github.com/coreyhaines31/marketingskills",)]
-        await pilot.click(by_id(app, f"m:{COPYWRITING}"))
-        await rest(pilot, 0.1)
-        assert app.state.selected == COPYWRITING
 
 
 @pytest.mark.asyncio

@@ -34,6 +34,7 @@ from textual.timer import Timer
 from ...core import views
 from .. import keys, theme
 from ..messages import DataChanged, ItemSelected, JobChanged, SkillSelected, StateChanged
+from ..state import ALL_OPEN, REPO_IDS
 from . import app_of, charts
 
 PKG = __package__.rpartition(".")[0]
@@ -48,8 +49,10 @@ REBUILD = frozenset(
         "show_project",
         "show_stale",
         "collapsed",
+        "opened",
         "compact",
         "group_size",
+        "row_detail",
     }
 )
 QUERY_DELAY = 0.1
@@ -58,6 +61,13 @@ NAME_SHARE = 0.8
 SPARK_W = views.SPARK_WEEKS
 STATUS_W, STATUS_WIDE = 12, 24
 DOTS_MAX = 5
+DOTS = {"on": "●", "off": "○", "mixed": "◐"}
+DOT_TONES = {True: "atlas-muted", False: "atlas-faint"}  # on or mixed, off
+COUNT_MIN = 50  # short rows show the count from this width
+MINI_MIN, MINI_MAX, MINI_SHARE = 20, 56, 0.9  # short rows size the name column from the p90 name
+LABEL_MIN = 16  # a repo label is cut to this before its meta drops a part
+UP = charts.TAGS["update"][0]
+FOLDED_TOAST = "Open a repo to see the descriptions."
 SPIN_SECONDS = 0.08
 FLASH_SECONDS, FLASH_STEPS = 0.7, 14
 NOTE = "You have every skill from this repo. New ones will show here."
@@ -101,6 +111,7 @@ class Status:
     zone: str = ""
     spin: bool = False
     wide: bool = False
+    brief: str = ""  # what a short row shows at rest, in place of the glyph
 
 
 @dataclass
@@ -274,9 +285,13 @@ class SkillList(ScrollView, can_focus=True):
         self._index: dict[str, int] = {}
         self._by_name: dict[str, list[int]] = {}
         self._name_len = NAME_MIN
+        self._mini_len = MINI_MIN
+        self._any_uses = False
         self._count_w = 2
         self._sw_w = 3
+        self._dots = 0
         self._compact = False
+        self._detail = False
         self._writable = True
         self._today = date.today()
         self._layouts: dict[int, Cols] = {}
@@ -331,8 +346,13 @@ class SkillList(ScrollView, can_focus=True):
 
     def on_state_changed(self, event: StateChanged) -> None:
         fields = event.fields
+        if "query" in fields and not app_of(self).state.view_state().q:
+            self._keep_open()
         if fields & REBUILD:
             self.rebuild()
+            shut = self.rows and not any(r.kind == "skill" for r in self.rows)
+            if "row_detail" in fields and self._detail and shut:
+                self.call_later(self._toast, FOLDED_TOAST)
         elif "query" in fields:
             # The search box sends every key; rebuild once after the last one in a burst.
             if self._query_timer is None:
@@ -377,6 +397,7 @@ class SkillList(ScrollView, can_focus=True):
         self._pick = 0
         was = self.results
         self._compact = app.state.compact
+        self._detail = app.state.row_detail
         self._large = app.state.group_size == "large"
         self._layouts.clear()
         self._cache.clear()
@@ -400,7 +421,7 @@ class SkillList(ScrollView, can_focus=True):
             self._today = ins.now.astimezone().date() if ins.now.tzinfo else ins.now.date()
             self.empty = self._no_harness(ins)
             if self.empty is None:
-                self._flatten(ins, views.sections(ins, st, app.state.collapsed))
+                self._flatten(ins, views.sections(ins, st, app.state.folds()))
             self.mode = "rows" if self.rows else "empty"
             if not self.rows and self.empty is None:
                 self.empty = views.empty_state(ins, st)
@@ -441,6 +462,7 @@ class SkillList(ScrollView, can_focus=True):
         rows, blank = self.rows, not self._compact
         known = ins.scan.get("harnesses") or {}
         names, uses, dots = [NAME_MIN], [0], 0
+        labels = [MINI_MIN]
         found = 0
         tagged = 7 if self._view != "new" else 1
         for sec in secs:
@@ -454,18 +476,20 @@ class SkillList(ScrollView, can_focus=True):
                 uses.append(views.uses(ins, s))
                 if self._harness == "all" and s.get("scope") == "personal":
                     dots = max(dots, sum(1 for h in s.get("harnesses") or [] if h in known))
-            first = True
+            first, after_open = True, False
             for g in sec["groups"]:
                 total = sum(views.uses(ins, m) for m in g["members"])
                 uses.append(total)
+                labels.append(cell_len(g["label"]) + 2 + cell_len(g["meta"]))
                 names.extend(
                     cell_len(a["name"]) + (tagged if a.get("new") else 1) for a in g["available"]
                 )
                 if not sec["open"]:
                     continue
-                if (blank or self._large) and not first:
+                # A blank line ends each open group, so a group does not move when it opens.
+                if (blank or self._large) and not first and after_open:
                     rows.append(Row("blank"))
-                first = False
+                first, after_open = False, g["open"]
                 gid, repo, head = g["id"], g["key"], len(rows)
                 item = dict(g)
                 rows.append(Row("group", gid, item, gid, head, uses=total))
@@ -487,9 +511,14 @@ class SkillList(ScrollView, can_focus=True):
                 rows.extend(Row("skill", s["path"], s) for s in sec["rows"])
         # One long name must not take the description's room from every row.
         names.sort()
+        labels.sort()
         self._name_len = names[int(NAME_SHARE * (len(names) - 1))]
+        p90 = max(xs[int(MINI_SHARE * (len(xs) - 1))] for xs in (names, labels))
+        self._mini_len = max(MINI_MIN, min(p90, MINI_MAX))
+        self._any_uses = any(uses)
         self._count_w = max([2, *(len(views.short(n)) for n in uses if n)])
-        self._sw_w = max(3, min(dots, DOTS_MAX))
+        self._dots = min(dots, DOTS_MAX)
+        self._sw_w = max(3, self._dots)
         self.results = found
 
     @staticmethod
@@ -597,6 +626,8 @@ class SkillList(ScrollView, can_focus=True):
             status = self._tag_status("update", tip=tip, zone=zone)
         rest = sorted((t for t in tags if t["kind"] != "update"), key=self._order)
         more = [self._from_tag(t) for t in rest]
+        if not self._detail:
+            more = [m for m in more if m.glyph]  # info tags (runs code, you only) stay in the panel
         if status is None:
             status = more.pop(0) if more else Status()
         return status, more
@@ -621,9 +652,13 @@ class SkillList(ScrollView, can_focus=True):
         if rank in ("error", "warn"):
             n = int(tag["text"].split()[0])
             kind = "error" if rank == "error" else "issues"
-            return self._tag_status(kind, views.plural(n, "issue"), tag["title"])
+            status = self._tag_status(kind, views.plural(n, "issue"), tag["title"])
+            status.brief = f"{status.glyph} {status.word}"
+            return status
         kind = {"edited": "edited", "risk": "risk", "div": "diverged"}.get(rank, "similar")
-        return self._tag_status(kind, tip=tag["title"])
+        status = self._tag_status(kind, tip=tag["title"])
+        status.brief = f"{status.glyph} {status.word}"
+        return status
 
     @staticmethod
     def _tag_status(kind: str, word: str = "", tip: str = "", zone: str = "") -> Status:
@@ -679,7 +714,9 @@ class SkillList(ScrollView, can_focus=True):
             )
         n = len(outdated)
         tip = f"Update {views.plural(n, 'skill')} from {g['label']}"
-        return Status("u", f"Update {n}", "atlas-accent", "atlas-text", tip, "update")
+        return Status(
+            "u", f"Update {n}", "atlas-accent", "atlas-text", tip, "update", brief=f"↑ {n}"
+        )
 
     # Layout
 
@@ -698,8 +735,38 @@ class SkillList(ScrollView, can_focus=True):
     def _cols(self, width: int) -> Cols:
         cols = self._layouts.get(width)
         if cols is None:
-            cols = self._layouts[width] = self._layout(width)
+            layout = self._layout if self._detail else self._mini_layout
+            cols = self._layouts[width] = layout(width)
         return cols
+
+    def _mini_layout(self, width: int) -> Cols:
+        """Short rows: dot, chevron, name; then the status, the count, and ⋯ after the p90 name."""
+        dots = max(1, self._dots) if self._harness == "all" else 1
+        chev = 3 + dots + 1
+        name = chev + 2
+        count_w = self._count_w if width >= COUNT_MIN else 0
+        tail = STATUS_W + 2 + (count_w + 2 if count_w else 0) + 2
+        name_w = max(4, min(self._mini_len, width - name - 2 - tail))
+        status = name + name_w + 2
+        count = status + STATUS_W + 2
+        menu = count + count_w + 2 if count_w else count
+        return Cols(
+            width=width,
+            sw=3,
+            sw_w=dots,
+            chev=chev,
+            name=name,
+            name_w=name_w,
+            desc=status,
+            desc_w=0,
+            spark=status,
+            spark_w=0,
+            count=count,
+            count_w=count_w,
+            status=status,
+            status_w=STATUS_W,
+            menu=menu,
+        )
 
     def _layout(self, width: int) -> Cols:
         """Columns for one width. Drop order (design §2): spark, count, status word, description."""
@@ -820,9 +887,9 @@ class SkillList(ScrollView, can_focus=True):
             line.add("▌", self._fg("atlas-text", ctx.bg))
         draw = {
             "section": self._draw_section,
-            "group": self._draw_group,
+            "group": self._draw_group if self._detail else self._draw_mini_group,
             "group-sub": self._draw_group_sub,
-            "skill": self._draw_skill,
+            "skill": self._draw_skill if self._detail else self._draw_mini_skill,
             "avail-head": self._draw_avail_head,
             "avail": self._draw_avail,
             "note": self._draw_note,
@@ -881,7 +948,7 @@ class SkillList(ScrollView, can_focus=True):
             n = int(row.key in marked)
             glyph = "◆" if n else "◇"
             tip = f"Mark /{row.item.get('invoke') or row.item['name']}"
-        if not n and not marked and ctx.hover is None:
+        if not n and not ctx.cursor and ctx.hover is None:
             glyph = " "
         z = _zone("mark", tip)
         if line.x:
@@ -958,14 +1025,16 @@ class SkillList(ScrollView, can_focus=True):
         line.at(cols.menu - 1).add(" ", _style(None, bg) + z)
         line.add(glyph, self._fg("atlas-muted", bg) + z).add(" ", _style(None, bg) + z)
 
-    def _count(self, line: Line, cols: Cols, uses: int, tip: str, ctx: Ctx) -> None:
+    def _count(
+        self, line: Line, cols: Cols, uses: int, tip: str, ctx: Ctx, tone: str = "atlas-muted"
+    ) -> None:
         if not cols.count_w or self._ins is None:
             return
         if not views.use_ready(self._ins):
             line.at(cols.count).add("–".rjust(cols.count_w), self._fg("atlas-faint", ctx.bg))
         elif uses:
             text = views.short(uses).rjust(cols.count_w)
-            line.at(cols.count).add(text, self._fg("atlas-muted", ctx.bg) + _zone("count", tip))
+            line.at(cols.count).add(text, self._fg(tone, ctx.bg) + _zone("count", tip))
 
     def _draw_section(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
         sec = row.item
@@ -976,11 +1045,14 @@ class SkillList(ScrollView, can_focus=True):
         line.add(" ", fold)
         ids = sec["group_ids"]
         if len(ids) > 1 and not app_of(self).state.view_state().q:
-            collapsed = app_of(self).state.collapsed
-            label = "Expand all" if all(g in collapsed for g in ids) else "Collapse all"
-            x = cols.width - 2 - len(label)
-            if x > line.x + 2:
-                self._action(line, x, label, "atlas-muted", "foldall", "", ctx)
+            folded = self._any_folded(ids)
+            label = "Expand all" if folded else "Collapse all"
+            tip = f"{'Open' if folded else 'Fold'} every group in {sec['title']}"
+            self._action(line, line.x + 1, label, "atlas-faint", "foldall", tip, ctx)
+        x = cols.count + cols.count_w - len("uses")
+        if sec["open"] and cols.count_w and self._any_uses and x > line.x + 2:
+            z = _zone("uses", "Times each skill ran, from your agent logs")
+            line.at(x).add("uses", self._fg("atlas-faint", ctx.bg) + z)
 
     def _draw_group(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
         g, bg = row.item, ctx.bg
@@ -1023,8 +1095,9 @@ class SkillList(ScrollView, can_focus=True):
     def _draw_group_sub(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
         g = row.item
         fold = _zone("fold", f"Show or hide {g['label']}")
-        ibg, _ = _ident(g["hue"], self._dark)
-        line.at(cols.chev - 1).add("  ", fold).add(" ", _style(None, ibg) + fold)
+        line.at(cols.chev - 1).add("  ", fold)
+        if self._detail:
+            line.add(" ", _style(None, _ident(g["hue"], self._dark)[0]) + fold)
         line.at(cols.name)
         self._meta(line, g, cols.menu - 2, ctx.bg, "")
 
@@ -1077,6 +1150,120 @@ class SkillList(ScrollView, can_focus=True):
             self._count(line, cols, cells.uses, cells.use_tip, ctx)
         self._status(line, cols, cells.status, ctx, cells.more)
         self._menu(line, cols, ctx)
+
+    def _draw_mini_skill(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
+        cells: Cells = self._memo(row)
+        bg = ctx.bg
+        full = ctx.cursor or ctx.hover is not None
+        self._mark(line, row, ctx)
+        if cells.switch:
+            self._dot(line, cols, cells.switch, cells.switch_tip, ctx)
+        elif cells.dots:
+            z = _zone("dots", "\n".join(tip for _, tip in cells.dots))
+            line.at(cols.sw)
+            for on, _ in cells.dots[: cols.sw_w]:
+                line.add(DOTS["on" if on else "off"], self._fg(DOT_TONES[on], bg) + z)
+        x = cols.name if row.gid else cols.chev
+        line.at(x).add("/", self._fg("atlas-faint", bg))
+        color = "atlas-muted" if cells.off else "atlas-text"
+        self._text(line, cells.name, cols.status - 2 - x - 1, color, bg)
+        status = cells.status
+        if not full and cells.more and not self._short(status, status.glyph):
+            status = cells.more[0]  # the Updates view hides ↑, so show the next status
+        self._mini_status(line, cols, status, ctx, brief=not (full or status.wide))
+        tone = "atlas-muted" if full else "atlas-faint"
+        self._count(line, cols, cells.uses, cells.use_tip, ctx, tone)
+        self._menu(line, cols, ctx)
+
+    def _draw_mini_group(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
+        g, bg = row.item, ctx.bg
+        full = ctx.cursor or ctx.hover is not None
+        self._mark(line, row, ctx)
+        switch = self._group_switch(g)
+        if switch is not None:
+            self._dot(line, cols, switch[0], switch[1], ctx)
+        fold = _zone("fold", f"Show or hide {g['label']}")
+        line.at(cols.chev).add("▾" if g["open"] else "▸", self._fg("atlas-muted", bg) + fold)
+        status = self._memo(row)
+        rest = self._short(status, status.glyph) if status else ""
+        end = cols.status + cols.status_w - (cell_len(rest) + 2 if rest else 0)
+        self._label(line, g, cols.name, end, bg)
+        self._mini_status(line, cols, status, ctx, brief=not full)
+        tone = "atlas-muted" if full else "atlas-faint"
+        self._count(line, cols, row.uses, views.plural(row.uses, "use"), ctx, tone)
+        self._menu(line, cols, ctx)
+
+    def _label(self, line: Line, g: dict, x: int, end: int, bg: str) -> None:
+        """A repo's label, +N new, and meta up to `end`. The label is cut before meta drops."""
+        fresh = f"+{g['fresh']} new" if g["fresh"] and self._view != "new" else ""
+        parts = g["meta"].split(" · ") if g["meta"] and not self._large else []
+        keep = min(cell_len(g["label"]), LABEL_MIN)
+
+        def tail(k: int) -> int:
+            meta = cell_len(" · ".join(parts[:k])) + 2 if k else 0
+            return (len(fresh) + 1 if fresh else 0) + meta
+
+        k = len(parts)
+        while k and end - x - tail(k) < keep:
+            k -= 1
+        if fresh and end - x - tail(0) < keep:
+            fresh = ""
+        line.at(x)
+        self._text(line, g["label"], end - x - tail(k), "atlas-text", bg, bold=True)
+        if fresh:
+            tip = f"{views.plural(g['fresh'], 'skill')} added since you last looked"
+            line.add(" ").add(fresh, self._fg("atlas-accent", bg) + _zone("status", tip))
+        muted, faint = self._fg("atlas-muted", bg), self._fg("atlas-faint", bg)
+        for i, part in enumerate(parts[:k]):
+            line.add(" · " if i else "  ", faint if i else None).add(part, muted)
+
+    def _short(self, status: Status, glyph: str) -> str:
+        """What a short row shows at rest. ↑ hides in the Updates view, where every row has it."""
+        if self._view == "updates" and UP in (status.glyph, status.brief[:1]):
+            return ""
+        return status.brief or glyph or status.word
+
+    def _dot(self, line: Line, cols: Cols, state: str, tip: str, ctx: Ctx) -> None:
+        """The switch of a short row: ● on, ○ off, ◐ mixed. It takes clicks on 2 cells."""
+        z = _zone("switch", tip)
+        tone = DOT_TONES[state != "off"]
+        line.at(cols.sw).add(DOTS[state], self._fg(tone, ctx.bg) + z).add(" ", z)
+
+    def _mini_status(
+        self, line: Line, cols: Cols, status: Status | None, ctx: Ctx, *, brief: bool
+    ) -> None:
+        """Status that ends at the right edge of its column. Brief: `status.brief` or the glyph."""
+        if status is None or not (status.glyph or status.word):
+            return
+        glyph, word = status.glyph, status.word
+        if status.spin:
+            if self.app.animation_level == "full":
+                glyph = charts.SPINNER[self._frame % len(charts.SPINNER)]
+            else:
+                word = f"{word}…"
+        whole = f"{glyph} {word}" if glyph and word else glyph or word
+        short = self._short(status, glyph)
+        end = cols.status + cols.status_w
+        text = short if brief else whole
+        if cell_len(text) > end - line.x - 2:
+            text = short
+        if not text or cell_len(text) > end - line.x - 2:
+            return
+        bg = self._zone_bg(status.zone, ctx) if status.zone else ctx.bg
+        z = _zone(status.zone or "status", status.tip)
+        x = end - cell_len(text)
+        if status.zone:
+            line.at(x - 1).add(" ", _style(None, bg) + z)
+        line.at(x)
+        if text == status.brief:
+            line.add(text, self._fg(status.color, bg) + z)
+        else:
+            if glyph and text.startswith(glyph):
+                line.add(glyph, self._fg(status.color, bg) + z)
+                text = text[len(glyph) :]
+            line.add(text, self._fg(status.word_color or status.color, bg) + z)
+        if status.zone:
+            line.add(" ", _style(None, bg) + z)
 
     def _draw_avail_head(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
         g = row.item
@@ -1138,12 +1325,13 @@ class SkillList(ScrollView, can_focus=True):
                 line.add("━" * max(4, int(cols.desc_w * share)), bar)
             else:
                 self._text(line, cells.desc, cols.desc_w, cells.desc_color, bg)
-        self._status(line, cols, cells.status, ctx)
+        if self._detail:
+            self._status(line, cols, cells.status, ctx)
+        else:
+            self._mini_status(line, cols, cells.status, ctx, brief=False)
 
     def _draw_note(self, line: Line, row: Row, cols: Cols, ctx: Ctx) -> None:
-        line.at(cols.name).add(
-            _cut(NOTE, cols.width - cols.name - 2), self._fg("atlas-muted", ctx.bg)
-        )
+        line.at(cols.name).add(_cut(NOTE, cols.menu - cols.name), self._fg("atlas-muted", ctx.bg))
 
     def _skeleton_line(self, y: int, width: int, base: Style) -> Strip:
         cols = self._cols(width)
@@ -1152,7 +1340,8 @@ class SkillList(ScrollView, can_focus=True):
         if y % 8 == 1:
             line.at(cols.name).add("━" * min(14 + (y * 5) % 9, cols.name_w + 4), bar)
         elif y % 8:
-            line.at(cols.sw).add(charts.SWITCH["loading"], bar)
+            switch = charts.SWITCH["loading"] if self._detail else "━" * cols.sw_w
+            line.at(cols.sw).add(switch, bar)
             line.at(cols.name).add("━" * min(10 + (y * 7) % 11, cols.name_w - 2), bar)
             if cols.desc_w:
                 share = 0.4 + ((y * 13) % 31) / 100
@@ -1270,11 +1459,43 @@ class SkillList(ScrollView, can_focus=True):
         else:
             self.post_message(ItemSelected(row.key, open=open))
 
+    def can_fold(self, key: str) -> bool:
+        """Whether enter folds the repo row with this key now."""
+        i = self._index.get(key)
+        return i is not None and self.rows[i].kind == "group" and self.foldable(self.rows[i])
+
+    def toggle_fold(self, key: str) -> None:
+        if self.can_fold(key):
+            self._fold(self.rows[self._index[key]])
+
+    def cursor_row(self) -> Row | None:
+        """The row under the cursor, or None while the list shows no rows."""
+        ok = self.mode == "rows" and 0 <= self.cursor < len(self.rows)
+        return self.rows[self.cursor] if ok else None
+
     def _follow_selection(self) -> None:
         state = app_of(self).state
         i = self._index.get(state.selected or state.selected_key or "")
-        if i is not None and i != self.cursor:
+        if i is None and state.selected:
+            self._unfold_to(state.selected)
+        elif i is not None and i != self.cursor:
             self._set_cursor(i)
+
+    def _keep_open(self) -> None:
+        """When a search clears, the repo of the selected skill stays open."""
+        app = app_of(self)
+        i = self._index.get(app.state.selected or "")
+        gid = self.rows[i].gid if i is not None else ""
+        if gid in app.state.folds():
+            self._open(gid, True)
+
+    def _unfold_to(self, path: str) -> None:
+        """Open the folded group that holds a skill selected from elsewhere."""
+        for row in self.rows:
+            shut = row.kind == "group" and not row.item["open"] and self.foldable(row)
+            if shut and any(s["path"] == path for s in row.item["skills"]):
+                self._open(row.key, True)
+                return
 
     def _step(self, delta: int) -> None:
         stops = self._stops
@@ -1320,12 +1541,18 @@ class SkillList(ScrollView, can_focus=True):
             self._select(self._stops[-1])
 
     async def action_select(self) -> None:
+        """Open the cursor row's details; on a repo, fold or unfold it and keep it selected."""
         if self.mode == "empty":
             actions = self.empty["actions"] if self.empty else []
             if actions:
                 await self._empty_action(actions[min(self._pick, len(actions) - 1)])
         elif 0 <= self.cursor < len(self.rows):
-            self._select(self.cursor, open=True)
+            row = self.rows[self.cursor]
+            if row.kind == "group" and self.foldable(row):
+                self._select(self.cursor, now=True)
+                self._fold(row)
+            else:
+                self._select(self.cursor, open=True)
 
     def _move_pick(self, delta: int) -> None:
         n = len(self.empty["actions"]) if self.empty else 0
@@ -1360,30 +1587,63 @@ class SkillList(ScrollView, can_focus=True):
     def action_unfold_all(self) -> None:
         self._fold_all(close=False)
 
+    def _any_folded(self, ids: Iterable[str]) -> bool:
+        folds = app_of(self).state.folds()
+        return any(g in folds for g in ids)
+
     def _fold_all(self, *, close: bool, ids: Iterable[str] | None = None) -> None:
-        app = app_of(self)
+        """Fold or open every group, or the `ids` of one section. Repos also set `opened`."""
+        st = app_of(self).state
+        every = ids is None
         if ids is None:
             ids = [g for r in self.rows if r.kind == "section" for g in r.item["group_ids"]]
-        want = set(ids)
-        collapsed = app.state.collapsed | want if close else app.state.collapsed - want
-        app.set_state(collapsed=frozenset(collapsed))
+        want = frozenset(ids)
+        repos = frozenset(g for g in want if g.startswith(REPO_IDS))
+        if close:
+            opened = frozenset() if every else st.opened - want
+        elif every:
+            opened = frozenset({ALL_OPEN})
+        else:
+            opened = st.opened if ALL_OPEN in st.opened else st.opened | repos
+        collapsed = st.collapsed | want if close else st.collapsed - want
+        app_of(self).set_state(collapsed=collapsed, opened=opened)
+
+    def foldable(self, row: Row) -> bool:
+        """Folds hold still during a search, and the New view keeps its sources open."""
+        st = app_of(self).state.view_state()
+        if st.q or self._ins is None:
+            return False
+        if row.kind == "avail-head":
+            return st.view != "new"
+        return not (row.kind == "group" and st.view == "new" and row.key.startswith("src:"))
 
     def _fold(self, row: Row) -> None:
-        app = app_of(self)
-        st = app.state.view_state()
-        if st.q or self._ins is None:
+        if not self.foldable(row):
             return
+        app = app_of(self)
         key = row.key
+        if row.kind == "group":
+            self._open(key, not row.item["open"])
+            return
         if row.kind == "avail-head":
-            if st.view == "new":
-                return
+            assert self._ins is not None
             # The saved flag means "not the default", as on the web.
-            plain = views.ViewState(view="all", group_by=st.group_by)
+            plain = views.ViewState(view="all", group_by=app.state.group_by)
             default = views.avail_open(self._ins, plain, row.repo, len(row.item["members"]))
             key = f"av:{row.repo}" if default else f"+av:{row.repo}"
-        elif row.kind == "group" and st.view == "new" and key.startswith("src:"):
-            return
         app.set_state(collapsed=app.state.collapsed ^ {key})
+
+    def _open(self, gid: str, on: bool) -> None:
+        """Open or fold one group. In the All view, `opened` keeps the repos you open."""
+        app = app_of(self)
+        st = app.state
+        changes = {"collapsed": st.collapsed - {gid} if on else st.collapsed | {gid}}
+        if st.view == "all" and gid.startswith(REPO_IDS):
+            if not on:
+                changes["opened"] = st.opened - {gid}
+            elif ALL_OPEN not in st.opened:
+                changes["opened"] = st.opened | {gid}
+        app.set_state(**changes)
 
     # Marks
 
@@ -1426,8 +1686,10 @@ class SkillList(ScrollView, can_focus=True):
             self._anchor = there.key
 
     def action_mark(self) -> None:
+        """Mark or unmark the cursor row, then move down, so `m m m` marks a run."""
         if 0 <= self.cursor < len(self.rows):
             self._mark_row(self.cursor)
+            self._step(1)
 
     def action_extend_down(self) -> None:
         self._extend(1)
@@ -1499,10 +1761,8 @@ class SkillList(ScrollView, can_focus=True):
         elif row.kind == "section":
             if zone == "foldall":
                 ids = row.item["group_ids"]
-                self._fold_all(
-                    close=not all(g in app_of(self).state.collapsed for g in ids), ids=ids
-                )
-            else:
+                self._fold_all(close=not self._any_folded(ids), ids=ids)
+            elif zone != "uses":
                 self._fold(row)
         elif row.kind == "avail-head":
             await self._avail_head_click(row, zone)
@@ -1515,8 +1775,6 @@ class SkillList(ScrollView, can_focus=True):
                 self._mark_range(y)
             else:
                 self._mark_row(y)
-        elif zone == "fold" and row.kind == "group":
-            self._fold(row)
         elif zone == "switch":
             self._select(y, now=True)
             await self._call("jobs", "toggle")
@@ -1529,6 +1787,11 @@ class SkillList(ScrollView, can_focus=True):
         elif zone == "install":
             self._select(y, now=True)
             await self._call("jobs", "install", row.repo, [row.item["path"]])
+        elif row.kind == "group" and self.foldable(row):
+            # The second click of a double click must not undo the first.
+            if event.chain == 1:
+                self._select(y, now=True)
+                self._fold(row)
         elif event.chain >= 2 and row.kind in ("skill", "avail"):
             self._select(y, now=True)
             await self._call(

@@ -34,15 +34,80 @@ App frame, top to bottom:
 
 | Row | Region | Surface | Contents |
 | --- | --- | --- | --- |
-| 0 | Header | `$atlas-surface-1`, `padding: 0 1` | brand, harness tabs, status at the right |
-| 1 | View strip | `$background`, `padding: 0 1` | view tabs with counts, search at the right |
+| 0 | Header | `$atlas-surface-1`, `padding: 0 1` | brand, harness chip, `! 1 not checked` and `↑ 9 updates` at the right |
+| 1 | View strip | `$background`, `padding: 0 1` | view chip (`All 347 ▾`), search at the right |
 | 2 | Rule | `─` in `$atlas-border` | becomes the progress bar during a job (§8) |
 | 3…n-2 | List, panel | `$background`, `$atlas-surface-1` | the panel docks at the right (§11) |
-| n-1 | Key bar | `$atlas-surface-1`, `padding: 0 1` | keys at the left, totals at the right |
+| n-1 | Key bar | `$atlas-surface-1`, `padding: 0 1` | three hints at the left, context cost at the right |
 
 The bulk bar replaces the view strip on row 1 while marks exist. It never adds a row.
 
+**Header.** The brand, then the harness chip (`Claude Code · personal ▾`). A click on the chip opens
+the harness menu. `[` and `]` step through the harnesses. At the right, `! 1` counts the sources
+that the last check could not read (`! 1 not checked`; `! 1` when narrow). A click on it lists the
+errors. Then a quiet `↑ 9 updates` link (`↑ 9` when narrow) opens the Updates view, as key `4`
+does. The link hides in the Updates view and while marks exist. With no updates, `✓ Up to date`
+shows. A click on it checks again, as `ctrl+r` and the palette do. The header has no `Check again`
+button and no new-skills chip; the New view is in the view menu.
+
+**View strip.** One view chip, `All 347 ▾`, shows the active view and its count. It replaces the
+eight view tabs. A click on the chip opens the view menu, with each view and its count. Costly,
+Similar, and Diverged hide at `0`. Keys `1`–`9` stay. Search sits at the right. In the Updates
+view, the accent button follows the chip: `Update 8` and a faint `Skips 1 you edited`, or
+`Update all` when it skips none. `views.update_targets` gives the count to the button and the
+`shift+u` job.
+
+**Key bar.** The list context has three hints: `enter open`, `ctrl+k actions`, `? help`. On a repo
+row, `enter` reads `expand` or `collapse`, from the fold state of the row. On a skill row with the
+panel docked, `enter open` becomes `x turn off` or `x turn on`. In search with text, the bar shows
+`esc clear`. The `enter` hint keeps the width of its longest label, so the hints after it do not
+move. Marks, search, and the panel
+have their own hints (`keys.BAR`). Help (`?`) and the palette (`ctrl+p`) list every key. Help
+starts with `ctrl+p All commands`. This
+includes the keys that are not in the bar. From 160 columns, the context cost of the harness
+(`≈14k tokens in context`) shows at the right in `$atlas-muted`. The view chip and the panel show
+the skill count, so the bar does not show it.
+
 **Skill row.** One line. Columns, left to right:
+
+| Column | Width | Align | Notes |
+| --- | --- | --- | --- |
+| Focus bar | 1 | — | col 0; `▌` on the cursor row only |
+| Mark | 1 | — | col 1; blank until a mark exists (§6) |
+| Dot | 1 | — | `●` on, `○` off, `◐` mixed (§6); blank when the harness has no switch. All harnesses: one dot for each harness, 5 at most |
+| Name | flex | left | `/` in `$atlas-faint`, name in `$atlas-text`; cut with `…` |
+| Status | 16 at most | right | the first status (§6): the glyph at rest; the glyph and its word on the cursor row and the hovered row. Rare statuses (similar, issues, error, edited, diverged, high risk) show the word at rest. `↑` hides in the Updates view |
+| Count | widest count in view (min 2) | right | `$atlas-faint`; blank for zero uses |
+| Menu | 1 | — | `⋯` at the right edge, on the cursor row and the hovered row |
+
+- **Name width** is the 90th-percentile name (and repo label with meta) in the view, held to 20–56
+  cells. On a wide list the extra space stays at the right, so the count stays near the name.
+- The section row has a faint `uses` label over the count column, and a faint `Expand all` (when a
+  repo is folded) or `Collapse all` next to the title.
+- A row has no description, no sparkline, and no info tags (`runs code`, `you only`). The detail
+  panel shows them.
+- The status column keeps its cells at rest. Thus the word can show on hover with no shift.
+- **Section label** (`YOUR SKILLS 42`, `AVAILABLE`) starts at col 3.
+- **Pin the repo row** of the top visible row on the list's first line while its rows scroll.
+- **Compact (`c`)** removes the blank rows.
+
+**Repo row.** Repos start folded in the All view. A folded repo is one line: the dot, `▸`, the
+name in bold, the meta in `$atlas-muted` (`30 of 37 on · 1 not installed`), its `↑ N` update
+(`Update N` on the cursor row), and the count. The monogram badge shows only on detail rows and in
+the panel. A long name is cut with `…` before a meta part drops. An open repo shows `▾`, and its skill rows follow it. The skill names start
+in line with the repo name.
+
+- `enter` expands or collapses the repo at the cursor. `right` opens it, and `left` folds it. A
+  click on the chevron does the same. `shift+l` (Expand all) opens every repo; `shift+h` folds them.
+- `UIState.opened` saves the repos that you open. `"*"` opens all repos. `UIState.collapsed` saves
+  the folds in the other views.
+- A search or a filter view shows its matches unfolded. When the search clears, the repo of the
+  selected skill stays open.
+- Folded repos have no blank line between them. One blank row comes after an open repo, so a repo
+  row does not move when it opens.
+
+**Detail rows.** Display > `Show descriptions in the list` (`UIState.row_detail`) brings back the
+detail row. It adds the description, the 12-week spark, and every tag. Its columns, left to right:
 
 | Cols | Column | Width | Align | Notes |
 | --- | --- | --- | --- | --- |
@@ -50,7 +115,7 @@ The bulk bar replaces the view strip on row 1 while marks exist. It never adds a
 | 1 | Mark | 1 | — | blank until a mark exists (§6) |
 | 2 | gap | 1 | | |
 | 3–5 | Switch | 3 | — | blank when the harness has no switch |
-| 6–9 | gap | 4 | | cols 8–9 hold the chevron on group headers |
+| 6–9 | gap | 4 | | cols 8–9 hold the chevron on repo rows |
 | 10… | Name | see below | left | `/` in `$atlas-faint`, name in `$atlas-text` |
 | | gap, Description | 2, flex (min 16) | left | `$atlas-muted`, cut with `…` |
 | | gap, Spark | 2, 12 | left | 12 weeks, one cell per week |
@@ -63,13 +128,11 @@ The bulk bar replaces the view strip on row 1 while marks exist. It never adds a
 - **Column drop order** when the list is narrow: spark, then count, then the status word (its glyph
   stays), then description. When the description drops, the status word comes back if it fits. The
   gutter, switch, and name never drop. All-harnesses dots show at most 5; the tooltip names each.
-- **Group header** uses the same columns. The group switch sits in the switch column. The chevron
-  sits at col 8, and the group name starts at col 10, in line with the skill names. The meta text
-  (`20 of 22 on · 30 available`) follows the name in `$atlas-muted`. The group spark, count, and
+- **Repo rows** use the same columns. The repo switch sits in the switch column. The chevron sits at
+  col 8, and the repo name starts at col 10, in line with the skill names. The meta text
+  (`20 of 22 on · 30 available`) follows the name in `$atlas-muted`. The repo spark, count, and
   status use the row columns.
-- **Section label** (`YOUR SKILLS 42`, `AVAILABLE`) starts at col 3.
-- **Pin the group header** of the top visible row on the list's first line while its rows scroll.
-- **Regular rows:** one blank row before each group header. **Compact (`c`):** no blank rows, no
+- **Regular rows:** one blank row before each repo row. **Compact (`c`):** no blank rows, no
   spark, description in `$atlas-faint`. This matches the web's compact mode.
 
 **Numbers.** Monospace digits are already the same width. Alignment is not automatic:
@@ -82,6 +145,20 @@ The bulk bar replaces the view strip on row 1 while marks exist. It never adds a
 **Panel.** `padding: 1 2`. One blank row between sections. Key-value rows use a 12-cell label column
 in `$atlas-muted` and a value column in `$atlas-text`. In **Loaded by**, the harness name is at the
 left; the switch, one space, and the word `on` or `off` sit at the right padding edge.
+
+**Side panel.** The title line (`Inventory` alone), then two lines of stats. They replace the six
+stat tiles:
+
+- `297 on   50 off   9 updates`. The numbers use their state colors (§4). The words are
+  `$atlas-muted`; on hover they go to `$atlas-accent`. A count that is not zero opens its view.
+- `66 untracked, 1 duplicate, 1 edited` in `$atlas-muted`.
+
+Then **Needs attention**: one short line for each item. The glyph is at the left, and `›` is at
+the right edge. The tooltip holds the full sentence. One faint row of at most 2 lines names the
+other sections (`Usage, cost, overlap, security, ›` / `profiles, skill set, display`) and opens
+them. Names that do not fit are cut to `, …`, and the tooltip lists all. The Display pane (`,`)
+has the checkbox `Show descriptions in the list`. When it turns on and every repo is folded, a
+toast says `Open a repo to see the descriptions.`
 
 **Measure.** Text in the panel wraps at 64 cells at most. Markdown in the reader is centered and wraps
 at 76 cells, the same as the web reader. Key bar pairs are 3 cells apart.
@@ -159,7 +236,7 @@ Separate regions with background steps first:
 | `$background` | list, view strip |
 | `$atlas-surface-1` | header, key bar, panel, a hovered list row, dialogs |
 | `$atlas-surface-2` | neutral cards in the panel, a hovered panel row, input fields, skeleton bars |
-| `$atlas-surface-3` | toasts, the active view tab, a focused input, a pressed hint |
+| `$atlas-surface-3` | toasts, the view chip, a focused input, a pressed hint |
 | tints | update card (`accent-tint`), problem cards (`warn-tint`, `danger-tint`) |
 
 A border earns its place in two cases only:
@@ -193,9 +270,9 @@ in a test). No emoji. No Nerd Font icons: many users do not have them.
 
 | Glyph | Meaning | Color |
 | --- | --- | --- |
-| `━━●` `○━━` `━◐━` | switch: on, off, mixed. The knob position says the state | on: `$atlas-on`; off: `$atlas-off`, knob `$atlas-muted` |
-| `●` `○` | on or off in one harness (All harnesses) | `$atlas-on` / `$atlas-off` |
-| `▾` `▸` | open, folded (group headers, panel sections) | `$atlas-muted` |
+| `━━●` `○━━` `━◐━` | switch in the panel and in detail rows: on, off, mixed. The knob position says the state | on: `$atlas-on`; off: `$atlas-off`, knob `$atlas-muted` |
+| `●` `○` `◐` | the row dot: on, off, mixed. All harnesses: on or off in one harness | `$atlas-muted`; `○` in `$atlas-faint` |
+| `▾` `▸` | open, folded (repo rows, panel sections); `▾` also opens a menu (harness chip, view chip) | `$atlas-muted` |
 | `▌` | focus bar on the focused row (col 0) | `$atlas-text` |
 | `◆` `◇` `◈` | marked, not marked (shown only while marks exist), some marked (group) | `$atlas-accent`, `$atlas-faint`, `$atlas-accent` |
 | `↑ update` | an update is available | accent |
@@ -215,11 +292,12 @@ in a test). No emoji. No Nerd Font icons: many users do not have them.
 | `–` | value not known yet | `$atlas-faint` |
 | `→` | from and to: `a3f9c1e → 7d20b4a`, `on → off` | `$atlas-muted` |
 | `↗` | opens in the browser | `$atlas-muted` |
-| `‹` `›` | more tabs past this edge | `$atlas-faint` |
+| `›` | opens a view or more rows: an attention item, the more row, or a link at the right of a panel row | `$atlas-faint` |
 
 - The first status on a row, by priority: busy, done, failed, update, edited, error, risk, issues,
-  diverged, similar, new. Then one more tag if it fits, then `+N` (its tooltip names the rest), as
-  the web shows 2 tags and `+N`. Plain tags (`runs code`, `you only`) are `$atlas-faint`.
+  diverged, similar, new. A row shows only this status. A detail row then shows one more tag if it
+  fits, then `+N` (its tooltip names the rest), as the web shows 2 tags and `+N`. Plain tags
+  (`runs code`, `you only`) are `$atlas-faint`. Only detail rows and the panel show them.
 - The brand is ` ╱ ` in `$atlas-on-accent` on `$atlas-accent`, then **Skill Atlas**, like the web logo.
 - Write keys as their names, lowercase: `enter`, `esc`, `space`, `tab`, `ctrl+k`, `shift+j`. Not `⏎`.
 - Never type `...`. Use `…`.
@@ -232,9 +310,9 @@ cursor row keeps a `$atlas-surface-2` background and drops the bar.
 
 | Element | Default | Mouse hover | Focus / cursor | Selected / active | Marked | Disabled |
 | --- | --- | --- | --- | --- | --- | --- |
-| Skill row | §2 columns | `$atlas-surface-1` | selection + `▌` | — | `$atlas-mark` + `◆`; cursor wins the background | off: name muted, description faint, spark faint |
-| Group header | bold name, muted meta | `$atlas-surface-1` | selection + `▌` | — | `◆` or `◈` | — |
-| View tab | label muted, count faint | label `$atlas-text` | not focusable; keys `1`–`9` | `$atlas-surface-3`, label text, count muted | — | count `–`, no hover |
+| Skill row | §2 columns | `$atlas-surface-1`; status word shows | selection + `▌`; status word shows | — | `$atlas-mark` + `◆`; cursor wins the background | off: name muted, description faint, spark faint |
+| Repo row | bold name, muted meta; `▸` folded, `▾` open | `$atlas-surface-1` | selection + `▌`; key bar `enter expand` or `enter collapse` | — | `◆` or `◈` | — |
+| View chip | `$atlas-surface-3`, label text, count muted, `▾` muted | `▾` in `$atlas-text` | not focusable; keys `1`–`9`; a click opens the view menu | — | — | count `–`, no hover |
 | Switch | §6 | via its row | via its row | — | — | all cells `$atlas-faint`, knob left |
 | Key hint | key accent; label text (content) or muted (key bar) | `$atlas-surface-2` under the hint and 1 cell each side | selection (dialogs only) | primary: ` u Update ` on accent | — | key and label faint, no hover |
 | Input | `$atlas-surface-2`, `/` and placeholder faint | — | `$atlas-surface-3`, cursor block in `$atlas-text` | — | — | text faint, no cursor |
@@ -243,8 +321,8 @@ cursor row keeps a `$atlas-surface-2` background and drops the bar.
 | Element | Busy | Error | Empty | Loading |
 | --- | --- | --- | --- | --- |
 | Skill row | status `⠋ updating`; `queued` in muted | status `✗ failed` | — | skeleton (below) |
-| Group header | `⠋ 3 of 8` in status | `✗ 2 failed` | the group hides | skeleton name bar |
-| View tab | — | — | count `0`; Issues, New, Costly, Review hide at `0`, as on the web | count `–` |
+| Repo row | `⠋ 3 of 8` in status | `✗ 2 failed` | the repo hides | skeleton name bar |
+| View chip | — | — | count `0`; in the view menu, Issues, New, Costly, and Review hide at `0`, as on the web | count `–` |
 | Switch | none: writes are optimistic | reverts, then a toast | — | `━━━` skeleton in `$atlas-surface-3` |
 | Key hint | label `Updating…`, spinner in place of the key | — | — | — |
 | Input | — | `✗` line below in danger, with the fix | placeholder | — |
@@ -255,7 +333,8 @@ cursor row keeps a `$atlas-surface-2` background and drops the bar.
   40–70% of its column. Each bar is `━` glyphs in `$atlas-surface-3` on `$background`, never cell
   backgrounds. Widths come from the row index, so they do not change between frames. No shimmer.
 - **Hover** never changes text, weight, or width. Reserve every cell that hover uses (the `◇` mark,
-  the hint padding).
+  the hint padding). The one exception is the status word on a list row. It uses cells that the
+  status column keeps, so nothing moves.
 - **Pressed** (mouse down on a hint): `$atlas-surface-3` until mouse up. Act on mouse up.
 
 ## 8. Motion
@@ -326,7 +405,7 @@ it. Without a spinner, the label (`Checking…`) carries the state.
 ## 10. Copy
 
 - Sentence case for every label, title, and message. Section labels are uppercased in code (§3).
-- Key bar labels are one or two lowercase words: `move`, `open`, `toggle`, `help`.
+- Key bar labels are one or two lowercase words: `open`, `expand`, `collapse`, `actions`, `help`.
 - Labels name the result: `See changes`, `Update`, `History (5)`, `Check again`, `Move to Trash`.
   Never `OK`, `Submit`, `Yes`, or `Done` alone.
 - Front-load the important word. No "please". No exclamation marks.
@@ -359,10 +438,10 @@ Check every screen at 80×24, 120×36, and 180×50 (`scripts/tui_shot.py`).
 | Width | Layout |
 | --- | --- |
 | < 60, or < 16 rows | only the too-small message (§10) |
-| 60–99 | list only. `enter` opens the panel as a drawer from the right, width `min(cols − 8, 64)`, over the list. `esc` closes it. The brand shows only its logo. Harness tabs show the active harness and `2 of 9 ›` in faint. Search hides until `/`, then takes the view strip row. |
-| 100–119 | panel docked at the right, width 40. The spark drops first (§2). |
-| 120–159 | panel width `round(0.34 × cols)`. All harness tabs show if they fit, else as at 60–99. Search shows at the right of the view strip, 28 cells wide. The reader shows its outline column (28 cells). |
-| ≥ 160 | panel width `min(round(0.34 × cols), 64)`. The key bar shows its right-side totals. |
+| 60–99 | list only. `enter` opens the panel as a drawer from the right, width `min(cols − 8, 64)`, over the list. `esc` closes it. The brand shows only its logo. Search hides until `/`, then takes the view strip row. |
+| 100–119 | panel docked at the right, width 40. In detail rows, the spark drops first (§2). |
+| 120–159 | panel width `round(0.34 × cols)`. Search shows at the right of the view strip, 28 cells wide. The reader shows its outline column (28 cells). |
+| ≥ 160 | panel width `min(round(0.34 × cols), 64)`. The key bar shows the context cost at the right. |
 
 | Height | Change |
 | --- | --- |
@@ -370,13 +449,14 @@ Check every screen at 80×24, 120×36, and 180×50 (`scripts/tui_shot.py`).
 | ≥ 30 rows | full heatmap. |
 | any | Dialogs: `max-height` = rows − 2, with an inner scroll. Toasts: 3 rows at most, right-aligned above the key bar, `max-width: 60`. |
 
-- When tabs do not fit, the strip scrolls to keep the active tab in view, with `‹`/`›` at the edges.
-- The key bar never wraps. It drops keys from the right by priority. `? help` and `q quit` stay.
+- The harness chip and the view chip open menus, so the header and the view strip never scroll.
+- The key bar never wraps. It drops hints from the right by priority. `? help` always stays.
+  `q quit` stays in the contexts that show it.
 
 ## 12. Performance
 
 - **The list is one line-API widget.** One `ScrollView` subclass with `render_line(y) -> Strip`.
-  No widget per row and no widget per group header. Cost follows visible lines, not skill count.
+  No widget per row and no widget per repo row. Cost follows visible lines, not skill count.
 - **Cache rendered lines** in a `textual.cache.LRUCache` keyed by row id, width, data version, and row
   flags (cursor, focus, marked, hover). Clear it on theme change, resize, and `DataChanged`.
 - **Refresh only what changed.** A cursor move refreshes two lines (`refresh_line`). A hover refreshes
@@ -401,21 +481,23 @@ Check every screen at 80×24, 120×36, and 180×50 (`scripts/tui_shot.py`).
   in `keys.py`. Each click target also has a key.
 - **The mouse alone does every task.** A user who never touches the keyboard (except to type a search
   or a name) can reach every feature in `parity.md`. Required:
-  - Click a harness tab, a view tab, a key bar hint, a panel action, or a dialog button to run it.
-  - Click a row to select it; double-click to open the reader. Click its switch to toggle it. Click its
-    mark cell to mark it; shift-click marks a range.
-  - Click a group chevron to fold the group; click the group switch and the group `Update N`.
+  - Click the harness chip or the view chip to open its menu. Click a key bar hint, a panel
+    action, or a dialog button to run it.
+  - Click a row to select it; double-click to open the reader. Click its dot (its switch in a
+    detail row) to toggle it. Click its mark cell to mark it; shift-click marks a range.
+  - Click a repo's chevron to open or fold the repo. Click its dot and its `↑ N`.
   - Right-click a row or a group (or click its `⋯` cell) to open its action menu, the same menu as
     `ctrl+k`.
   - The wheel scrolls the region under the pointer. Scrollbars can be dragged.
   - Every modal has a clickable close cell (`✕`) and a clickable primary and secondary action.
     A click on the dimmed area outside a modal closes it, except for confirm-delete.
-  - Hover shows a tooltip for every glyph-only target (switch, tags, `⋯`, `✕`, spark, heat cell).
+  - Hover shows a tooltip for every glyph-only target (dot, switch, status glyph, tags, `⋯`, `✕`,
+    spark, heat cell).
   - Drag the divider between the list and the panel to resize the panel.
 - **A key never changes its meaning because the data changed.** View numbers stay fixed when a view
   hides.
 - **Click targets** are 3 cells wide or more. A switch takes clicks on its 3 cells and 1 cell on each
-  side. Two targets never overlap.
+  side. A dot takes clicks on its cell and 1 cell on each side. Two targets never overlap.
 - Do not bind `ctrl+c`, `ctrl+z`, `ctrl+s`, or `ctrl+q`. Screen readers get little from a terminal, so
   help (`?`) names the web page (`atlas`) as the client for them.
 
@@ -429,8 +511,8 @@ The Ledger mockup sets the layout. These details change, each for a rule above:
 3. Key hints have no brackets: `d See changes`, not `[d] See changes` (§7).
 4. The switch is 3 cells, so the knob position shows on, off, and mixed without color (§6).
 5. The focus bar is `$atlas-text`, not the accent. The accent stays for "act here" (§4).
-6. The active view tab and the active harness tab use `$atlas-text` on `$atlas-surface-3`, not a solid
-   accent block (§7). The header row keeps the accent for `Update all` only.
+6. The view chip and the harness chip use `$atlas-text` on `$atlas-surface-3`, not a solid
+   accent block (§7). The accent `Update N` button shows only in the Updates view.
 7. The brand is the ` ╱ ` logo cell. `◆` is the mark glyph (§6).
 8. The spark shows 12 weeks, as on the web. Similar shows `82%`, not `0.82 overlap`.
 9. Web strings replace mockup ones: `no switch` (not `lists only`), `checked 2m ago` (not `⟳ 2m ago`),
@@ -462,7 +544,7 @@ and the code. Check:
 - [ ] Each animation has an explicit easing, a faster exit, and the right level (§8).
 - [ ] Writes are optimistic and revert with a specific toast (§9).
 - [ ] Copy uses web strings, sentence case, specific labels, and errors with a fix (§10).
-- [ ] The 80×24 shot works: drawer panel, dropped columns, short key bar (§11).
+- [ ] The 80×24 shot works: drawer panel, rows that fit, the key bar on one line (§11).
 - [ ] No widget per row; IO in workers; line cache in place (§12).
 - [ ] Every action has a key and a palette command; focus is always visible (§13).
 

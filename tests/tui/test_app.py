@@ -3,13 +3,15 @@ import threading
 
 import pytest
 from textual.app import App
-from textual.widgets import Input, OptionList, Static
+from textual.widgets import OptionList, Static
 
 from skill_atlas.core import views
 from skill_atlas.tui import keys, state
 from skill_atlas.tui.app import AtlasApp, ErrorBand, settle
+from skill_atlas.tui.commands import ActionMenu
 from skill_atlas.tui.messages import StateChanged
 from skill_atlas.tui.screens import AtlasModal
+from skill_atlas.tui.screens.help import HelpScreen
 from skill_atlas.tui.widgets import toast
 from skill_atlas.tui.widgets.bulkbar import BulkBar
 from skill_atlas.tui.widgets.detail import DetailPanel
@@ -231,14 +233,34 @@ async def test_marks_swap_the_view_strip_for_the_bulk_bar(app):
 
 
 @pytest.mark.asyncio
-async def test_click_a_harness_tab_and_a_view_tab(app):
+async def test_escape_clears_search_then_marks_then_the_view_from_the_list(app):
+    async with app.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        app.set_state(view="off", query="a", marked={app.data.skills[0]["path"]})
+        await pilot.pause()
+        await pilot.press("escape")
+        assert app.state.query == "" and app.state.marked and app.state.view == "off"
+        await pilot.press("escape")
+        assert not app.state.marked and app.state.view == "off"
+        await pilot.press("escape")
+        assert app.state.view == "all"
+
+
+@pytest.mark.asyncio
+async def test_click_the_harness_and_view_chips_then_a_menu_item(app):
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
         other = next(h for h in app.data.harnesses if h != app.state.harness)
         h = app.data.harnesses[other]
-        await pilot.click(offset=find(app, h.get("label") or h["name"], row=0))
+        await pilot.click(offset=find(app, "▾", row=0))
+        await settle(pilot)
+        await pilot.click(offset=find(app, h.get("label") or h["name"]))
+        await settle(pilot)
         assert app.state.harness == other
-        await pilot.click(offset=find(app, "Off", row=1))
+        await pilot.click(offset=find(app, "▾", row=1))
+        await settle(pilot)
+        await pilot.click(offset=find(app, "Off"))
+        await settle(pilot)
         assert app.state.view == "off"
 
 
@@ -246,11 +268,14 @@ async def test_click_a_harness_tab_and_a_view_tab(app):
 async def test_click_a_key_bar_hint_runs_its_action(app):
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
-        await pilot.click(offset=find(app, "search", row=WIDE[1] - 1))
-        assert isinstance(app.focused, Input)
-        await pilot.click(offset=find(app, "quit", row=WIDE[1] - 1))
-        await pilot.pause()
-        assert not app.is_running
+        await pilot.click(offset=find(app, "actions", row=WIDE[1] - 1))
+        await settle(pilot)
+        assert isinstance(app.screen, ActionMenu)
+        await pilot.press("escape")
+        await settle(pilot)
+        await pilot.click(offset=find(app, "help", row=WIDE[1] - 1))
+        await settle(pilot)
+        assert isinstance(app.screen, HelpScreen)
 
 
 @pytest.mark.asyncio

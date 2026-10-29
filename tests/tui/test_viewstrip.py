@@ -1,6 +1,7 @@
 import re
 import threading
 import time
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -9,8 +10,9 @@ from textual.widgets import OptionList, Static
 
 from skill_atlas.core import views
 from skill_atlas.core.demo import DemoAtlas
+from skill_atlas.tui import jobs, keys
 from skill_atlas.tui.app import AtlasApp, settle
-from skill_atlas.tui.messages import LoadStarted
+from skill_atlas.tui.messages import JobChanged, LoadStarted
 from skill_atlas.tui.widgets import viewstrip
 from skill_atlas.tui.widgets.skill_list import SkillList
 from skill_atlas.tui.widgets.viewstrip import (
@@ -20,15 +22,16 @@ from skill_atlas.tui.widgets.viewstrip import (
     WAIT,
     SearchBox,
     SearchInput,
+    ViewChip,
     ViewMenu,
     ViewStrip,
-    ViewTab,
     fit_placeholder,
-    window,
+    open_view_menu,
 )
 
 NOW = datetime(2026, 10, 1, 12, tzinfo=timezone.utc)
-HUGE, WIDE, MID, NARROW = (180, 50), (140, 40), (120, 36), (80, 24)
+HUGE, WIDE, MID, NARROW, TINY = (180, 50), (140, 40), (120, 36), (80, 24), (60, 20)
+SHOW_ANOTHER = "Show another view · " + next(k.show for k in keys.KEYS if k.action == "view(1)")
 
 
 class SwitchAtlas(DemoAtlas):
@@ -100,6 +103,14 @@ def strip_of(app) -> ViewStrip:
     return app.main.query_one(ViewStrip)
 
 
+def chip_of(app) -> ViewChip:
+    return app.query_one(ViewChip)
+
+
+def chip_text(app) -> str:
+    return str(chip_of(app).render())
+
+
 def row(app) -> str:
     return app.screen._compositor.render_strips()[strip_of(app).region.y].text
 
@@ -111,12 +122,18 @@ def find(app, text):
     return (x, y)
 
 
-def shown_tabs(app) -> list[str]:
-    return [t.view for t in app.query(ViewTab) if t.display]
-
-
 def count_text(app) -> str:
     return str(app.query_one("#search-count", Static).content)
+
+
+def menu_ids(app) -> list[str]:
+    menu = app.screen.query_one(OptionList)
+    return [menu.get_option_at_index(i).id for i in range(menu.option_count)]
+
+
+def tab_of(app, view):
+    ins, st = app.data.insights, app.state.view_state()
+    return next(t for t in views.view_tabs(ins, st) if t["id"] == view)
 
 
 async def until(pilot, check, timeout: float = 10.0) -> bool:
@@ -131,7 +148,7 @@ async def until(pilot, check, timeout: float = 10.0) -> bool:
 
 def first_result(app):
     ins, st = app.data.insights, app.state.view_state()
-    sec = views.sections(ins, st, app.state.collapsed)[0]
+    sec = views.sections(ins, st, app.state.folds())[0]
     return sec["groups"][0]["skills"][0]["path"] if sec["groups"] else sec["rows"][0]["path"]
 
 
@@ -146,103 +163,250 @@ def test_placeholder_cuts_at_a_comma():
     assert cell_len(fit_placeholder(SEARCH_WIDE - 4)) <= SEARCH_WIDE - 4
 
 
-def test_window_keeps_the_active_tab_in_view():
-    widths = [10] * 8
-    assert window(widths, 0, 40) == (0, 3)
-    i, j = window(widths, 7, 40)
-    assert i <= 7 < j and j == 8
-    i, j = window(widths, 4, 40)
-    assert i <= 4 < j
-
-
 def test_glyphs_are_one_cell_and_css_uses_tokens_only():
-    for glyph in ("‹", "›", "✕", "–", "·", "/"):
+    for glyph in ("▾", "✕", "–", "/"):
         assert cell_len(glyph) == 1
-    for cls in (viewstrip.ViewTab, viewstrip.ViewEdge, ViewMenu, SearchInput, SearchBox, ViewStrip):
+    for cls in (ViewChip, ViewMenu, SearchInput, SearchBox, ViewStrip):
         css = cls.DEFAULT_CSS
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b(?!-)", css)
         assert not re.search(r"\b(reverse|italic|underline|bold|dim|strike|heavy|double)\b", css)
 
 
-# Tabs
+# The view chip
 
 
 @pytest.mark.asyncio
-async def test_tabs_follow_the_view_rules_with_counts(demo):
+async def test_one_chip_shows_the_active_view_and_its_count(demo):
     async with demo.run_test(size=HUGE) as pilot:
         await settle(pilot)
-        ins, st = demo.data.insights, demo.state.view_state()
-        assert shown_tabs(demo) == views.shown_views(ins, st)
-        text = row(demo)
-        for tab in views.view_tabs(ins, st):
-            assert re.search(rf"{tab['label']} +{tab['count']}\b", text), tab
-        assert demo.query_one("#tab-all").has_class("-active")
-        assert "Skills with SKILL.md problems" in str(demo.query_one("#tab-issues").tooltip)
-        assert "Press 5" in str(demo.query_one("#tab-issues").tooltip)
-        assert "Press 9" in str(demo.query_one("#tab-review").tooltip)
-        assert re.search(r"Updates \d+ +Issues \d+ +New \d+", text)
+        n = tab_of(demo, "all")["count"]
+        assert len(demo.query(ViewChip)) == 1
+        assert chip_text(demo) == f"All {n} ▾" and f"All {n} ▾" in row(demo)
+        for label in ("On", "Off", "Updates", "Issues", "Review"):
+            assert not re.search(rf"\b{label} \d", row(demo)), label
+        assert chip_of(demo).tooltip == SHOW_ANOTHER
+        assert "writes" not in row(demo) and not demo.query("#meta")
+        surface = demo.current_theme.variables["atlas-surface-3"].lower()
+        assert chip_of(demo).styles.background.hex.lower() == surface
 
 
 @pytest.mark.asyncio
-async def test_click_a_tab_and_press_it_with_the_mouse(demo):
-    async with demo.run_test(size=WIDE) as pilot:
-        await settle(pilot)
-        await pilot.click(offset=find(demo, "Off"))
-        assert demo.state.view == "off"
-        assert demo.query_one("#tab-off").has_class("-active")
-        assert not demo.query_one("#tab-all").has_class("-active")
-        await pilot.mouse_down("#tab-updates")
-        assert demo.query_one("#tab-updates").has_class("-pressed")
-        await pilot.mouse_up("#tab-updates")
-        assert not demo.query_one("#tab-updates").has_class("-pressed")
-        await pilot.hover("#tab-on")
-        await pilot.pause()
-        assert demo.query_one("#tab-on").mouse_hover
-
-
-@pytest.mark.asyncio
-async def test_digit_keys_move_the_active_tab(demo):
+async def test_digit_keys_change_the_chip(demo):
     async with demo.run_test(size=WIDE) as pilot:
         await settle(pilot)
         await pilot.press("3")
         assert demo.state.view == "off"
-        assert demo.query_one("#tab-off").has_class("-active")
+        assert re.fullmatch(rf"Off {tab_of(demo, 'off')['count']} +▾", chip_text(demo))
         await pilot.press("9")
         assert demo.state.view == "review"
-        assert demo.query_one("#tab-review").has_class("-active")
+        assert chip_text(demo).startswith("Review ")
+        assert "Skills with high-risk patterns" in str(chip_of(demo).tooltip)
         await pilot.press("1")
-        assert demo.query_one("#tab-all").has_class("-active")
+        assert chip_text(demo).startswith("All ")
+        assert demo.focused is demo.query_one("#list")
 
 
 @pytest.mark.asyncio
-async def test_a_hidden_view_shows_while_it_is_active(demo):
-    async with demo.run_test(size=HUGE) as pilot:
+async def test_hover_press_and_click_the_chip_opens_the_view_menu(demo):
+    async with demo.run_test(size=WIDE) as pilot:
         await settle(pilot)
-        assert "costly" not in shown_tabs(demo) and "similar" not in shown_tabs(demo)
+        chip = chip_of(demo)
+        assert chip.styles.background_tint.a == 0
+        await pilot.hover(chip)
+        await pilot.pause()
+        assert chip.mouse_hover and chip.styles.background_tint.a > 0
+        await pilot.mouse_down(chip)
+        assert chip.has_class("-pressed") and chip.styles.background_tint.a > 0.1
+        await pilot.mouse_up(chip)
+        assert not chip.has_class("-pressed")
+        await pilot.click(chip, button=3)
+        await pilot.pause()
+        assert not isinstance(demo.screen, ViewMenu)
+
+        await pilot.click(chip)
+        await pilot.pause()
+        assert isinstance(demo.screen, ViewMenu)
+        ids = menu_ids(demo)
+        shown = {*views.shown_views(demo.data.insights, demo.state.view_state()), *viewstrip.MORE}
+        assert ids == [v for v, _, _ in views.VIEWS if v in shown]
+        menu = demo.screen.query_one(OptionList)
+        assert menu.region.x == chip.region.x and menu.region.y == chip.region.bottom
+        assert menu.highlighted == ids.index("all")
+        lines = [s.text for s in demo.screen._compositor.render_strips()]
+        n = tab_of(demo, "updates")["count"]
+        assert any(re.search(rf"Updates +{n} +4 ", line) for line in lines)
+        await pilot.click(OptionList, offset=(2, 1 + ids.index("review")))
+        await pilot.pause()
+        assert not isinstance(demo.screen, ViewMenu)
+        assert demo.state.view == "review" and chip_text(demo).startswith("Review ")
+
+
+@pytest.mark.asyncio
+async def test_menu_keys_pick_a_view_or_close(demo):
+    async with demo.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        await pilot.press("down", "down", "enter")
+        await pilot.pause()
+        assert demo.state.view == "off"
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        await pilot.press("9")
+        await pilot.pause()
+        assert demo.state.view == "review"
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(demo.screen, ViewMenu) and demo.state.view == "review"
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        await pilot.click(offset=(WIDE[0] - 5, WIDE[1] - 3))
+        await pilot.pause()
+        assert not isinstance(demo.screen, ViewMenu) and demo.state.view == "review"
+
+
+@pytest.mark.asyncio
+async def test_the_menu_opens_by_key(demo):
+    async with demo.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        await demo.action_run("widgets.viewstrip:open_view_menu")
+        await pilot.pause()
+        assert isinstance(demo.screen, ViewMenu)
+        await pilot.press("escape")
+        await pilot.pause()
+        open_view_menu(demo)
+        await pilot.pause()
+        await pilot.press("4")
+        await pilot.pause()
+        assert demo.state.view == "updates" and not isinstance(demo.screen, ViewMenu)
+
+
+@pytest.mark.asyncio
+async def test_the_menu_offers_costly_similar_and_diverged_with_counts(demo):
+    async with demo.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        assert set(viewstrip.MORE) <= set(menu_ids(demo))
+        lines = [s.text for s in demo.screen._compositor.render_strips()]
+        for view, label, _ in views.VIEWS:
+            if view in viewstrip.MORE:
+                st = replace(demo.state.view_state(), view=view)
+                n = len(views.visible_skills(demo.data.insights, st))
+                assert n and any(re.search(rf"{label} +{n} ", line) for line in lines), view
+        await pilot.press("escape")
         demo.set_state(view="similar")
         await pilot.pause()
-        assert "similar" in shown_tabs(demo)
-        assert re.search(r"Similar +Review", row(demo))
-        assert "Press" not in str(demo.query_one("#tab-similar").tooltip)
-        demo.set_state(view="all")
-        await pilot.pause()
-        assert "similar" not in shown_tabs(demo)
+        n = len(views.visible_skills(demo.data.insights, demo.state.view_state()))
+        assert chip_text(demo) == f"Similar {n} ▾"
 
 
 @pytest.mark.asyncio
-async def test_counts_hold_their_cells_when_a_digit_changes(prefs):
+async def test_an_empty_view_leaves_the_menu_but_shows_while_active(prefs):
+    app = AtlasApp(SwitchAtlas(n=12))
+    async with app.run_test(size=HUGE) as pilot:
+        await settle(pilot)
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        assert not {"similar", "diverged"} & set(menu_ids(app))
+        await pilot.press("escape")
+        app.set_state(view="similar")
+        await pilot.pause()
+        assert chip_text(app) == "Similar 0 ▾"
+        assert chip_of(app).tooltip == SHOW_ANOTHER
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        assert "similar" in menu_ids(app)
+        await pilot.press("escape")
+        app.set_state(view="all")
+        await pilot.pause()
+        assert chip_text(app).startswith("All ")
+
+
+# Update all
+
+
+@pytest.mark.asyncio
+async def test_the_updates_view_offers_update_all_and_names_the_skills_it_skips(demo, monkeypatch):
+    ran = []
+    monkeypatch.setattr(jobs, "update_all", lambda app: ran.append(app.state.harness))
+    async with demo.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        button = demo.query_one("#update-all")
+        assert not button.display and "Update" not in row(demo)
+        await pilot.press("4")
+        await pilot.pause()
+        n, edited = viewstrip.update_plan(demo)
+        assert n and edited == 1 and n + edited == tab_of(demo, "updates")["count"]
+        assert button.display and str(button.render()) == f"Update {n}"
+        assert "Skips 1 you edited" in row(demo)
+        key = next(k.show for k in keys.KEYS if k.action == viewstrip.UPDATE_ALL)
+        assert button.tooltip == f"Update each skill you did not edit · {key}"
+        assert chip_of(demo).region.right < button.region.x
+        assert button.region.right < demo.query_one(SearchBox).region.x
+        await pilot.click(button, button=3)
+        assert ran == []
+        await pilot.click(button)
+        await pilot.pause()
+        assert ran == [demo.state.harness]
+        items = {"a": {"state": "queued"}}
+        demo.broadcast(lambda: JobChanged({"kind": "update", "done": False, "items": items}))
+        await pilot.pause()
+        assert not button.display and "Skips" not in row(demo)
+        demo.broadcast(lambda: JobChanged(None))
+        await pilot.pause()
+        assert button.display
+        await pilot.press("1")
+        await pilot.pause()
+        assert not button.display and "Skips" not in row(demo)
+
+
+@pytest.mark.asyncio
+async def test_update_all_reads_all_with_no_skips_and_hides_with_no_target(demo, monkeypatch):
+    async with demo.run_test(size=WIDE) as pilot:
+        await settle(pilot)
+        demo.set_state(view="updates")
+        await pilot.pause()
+        button, note = demo.query_one("#update-all"), demo.query_one("#update-note")
+        monkeypatch.setattr(viewstrip, "update_plan", lambda app: (3, 0))
+        strip_of(demo)._draw()
+        await pilot.pause()
+        assert str(button.render()) == "Update all" and not note.display
+        monkeypatch.setattr(viewstrip, "update_plan", lambda app: (0, 2))
+        strip_of(demo)._draw()
+        await pilot.pause()
+        assert not button.display and "Skills you edited update one at a time" in row(demo)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", [NARROW, TINY])
+async def test_update_all_fits_a_narrow_strip(demo, size):
+    async with demo.run_test(size=size) as pilot:
+        await settle(pilot)
+        demo.set_state(view="updates")
+        await pilot.pause()
+        button = demo.query_one("#update-all")
+        assert button.display
+        assert button.region.right <= demo.query_one(SearchBox).region.x
+        assert "Update" in row(demo)
+
+
+@pytest.mark.asyncio
+async def test_the_chip_holds_its_width_when_a_count_loses_a_digit(prefs):
     atlas = SwitchAtlas(n=100)
     app = AtlasApp(atlas)
     async with app.run_test(size=HUGE) as pilot:
         await settle(pilot)
-        assert re.search(r"On 100 +Off +0\b", row(app))
-        before = {label: find(app, label)[0] for label in ("On", "Off", "Updates", "Unused")}
+        app.set_state(view="on")
+        await pilot.pause()
+        assert chip_text(app) == "On 100 ▾"
+        width = chip_of(app).size.width
         atlas.off = ["skill-000"]
         app.reload(["scan"])
         await settle(pilot)
-        assert re.search(r"On +99 +Off +1\b", row(app))
-        after = {label: find(app, label)[0] for label in before}
-        assert after == before
+        assert chip_text(app) == "On 99  ▾" and chip_of(app).size.width == width
 
 
 @pytest.mark.asyncio
@@ -250,48 +414,37 @@ async def test_unused_waits_until_usage_is_read(prefs):
     app = AtlasApp(SwitchAtlas(n=12, usage="indexing"))
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
-        unused = app.query_one("#tab-unused", ViewTab)
-        assert unused.has_class("-waiting")
-        assert re.search(r"Unused +–", row(app))
-        assert WAIT in str(unused.tooltip)
-        await pilot.click("#tab-unused")
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        ids = menu_ids(app)
+        menu = app.screen.query_one(OptionList)
+        assert menu.get_option_at_index(ids.index("unused")).disabled
+        await pilot.click(OptionList, offset=(2, 1 + ids.index("unused")))
+        await pilot.pause()
         assert app.state.view == "all"
+        await pilot.press("escape")
+        await pilot.pause()
+        app.set_state(view="unused")
+        await pilot.pause()
+        assert re.fullmatch(r"Unused – +▾", chip_text(app))
+        assert WAIT in str(chip_of(app).tooltip)
 
 
 @pytest.mark.asyncio
-async def test_tabs_show_dashes_before_the_scan(prefs):
+async def test_the_chip_shows_a_dash_before_the_scan(prefs):
     atlas = SwitchAtlas(n=12)
     atlas.gate = threading.Event()
     app = AtlasApp(atlas)
     async with app.run_test(size=WIDE) as pilot:
         await pilot.pause()
-        assert shown_tabs(app) == list(viewstrip.FIRST)
-        assert re.search(r"All +– +On +– +Off +–", row(app))
+        assert re.fullmatch(r"All – +▾", chip_text(app))
+        await pilot.click(ViewChip)
+        await pilot.pause()
+        assert menu_ids(app) == list(viewstrip.FIRST)
+        await pilot.press("escape")
         atlas.gate.set()
         await settle(pilot)
-        assert re.search(r"All +12 +On +12", row(app))
-
-
-# Meta notes
-
-
-@pytest.mark.asyncio
-async def test_meta_says_where_the_switches_write(demo):
-    async with demo.run_test(size=HUGE) as pilot:
-        await settle(pilot)
-        notes = views.header_meta(demo.data.insights, demo.state.harness)
-        assert " · ".join(notes) in row(demo)
-        demo.set_state(harness="all")
-        await pilot.pause()
-        assert "pick a harness to switch skills" in row(demo)
-
-
-@pytest.mark.asyncio
-async def test_meta_drops_when_the_row_is_short(demo):
-    async with demo.run_test(size=NARROW) as pilot:
-        await settle(pilot)
-        assert not demo.query_one("#meta").display
-        assert "writes" not in row(demo)
+        assert chip_text(app) == "All 12 ▾"
 
 
 # Search: keys
@@ -416,17 +569,21 @@ async def test_box_width_follows_the_window(demo):
         box = demo.query_one(SearchBox)
         assert box.size.width == SEARCH and not box.has_class("-folded")
         assert demo.query_one(SearchInput).placeholder == "Search skills, sources"
+        assert box.region.right == WIDE[0] - 1
         await pilot.resize_terminal(*HUGE)
         await settle(pilot)
         assert box.size.width == SEARCH_WIDE
         assert demo.query_one(SearchInput).placeholder == PLACEHOLDER
+        await pilot.resize_terminal(*NARROW)
+        await settle(pilot)
+        assert box.has_class("-folded") and box.size.width == 3
 
 
 # Back to All (P47)
 
 
 @pytest.mark.asyncio
-async def test_show_all_from_an_empty_list_focuses_the_all_tab(prefs):
+async def test_show_all_from_an_empty_list_focuses_the_chip_and_its_keys_work(prefs):
     app = AtlasApp(SwitchAtlas(n=12))
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
@@ -435,19 +592,33 @@ async def test_show_all_from_an_empty_list_focuses_the_all_tab(prefs):
         assert app.focused is app.query_one("#list")
         app.set_state(view="all")
         await pilot.pause()
-        tab = app.query_one("#tab-all", ViewTab)
-        assert app.focused is tab
+        chip = chip_of(app)
+        assert app.focused is chip
+        focus = app.current_theme.variables["atlas-selection"].lower()
+        assert chip.styles.background.hex.lower() == focus
         await pilot.press("right")
-        assert app.state.view == "on" and app.focused is app.query_one("#tab-on")
+        assert app.state.view == "on" and app.focused is chip
         await pilot.press("left")
-        assert app.state.view == "all" and app.focused is tab
+        assert app.state.view == "all" and app.focused is chip
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ViewMenu)
+        await pilot.press("down", "enter")
+        await pilot.pause()
+        assert app.state.view == "on" and app.focused is chip
+        await pilot.press("space")
+        await pilot.pause()
+        assert isinstance(app.screen, ViewMenu)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert app.focused is chip
         await pilot.press("down")
         assert app.focused is app.query_one("#list")
-        assert not any(isinstance(w, ViewTab) for w in app.screen.focus_chain)
+        assert not any(isinstance(w, ViewChip) for w in app.screen.focus_chain)
 
 
 @pytest.mark.asyncio
-async def test_show_all_skills_click_in_the_empty_list_focuses_the_tab(prefs):
+async def test_show_all_skills_click_in_the_empty_list_focuses_the_chip(prefs):
     app = AtlasApp(SwitchAtlas(n=12))
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
@@ -458,7 +629,7 @@ async def test_show_all_skills_click_in_the_empty_list_focuses_the_tab(prefs):
         await pilot.click(offset=(lines[y].find("Show all skills") + 2, y))
         await pilot.pause()
         assert app.state.view == "all"
-        assert app.focused is app.query_one("#tab-all")
+        assert app.focused is chip_of(app)
 
 
 @pytest.mark.asyncio
@@ -475,18 +646,30 @@ async def test_a_digit_from_a_list_with_rows_keeps_focus_in_the_list(demo):
 
 
 @pytest.mark.asyncio
-async def test_narrow_search_folds_to_a_cell_and_takes_the_row(demo):
-    async with demo.run_test(size=NARROW) as pilot:
+@pytest.mark.parametrize("size", [NARROW, TINY])
+async def test_narrow_widths_keep_the_chip_and_fold_the_search(demo, size):
+    async with demo.run_test(size=size) as pilot:
         await settle(pilot)
-        strip, box = strip_of(demo), demo.query_one(SearchBox)
+        strip, box, chip = strip_of(demo), demo.query_one(SearchBox), chip_of(demo)
+        demo.set_state(view="review")
+        await pilot.pause()
+        assert chip_text(demo).startswith("Review ") and "Review" in row(demo)
         assert box.has_class("-folded") and box.size.width == 3
+        assert chip.region.right < box.region.x and box.region.right == size[0] - 1
+        await pilot.click(chip)
+        await pilot.pause()
+        assert isinstance(demo.screen, ViewMenu)
+        assert demo.screen.query_one(OptionList).region.right <= size[0]
+        await pilot.press("1")
+        await pilot.pause()
+        assert demo.state.view == "all"
         await pilot.click(SearchBox)
         assert strip.has_class("-open") and demo.focused is demo.query_one(SearchInput)
-        assert not demo.query_one("#tabs").display
+        assert not demo.query_one("#views").display
         await pilot.press(*"seo")
         await pilot.click("#list")
         assert not strip.has_class("-open") and box.has_class("-folded")
-        assert "seo" in row(demo) and "All" in row(demo)
+        assert "seo" in row(demo) and "All" in row(demo) and "▾" in row(demo)
         await pilot.click("#search-clear")
         assert demo.state.query == "" and box.size.width == 3
 
@@ -497,62 +680,11 @@ async def test_narrow_slash_and_esc_open_and_close_the_search(demo):
         await settle(pilot)
         strip = strip_of(demo)
         await pilot.press("slash")
-        assert strip.has_class("-open")
+        assert strip.has_class("-open") and "▾" not in row(demo)
         await pilot.press("escape")
         assert not strip.has_class("-open")
         assert demo.focused is demo.query_one("#list")
-
-
-@pytest.mark.asyncio
-async def test_narrow_tabs_keep_the_active_one_in_view(demo):
-    async with demo.run_test(size=NARROW) as pilot:
-        await settle(pilot)
-        assert demo.query_one("#edge-right").display
-        assert not demo.query_one("#edge-left").display
-        demo.set_state(view="review")
-        await pilot.pause()
-        assert demo.query_one("#tab-review").display
-        assert demo.query_one("#edge-left").display
-        assert "Review" in row(demo)
-
-
-@pytest.mark.asyncio
-async def test_edge_opens_a_menu_of_every_view_mouse(demo):
-    async with demo.run_test(size=NARROW) as pilot:
-        await settle(pilot)
-        await pilot.click("#edge-right")
-        await pilot.pause()
-        assert isinstance(demo.screen, ViewMenu)
-        menu = demo.screen.query_one(OptionList)
-        ids = [menu.get_option_at_index(i).id for i in range(menu.option_count)]
-        assert ids == views.shown_views(demo.data.insights, demo.state.view_state())
-        lines = [s.text for s in demo.screen._compositor.render_strips()]
-        assert any(re.search(r"Review +\d+ +9 ", line) for line in lines)
-        await pilot.click(OptionList, offset=(2, 1 + ids.index("review")))
-        await pilot.pause()
-        assert not isinstance(demo.screen, ViewMenu)
-        assert demo.state.view == "review"
-
-
-@pytest.mark.asyncio
-async def test_menu_keys_pick_a_view_or_close(demo):
-    async with demo.run_test(size=NARROW) as pilot:
-        await settle(pilot)
-        await pilot.click("#edge-right")
-        await pilot.pause()
-        await pilot.press("down", "down", "enter")
-        await pilot.pause()
-        assert demo.state.view == "off"
-        await pilot.click("#edge-right")
-        await pilot.pause()
-        await pilot.press("9")
-        await pilot.pause()
-        assert demo.state.view == "review"
-        await pilot.click("#edge-left")
-        await pilot.pause()
-        await pilot.press("escape")
-        await pilot.pause()
-        assert not isinstance(demo.screen, ViewMenu) and demo.state.view == "review"
+        assert chip_text(demo) in row(demo)
 
 
 # Marks
@@ -564,6 +696,8 @@ async def test_the_strip_hides_for_marks_and_comes_back_current(prefs):
     app = AtlasApp(atlas)
     async with app.run_test(size=WIDE) as pilot:
         await settle(pilot)
+        app.set_state(view="on")
+        await pilot.pause()
         y = strip_of(app).region.y
         await pilot.press("slash", *"skill")
         app.set_state(marked={app.data.skills[0]["path"]})
@@ -578,7 +712,7 @@ async def test_the_strip_hides_for_marks_and_comes_back_current(prefs):
         app.set_state(marked=frozenset())
         await pilot.pause()
         assert strip_of(app).display and strip_of(app).region.y == y
-        assert re.search(r"On +98 +Off +2\b", row(app))
+        assert chip_text(app) == "On 98  ▾" and "On 98  ▾" in row(app)
         assert app.query_one(SearchInput).value == "skill"
 
 
@@ -586,7 +720,7 @@ async def test_the_strip_hides_for_marks_and_comes_back_current(prefs):
 
 
 @pytest.mark.asyncio
-async def test_typing_and_load_starts_do_not_redraw_the_tabs(demo, monkeypatch):
+async def test_typing_and_load_starts_do_not_redraw_the_chip(demo, monkeypatch):
     draws = []
     real = ViewStrip._draw
     monkeypatch.setattr(ViewStrip, "_draw", lambda self: draws.append(1) or real(self))
@@ -601,7 +735,7 @@ async def test_typing_and_load_starts_do_not_redraw_the_tabs(demo, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_tab_counts_come_from_the_shared_memo(demo, monkeypatch):
+async def test_counts_come_from_the_shared_memo(demo, monkeypatch):
     calls = []
     async with demo.run_test(size=WIDE) as pilot:
         await settle(pilot)

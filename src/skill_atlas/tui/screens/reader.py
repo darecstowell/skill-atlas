@@ -46,6 +46,7 @@ HINTS = (
     ("y", "Copy", "copy", "Copy the Markdown", "copy"),
     ("o", "GitHub ↗", "github", "Open the file on GitHub", "github"),
     ("shift+r", "Reveal", "reveal", "Show the folder", "reveal"),
+    ("esc", "Close", "close", "Close the reader", "close-hint"),
 )
 SHORT = 30
 READ_ONLY = "This read-only build has only the first lines. Run atlas to read the whole file."
@@ -471,12 +472,13 @@ class Outline(ScrollView, can_focus=True):
 
 
 class ModeSwitch(Widget):
-    """Formatted | Markdown. Click a side to show it."""
+    """r, then Formatted | Markdown. Click a side to show it, or the r to switch."""
 
+    KEY = "r "
     LABELS = (" Formatted ", " Markdown ")
     DEFAULT_CSS = """
     ModeSwitch {
-        width: 21; height: 1; margin-right: 2; background: $background; color: $atlas-muted;
+        width: 23; height: 1; margin-right: 2; background: $atlas-surface-1; color: $atlas-muted;
     }
     """
     raw = reactive(False)
@@ -486,16 +488,21 @@ class ModeSwitch(Widget):
         self.tooltip = "Show formatted text or Markdown (r)"
 
     def render(self) -> Content:
-        parts = []
+        parts = [(self.KEY, LINK)]
         for i, label in enumerate(self.LABELS):
             if (i == 1) == self.raw:
                 parts.append((label, f"{TEXT} on $atlas-surface-3"))
             else:
-                parts.append((label, f"{TEXT} on $atlas-surface-2" if i == self.hover else MUTED))
+                look = (
+                    f"{TEXT} on $atlas-surface-2" if i == self.hover else f"{MUTED} on $background"
+                )
+                parts.append((label, look))
         return Content.assemble(*parts)
 
     def _side(self, x: int) -> int:
-        return 0 if x < len(self.LABELS[0]) else 1
+        """0 or 1 for a label; -1 for the key."""
+        x -= len(self.KEY)
+        return -1 if x < 0 else 0 if x < len(self.LABELS[0]) else 1
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         self.hover = self._side(event.x)
@@ -505,7 +512,8 @@ class ModeSwitch(Widget):
 
     async def on_click(self, event: events.Click) -> None:
         event.stop()
-        if (self._side(event.x) == 1) != self.raw:
+        side = self._side(event.x)
+        if side < 0 or (side == 1) != self.raw:
             await self.screen.run_action("raw")
 
 

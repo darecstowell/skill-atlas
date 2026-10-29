@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import json
+import threading
 import time
 from datetime import datetime
 
@@ -350,9 +351,10 @@ async def test_profiles_slow_read_shows_loading_late(app, jobs, monkeypatch):
     async with app.run_test(size=SIZE) as pilot:
         await settle(pilot)
         listing = app.atlas.profiles
+        done = threading.Event()
 
         def slow():
-            time.sleep(0.6)
+            done.wait(5)
             return listing()
 
         monkeypatch.setattr(app.atlas, "profiles", slow)
@@ -360,9 +362,13 @@ async def test_profiles_slow_read_shows_loading_late(app, jobs, monkeypatch):
         await pilot.pause()
         screen = app.screen
         assert "Loading profiles…" not in shown(app)
-        await asyncio.sleep(0.45)
+        for _ in range(100):
+            await asyncio.sleep(0.02)
+            if "Loading profiles…" in shown(app):
+                break
         assert "Loading profiles…" in shown(app)
-        await asyncio.sleep(0.5)
+        done.set()
+        await asyncio.sleep(0.1)
         await settle(pilot)
         assert "Loading profiles…" not in shown(app)
         assert len(screen.query(profiles.ProfileRow)) == 3

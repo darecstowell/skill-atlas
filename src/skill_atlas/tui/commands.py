@@ -60,6 +60,7 @@ SKIP_SYSTEM = {"Quit", "Keys", "Theme", "Minimize", "Maximize", "Check for updat
 # Action id -> the keys.py key that does the same thing from the list.
 ACTION_KEYS = {
     "open": "enter",
+    "fold": "enter",
     "read": "v",
     "switch": "x",
     "everywhere": "X",
@@ -67,6 +68,7 @@ ACTION_KEYS = {
     "diff": "d",
     "history": "h",
     "copy": "y",
+    "mark": "m",
     "github": "o",
     "reveal": "R",
     "link": "l",
@@ -230,6 +232,22 @@ def _select(app: AtlasApp, t: Target, open: bool) -> None:
         app.post_message(ItemSelected(t.key, open=open))
 
 
+def _repo_open(app: AtlasApp, t: Target) -> list[Action]:
+    """On a repo that folds, enter folds it, so the menu names that and keeps details keyless."""
+    from .widgets.skill_list import SkillList
+
+    details = partial(_select, app, t, True)
+    found = app.main.query(SkillList)
+    lst = found.first() if found else None
+    if lst is None or not lst.can_fold(t.key):
+        return [Action("open", "Open details", details)]
+    label = "Expand" if t.key in app.state.folds() else "Collapse"
+    return [
+        Action("fold", label, partial(lst.toggle_fold, t.key)),
+        Action("details", "Open details", details),
+    ]
+
+
 def actions_for(app: AtlasApp, t: Target) -> list[Action]:
     """The actions that apply to a target, in menu order. Delete comes last."""
     ins = app.data.insights
@@ -240,6 +258,10 @@ def actions_for(app: AtlasApp, t: Target) -> list[Action]:
     if t.kind == "group":
         return _group_actions(app, ins, t)
     return _avail_actions(app, ins, t)
+
+
+def _mark(app: AtlasApp, path: str) -> None:
+    app.set_state(marked=app.state.marked ^ {path})
 
 
 def _skill_actions(app: AtlasApp, ins: views.Insights, t: Target) -> list[Action]:
@@ -270,6 +292,9 @@ def _skill_actions(app: AtlasApp, ins: views.Insights, t: Target) -> list[Action
     if copies:
         run = _later(app, "screens.diff", "open_compare", s["path"], copies[0]["path"])
         acts.append(Action("compare", "Compare with its other copy", run))
+    if ok:
+        verb = "Unmark" if t.key in app.state.marked else "Mark"
+        acts.append(Action("mark", verb, partial(_mark, app, t.key)))
     folder = s.get("dir_name") or s["name"]
     acts.append(Action("copy", "Copy as prompt", _later(app, "jobs", "copy_prompt", [folder])))
     where = s.get("dir") or s["path"]
@@ -295,7 +320,7 @@ def _skill_actions(app: AtlasApp, ins: views.Insights, t: Target) -> list[Action
 def _group_actions(app: AtlasApp, ins: views.Insights, t: Target) -> list[Action]:
     g, h, ok = t.item, app.state.harness, ins.writable
     members = g["members"]
-    acts = [Action("open", "Open details", partial(_select, app, t, True))]
+    acts = _repo_open(app, t)
     if ok and g["switch"] and h != "all":
         on = g["checked"] == "true"
         verb = "off" if on else "on"
@@ -308,6 +333,11 @@ def _group_actions(app: AtlasApp, ins: views.Insights, t: Target) -> list[Action
             run = _later(app, "jobs", "set_switch", h, names, not on, kind="skill")
             label = f"Turn {verb} all {len(members)} in {where}"
             acts.append(Action("switch", label, run))
+            if g["checked"] == "mixed":
+                sws = (views.switch_state(ins, h, s) for s in members)
+                lit = [sw["key"] for sw in sws if sw["on"]]
+                run = _later(app, "jobs", "set_switch", h, lit, False, kind="skill")
+                acts.append(Action("switch_off", f"Turn off all {len(lit)} in {where}", run))
     outdated = [n for s in members if views.is_outdated(ins, s) for n in [views.lock_name(s)] if n]
     if ok and outdated:
         run = _later(app, "jobs", "update", outdated)
@@ -968,6 +998,7 @@ class AtlasCommands(Provider):
             note = "current" if st.group_by == g else ""
             out.append(Entry(f"Group by {word}", partial(app.set_state, group_by=g), note=note))
         toggles = (
+            ("row_detail", "Show descriptions in the list", "Hide descriptions in the list"),
             ("show_project", "Show project skills", "Hide project skills"),
             ("show_stale", "Show old plugin versions", "Hide old plugin versions"),
             ("key_hints", "Show keyboard hints", "Hide keyboard hints"),

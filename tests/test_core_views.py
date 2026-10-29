@@ -587,15 +587,15 @@ def test_sections_by_source(ins):
     ]
     acme = groups[0]
     assert names(acme["skills"]) == ["alpha", "beta"]
-    assert acme["meta"] == "2 of 2 on · 3 available"
+    assert acme["meta"] == "2 of 2 on · 3 not installed"
     assert acme["repo_url"] == "https://github.com/acme/tools"
     assert acme["checked"] == "true" and not acme["switch"]
     assert names(acme["available"]) == ["acme-new", "old-one", "gamma"]
     assert acme["available_open"] and acme["fresh"] == 1
     assert (acme["installable"], acme["fresh_installable"]) == (2, 1)
     fresh, kit, quiet = groups[1], groups[2], groups[3]
-    assert fresh["meta"] == "watching · 1 available" and fresh["skills"] == []
-    assert kit["meta"] == "no source · 3 of 3 on" and kit["local"] and kit["repo"] is None
+    assert fresh["meta"] == "watching · 1 not installed" and fresh["skills"] == []
+    assert kit["meta"] == "local · 3 of 3 on" and kit["local"] and kit["repo"] is None
     assert quiet["available_note"].startswith("You have every skill")
     assert set(secs[0]["group_ids"]) == {g["id"] for g in groups}
     assert [g["id"] for g in secs[1]["groups"]] == [
@@ -610,7 +610,7 @@ def test_source_group_counts_and_switch(ins):
     st = ViewState(harness=CLAUDE, query="beta")
     acme = views.groups(ins, st)[0]
     assert acme["id"] == "src:acme/tools"
-    assert acme["meta"] == "1 of 2 on · 1 shown · 3 available"
+    assert acme["meta"] == "1 of 2 on · 1 shown · 3 not installed"
     assert acme["checked"] == "mixed" and acme["switch"]
     assert acme["open"]
 

@@ -305,3 +305,61 @@ change you need.
   reduced.
 - Deferred: mounting the panels after the first paint (cross row 7) made a timer divide by zero
   at exit, so the panels still compose with the app.
+
+## Main screen: the Sources direction
+
+The owner said the main screen showed too much at once. Two prototype rounds
+(`out/proto-calm/calm.py`, now deleted) compared the current screen with six calmer versions. The
+owner chose **Sources**.
+
+- **Rows.** A row shows a dot (● on, ○ off, ◐ mixed), the name, the status glyph (↑ ≈ ✗ !), a
+  faint use count, and ⋯. The status word shows on the cursor row and the hovered row only. Rows
+  have no description, no sparkline, and no info tags (runs code, you only). The panel shows them.
+  The row content stops at 96 cells, so the count stays near the name.
+- **Repos start folded** in the All view. The list shows every source as one line: the name, "30 of
+  37 on", "1 available", and its update button. A search or a filter view shows its matches
+  unfolded. `UIState.opened` saves the repos you open; `"*"` opens all. Folded repos have no blank
+  line between them.
+- **Header.** One "Update 9" button replaces the count and "Update all". The warning is "! 1".
+  "Check again" leaves the bar; `ctrl+r`, the palette, and a click on "✓ Up to date" still run it.
+- **Views.** One "All 347 ▾" chip replaces the eight tabs. It opens the view menu. Keys 1–9 stay.
+- **Panel.** The six stat tiles become two lines of text. Each attention item is one short line,
+  with the full sentence in its tooltip. The other sections sit behind one "Usage, cost, security
+  and more" row.
+- **Key bar.** Three hints: enter, ctrl+k, ?.
+- **Detail rows.** `UIState.row_detail` (Display) brings back the rows with descriptions,
+  sparklines, and all tags.
+
+Rejected:
+
+- Quiet (one-line rows with grey switches): it kept the descriptions, so it still felt busy.
+- Stacked (two-line rows as on the web): calm, but it showed about 14 skills on a screen.
+- Focus and Solo (no panel at rest): the overview was one step away, and the rows did not get
+  calmer.
+- Index (minimal rows with every repo open): calmer, but it was still a long list on first look.
+
+### Polish pass
+
+A usability walkthrough and a visual review found these fixes. Four builders applied them.
+
+- **List.** No monogram on short rows. The name column follows the p90 name (20–56 cells), so the
+  count sits near the names. Rare statuses (similar, issues, error, edited, diverged, high risk)
+  show their word at rest. `↑` hides in the Updates view, and the next status shows there. `◇`
+  shows only on the cursor row. A faint `uses` label sits over the counts, and `Expand all` or
+  `Collapse all` sits next to the section title. One blank line comes after an open repo, so a
+  repo row does not move. `m` marks and moves down. After a search, the repo of the selected
+  skill stays open.
+- **Header.** `↑ 9 updates` is a quiet link to the Updates view. The accent button moved into that
+  view: `Update 8` and `Skips 1 you edited`. The "9 vs 8" was the skip rule, not a bug;
+  `views.update_targets` now gives the count to the button and the job. The warning reads
+  `! 1 not checked`. The new-skills chip is gone. The link hides while marks exist. The view menu
+  adds Costly, Similar, and Diverged.
+- **Panel.** The title is `Inventory`. The on, off, and updates counts open their views. The More
+  row names each section it holds.
+- **Keys and menus.** The repo menu reads the real fold state. A mixed repo offers `Turn on all`
+  and `Turn off all`. The palette can show or hide descriptions. The skill menu has `Mark`. With
+  the panel docked, the bar shows `x turn off` in place of `enter open`. Search with text shows
+  `esc clear`. Help starts with `ctrl+p All commands`. The reader shows `r` and `esc`.
+- **Escape** steps back: search, then marks, then focus to the list, then the All view.
+- **Repo panel.** The `Skills` section is gone. The list at the left already shows the repo's
+  skills.

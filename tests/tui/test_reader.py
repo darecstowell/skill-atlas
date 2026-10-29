@@ -168,6 +168,20 @@ async def test_r_and_clicks_switch_between_formatted_and_markdown(app):
 
 
 @pytest.mark.asyncio
+async def test_the_head_shows_the_r_and_esc_keys_and_a_click_on_each_works(app):
+    async with app.run_test(size=WIDE) as pilot:
+        screen = await open_on(pilot, app)
+        shown = screen_text(app)
+        assert "r  Formatted  Markdown" in shown and "esc Close" in shown
+        await pilot.click(ModeSwitch, offset=(0, 0))
+        await pilot.pause()
+        assert screen.query_one(ModeSwitch).raw
+        await pilot.click("#close-hint")
+        await settle(pilot)
+        assert not isinstance(app.screen, ReaderScreen)
+
+
+@pytest.mark.asyncio
 async def test_markdown_view_numbers_lines_and_wraps_under_the_text(app):
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_on(pilot, app)

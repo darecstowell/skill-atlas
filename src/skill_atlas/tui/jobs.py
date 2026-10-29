@@ -629,9 +629,10 @@ def _update_batch(
     if running(app):
         toast(app, "An update is already running.")
         return
-    out = [s for s in skills if views.is_outdated(ins, s)]
-    safe = out if confirmed else [s for s in out if not s.get("local_edits")]
-    skipped = len(out) - len(safe)
+    safe, edited = views.update_targets(ins, skills)
+    if confirmed:
+        safe, edited = safe + edited, []
+    skipped = len(edited)
     if not safe:
         text = "Everything is up to date."
         if skipped:
