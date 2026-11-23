@@ -133,6 +133,12 @@ def skill_source(repo: str, paths: list[str]) -> tuple[str, list[str]]:
     return repo, paths
 
 
+def skill_sources(sources: dict[str, list[str]]) -> dict[str, list[str]]:
+    if not isinstance(sources, dict) or not sources:
+        raise ValueError("sources must be a map of repo to paths")
+    return dict(skill_source(repo, paths) for repo, paths in sources.items())
+
+
 def _find(data: dict | None, path: str) -> dict | None:
     return next((s for s in data["skills"] if s["path"] == path), None) if data else None
 
@@ -284,9 +290,8 @@ class Atlas:
         repo, paths = skill_source(repo, paths)
         return updates.describe(repo, paths, self.roots())
 
-    def install(self, repo: str, paths: list[str]) -> dict:
-        repo, paths = skill_source(repo, paths)
-        return updates.job_view(updates.start_install({repo: paths}, self.roots()))
+    def install(self, sources: dict[str, list[str]]) -> dict:
+        return updates.job_view(updates.start_install(skill_sources(sources), self.roots()))
 
     def dismiss(self, repo: str, paths: list[str]) -> dict:
         repo, paths = skill_source(repo, paths)

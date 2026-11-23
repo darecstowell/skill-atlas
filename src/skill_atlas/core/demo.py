@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from .. import health, manifest, profiles, security, tokens, updates
 from ..history import KEEP, SNAP_ID, diff_folders
 from ..scan import as_list, parse_frontmatter
-from .atlas import skill_name, skill_names, skill_source
+from .atlas import skill_name, skill_names, skill_source, skill_sources
 
 if TYPE_CHECKING:
     from .api import AtlasAPI
@@ -2690,10 +2690,10 @@ class DemoAtlas:
             }
             return {"repo": repo, "skills": found}
 
-    def install(self, repo: str, paths: list[str]) -> dict:
-        repo, paths = skill_source(repo, paths)
+    def install(self, sources: dict[str, list[str]]) -> dict:
+        sources = skill_sources(sources)
         with self._mutex:
-            steps, finish = self._install_steps({repo: paths})
+            steps, finish = self._install_steps(sources)
             return self._start(steps, finish)
 
     def dismiss(self, repo: str, paths: list[str]) -> dict:

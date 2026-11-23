@@ -9,7 +9,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from conftest import get, post, raw
-from skill_atlas import serve
+from skill_atlas import serve, updates
 
 
 def test_skill_off_then_on(tmp_path):
@@ -55,6 +55,21 @@ def test_bad_names_refused(server, names):
 @pytest.mark.parametrize("paths", [[], ["/abs/SKILL.md"], ["a/../SKILL.md"], ["a/README.md"]])
 def test_bad_paths_refused(server, paths):
     assert post(f"{server}/api/install", {"repo": "owner/repo", "paths": paths})[0] == 400
+
+
+@pytest.mark.parametrize(
+    "sources", [{}, [], {"owner/repo": []}, {"owner/repo": "SKILL.md"}, {"o/r": ["a/../SKILL.md"]}]
+)
+def test_bad_sources_refused(server, sources):
+    assert post(f"{server}/api/install", {"sources": sources})[0] == 400
+
+
+def test_install_from_many_sources(server, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(updates, "start_install", lambda s, roots: seen.update(s) or {})
+    sources = {"a/one": ["x/SKILL.md"], "b/two": ["SKILL.md", "y/SKILL.md"]}
+    assert post(f"{server}/api/install", {"sources": sources})[0] == 200
+    assert seen == sources
 
 
 @pytest.fixture

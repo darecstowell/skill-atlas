@@ -129,7 +129,7 @@ def test_bad_skill_names_are_refused(
 @pytest.mark.parametrize("paths", [[], ["/abs/SKILL.md"], ["a/../SKILL.md"], ["a/README.md"]])
 def test_bad_skill_paths_are_refused(atlas: Atlas, paths: list[str]) -> None:
     with pytest.raises(ValueError, match="bad skill paths"):
-        atlas.install("owner/repo", paths)
+        atlas.install({"owner/repo": paths})
 
 
 def test_data_matches_the_route(atlas: Atlas, claude: Path, server: str) -> None:

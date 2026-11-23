@@ -50,6 +50,14 @@ def str_list(req: dict, key: str) -> list[str]:
     return [str(x) for x in v]
 
 
+def install_sources(req: dict) -> dict[str, list[str]]:
+    """{repo: [SKILL.md path]} from `sources`, or from `repo` and `paths`."""
+    raw = req["sources"] if "sources" in req else {req["repo"]: req.get("paths")}
+    if not isinstance(raw, dict):
+        raise ValueError("sources must be a map of repo to paths")
+    return {str(r): str_list(raw, r) for r in raw}
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code: int, body: bytes, ctype: str) -> None:
         try:
@@ -177,13 +185,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/watch":
             on = bool(req.get("on", True))
             return self._json(200, ATLAS.watch(str(req["repo"]), on))
-        if path in ("/api/available", "/api/install", "/api/dismiss"):
+        if path == "/api/install":
+            return self._json(200, ATLAS.install(install_sources(req)))
+        if path in ("/api/available", "/api/dismiss"):
             repo, paths = str(req["repo"]), str_list(req, "paths")
             if path == "/api/available":
                 return self._json(200, ATLAS.available(repo, paths))
-            if path == "/api/dismiss":
-                return self._json(200, ATLAS.dismiss(repo, paths))
-            return self._json(200, ATLAS.install(repo, paths))
+            return self._json(200, ATLAS.dismiss(repo, paths))
         if path == "/api/rollback":
             return self._json(200, ATLAS.rollback(str(req["name"]), str(req["id"])))
         if path.startswith("/api/profiles/") and path[14:] in profiles.ACTIONS:

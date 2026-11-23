@@ -394,7 +394,7 @@ def test_install_new_skill(fresh: DemoAtlas) -> None:
     paths = [a["path"] for a in new]
     described = fresh.available("mattpocock/skills", paths)["skills"]
     assert set(described) == set(paths) and all(v["description"] for v in described.values())
-    run = finish(fresh, fresh.install("mattpocock/skills", paths))
+    run = finish(fresh, fresh.install({"mattpocock/skills": paths}))
     assert {i["state"] for i in run["last"]["items"].values()} == {"done"}
     names = {s["name"] for s in fresh.data()["skills"]}
     assert {a["name"] for a in new} <= names

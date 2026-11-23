@@ -551,7 +551,7 @@ async def test_install_one_available_skill_and_the_new_ones(lean, steps):
 async def test_follow_tracks_a_job_the_core_already_started(lean, demo):
     async with lean.run_test(size=SIZE) as pilot:
         await start(lean, pilot)
-        view = demo.install("mattpocock/skills", ["skills/triage-issue/SKILL.md"])
+        view = demo.install({"mattpocock/skills": ["skills/triage-issue/SKILL.md"]})
         jobs.follow(lean, view, note=" Switched 2 skills.")
         assert jobs.current(lean)["kind"] == "install"
         await settle(pilot)

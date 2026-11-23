@@ -1,6 +1,6 @@
 {
   "name": "skill-atlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Open Skill Atlas: browse, toggle, update, and clean up the agent skills on this machine",
   "author": {
     "name": "Darec Stowell"

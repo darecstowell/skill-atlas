@@ -698,7 +698,7 @@ def _install_from(app: AtlasApp, repo: str, items: list[dict]) -> None:
         return
     paths = [a["path"] for a in ok]
     names = [a["name"] for a in ok]
-    _start(app, "install", names, lambda: app.atlas.install(repo, paths), repo=repo)
+    _start(app, "install", names, lambda: app.atlas.install({repo: paths}), repo=repo)
 
 
 def _start(
