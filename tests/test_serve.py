@@ -9,7 +9,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from conftest import get, post, raw
-from skill_atlas import serve
+from skill_atlas import serve, updates
 
 
 def test_skill_off_then_on(tmp_path):
@@ -66,7 +66,7 @@ def test_bad_sources_refused(server, sources):
 
 def test_install_from_many_sources(server, monkeypatch):
     seen = {}
-    monkeypatch.setattr(serve.updates, "start_install", lambda s, roots: seen.update(s) or {})
+    monkeypatch.setattr(updates, "start_install", lambda s, roots: seen.update(s) or {})
     sources = {"a/one": ["x/SKILL.md"], "b/two": ["SKILL.md", "y/SKILL.md"]}
     assert post(f"{server}/api/install", {"sources": sources})[0] == 200
     assert seen == sources

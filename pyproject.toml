@@ -7,6 +7,9 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+tui = ["textual>=8.2,<9"]
+
 [project.scripts]
 skill-atlas = "skill_atlas.__main__:main"
 
@@ -21,7 +24,13 @@ path = "src/skill_atlas/__init__.py"
 packages = ["src/skill_atlas"]
 
 [dependency-groups]
-dev = ["mypy>=1.11", "pytest>=8", "ruff>=0.6"]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8",
+    "pytest-asyncio>=1.0",
+    "ruff>=0.6",
+    "textual>=8.2,<9",
+]
 
 [tool.ruff]
 target-version = "py310"
